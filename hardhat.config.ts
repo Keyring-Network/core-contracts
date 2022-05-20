@@ -8,7 +8,7 @@ import "hardhat-spdx-license-identifier";
 import "solidity-coverage";
 
 import "./tasks/accounts";
-import "./tasks/deploy";
+// import "./tasks/deploy";
 
 import { chainIds } from "./constants";
 import { resolve } from "path";
