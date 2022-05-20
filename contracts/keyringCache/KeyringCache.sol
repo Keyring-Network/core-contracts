@@ -11,18 +11,14 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
  */
 
 contract KeyringCache is IKeyringCache, KeyringAccessControl, Initializable {
-
-    bytes32 public constant CACHE_UPDATER = keccak256("cache updater");
-    bool[50] private reservedSlots;
+    bytes32 private constant ROLE_CACHE_UPDATER = keccak256("cache updater");
+    bytes32[50] private reservedSlots;
 
     // admission policy => user => updateTime
     mapping(bytes32 => mapping(address => uint256)) public override getCache;
 
-    modifier onlyUpdater {
-        _checkRole(
-            CACHE_UPDATER, 
-            _msgSender(),
-            "KeyringCache:onlyUpdater");
+    modifier onlyUpdater() {
+        _checkRole(ROLE_CACHE_UPDATER, _msgSender(), "KeyringCache:onlyUpdater");
         _;
     }
 
@@ -39,4 +35,7 @@ contract KeyringCache is IKeyringCache, KeyringAccessControl, Initializable {
         emit UpdateCache(_msgSender(), admissionPolicyId, user);
     }
 
+    function roleCacheUpdater() external pure returns (bytes32 role) {
+        role = ROLE_CACHE_UPDATER;
+    }
 }

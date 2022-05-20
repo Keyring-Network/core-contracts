@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
+
 pragma solidity 0.8.12;
 
 import "../integration/KeyringGuard.sol";
@@ -18,16 +19,22 @@ contract ExampleCompliantERC20 is ERC20, KeyringGuard {
     bytes32 public constant keyringAdmissionPolicyId =
         0x0000000000000000000000000000000000000000000000000000000000000000000000000; // actual admissionPolicyId
 
+    event KeyringEnabled();
+
+    /**
+     The two upgradeable contract addresses are not expected to change and will likely be hard-coded into 
+     the KeyringGuard when production addresses are known. KeyringGuard initializes immutables with
+     constructor arguments.
+     */
+
+    // solhint-disable no-empty-blocks
     constructor()
         ERC20("ExampleCompliantERC20", "EC20")
-        /**
-         The two upgradeable contract addresses are not expected to change and will likely be hard-coded into 
-         the KeyringGuard when production addresses are known. KeyringGuard initializes immutables with
-         constructor arguments.
-         */
         // keyring cache, keyring AdmissionPolicyManager
         KeyringGuard(address(0x1234), address(0x5678))
-    {}
+    {
+        emit KeyringEnabled();
+    }
 
     function transfer(address to, uint256 amount)
         public
