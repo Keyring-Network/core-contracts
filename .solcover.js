@@ -5,5 +5,8 @@ module.exports = {
   providerOptions: {
     privateKey: process.env.PRIVATE_KEY,
   },
-  skipFiles: ["test"],
+  skipFiles: [
+    "./forwarder/NoImplementation.sol",
+    "./mocks/MockERC20.sol"
+  ]
 };

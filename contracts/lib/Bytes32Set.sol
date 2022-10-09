@@ -1,26 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 
-pragma solidity 0.8.12;
+pragma solidity 0.8.14;
 
-/*
-Copyright (c), 2019, 2022, Rob Hitchens, the MIT License
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-THIS SOFTWARE IS NOT TESTED OR AUDITED. DO NOT USE FOR PRODUCTION.
-*/
+/**
+ * @notice Key sets with enumeration. Uses mappings for random and existence checks
+ * and dynamic arrays for enumeration. Key uniqueness is enforced.
+ * @dev Sets are unordered.
+ */
 
 library Bytes32Set {
     struct Set {
@@ -28,39 +14,60 @@ library Bytes32Set {
         bytes32[] keyList;
     }
 
+    string private constant MODULE = "Bytes32Set";
+
+    error SetConsistency(string module, string method, string reason, string context);
+
+    /**
+     * @notice Insert a key to store.
+     * @dev Duplicate keys are not permitted.
+     * @param self A Bytes32Set struct - similar syntax to python classes.
+     * @param key A value in the Bytes32Set.
+     * @param context A message string about interpretation of the issue.
+     */
     function insert(
         Set storage self,
         bytes32 key,
-        string memory error
+        string memory context
     ) internal {
-        require(!exists(self, key), error);
+        if (exists(self, key))
+            revert SetConsistency({
+                module: MODULE,
+                method: "insert",
+                reason: "exists",
+                context: context
+            });
         self.keyList.push(key);
         self.keyPointers[key] = self.keyList.length - 1;
     }
 
-    function remove(
-        Set storage self,
-        bytes32 key,
-        string memory error
-    ) internal {
-        require(exists(self, key), error);
-        bytes32 keyToMove = self.keyList[count(self) - 1];
-        uint256 rowToReplace = self.keyPointers[key];
-        self.keyPointers[keyToMove] = rowToReplace;
-        self.keyList[rowToReplace] = keyToMove;
-        delete self.keyPointers[key];
-        self.keyList.pop();
-    }
-
+    /**
+     * @notice Count the keys.
+     * @param self A Bytes32Set struct - similar syntax to python classes.
+     * @return uint256 Length of the `keyList`, which correspond to the number of elements
+     * stored in the `keyPointers` mapping.
+     */
     function count(Set storage self) internal view returns (uint256) {
         return (self.keyList.length);
     }
 
+    /**
+     * @notice Check if a key exists in the Set.
+     * @param self A Bytes32Set struct - similar syntax to python classes.
+     * @param key A value in the Bytes32Set.
+     * @return bool True if key exists in the Set, otherwise false.
+     */
     function exists(Set storage self, bytes32 key) internal view returns (bool) {
         if (self.keyList.length == 0) return false;
         return self.keyList[self.keyPointers[key]] == key;
     }
 
+    /**
+     * @notice Retrieve an bytes32 by its key.
+     * @param self A Bytes32Set struct - similar syntax to python classes.
+     * @param index The internal index of the keys
+     * @return bytes32 The bytes32 value stored in a `keyList`.
+     */
     function keyAtIndex(Set storage self, uint256 index) internal view returns (bytes32) {
         return self.keyList[index];
     }
