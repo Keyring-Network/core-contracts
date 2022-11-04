@@ -96,7 +96,7 @@ contract KeyringV1CredentialUpdater is
                 reason: "incorrect userPolicyId"
             });
         }
-        if (timestamp >= block.timestamp)
+        if (timestamp > block.timestamp)
             revert Unacceptable({
                 sender: _msgSender(),
                 module: MODULE,

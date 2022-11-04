@@ -70,7 +70,7 @@ contract KeyringCredentials is IKeyringCredentials, KeyringAccessControl, Initia
         bytes32 admissionPolicyId,
         uint256 timestamp
     ) external override onlyUpdater {
-        if (timestamp >= block.timestamp)
+        if (timestamp > block.timestamp)
             revert Unacceptable({
                 sender: _msgSender(),
                 module: MODULE,

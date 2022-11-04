@@ -257,6 +257,62 @@ describe("Cryptography", function () {
       expect(credentialsTime.toNumber()).to.equal(timestamp);
     });
 
+
+    it("should update the credentials for default user policy", async function () {
+      // first, gather info for the message to sign
+      const user = adminWallet.address;
+      const userPolicyId = await policyManager.userPolicy(adminWallet.address);
+      ethers.constants.HashZero;
+      const admissionPolicyId = await policyManager.policyAtIndex(0);
+      const blockInfo = await waffle.provider.getBlock("latest");
+      const timestamp = blockInfo.timestamp;
+
+      // user that has not set a policy should have the default user policy id
+      expect(userPolicyId).to.be.equal(ethers.constants.HashZero);
+
+      // the message is an instance of the Attestation type
+      const attestation: Attestation = {
+        user: user,
+        userPolicyId: userPolicyId,
+        admissionPolicyId: admissionPolicyId,
+        timestamp: timestamp,
+        // false indicates this is a response from a VERIFIER signer that has responded in the affirmative.
+        isRequest: false,
+      };
+
+      // chain and verifier are part of the EIP712 typedData to sign
+      const { chainId } = await provider.getNetwork();
+      const verifyingContract = credentialsUpdater.address;
+
+      // signUtil returns a signedAttestion from the message, chain and receiverAddress, using the wallet with private key to generate the signature.
+      // this object contains the information needed to successfully update the credentials.
+
+      const signedAttestation: SignedAttestation = await signAttestation(
+        attestation,
+        chainId.toString(),
+        verifyingContract,
+        verifier1Wallet,
+      );
+
+      const signatures = [signedAttestation.signature];
+
+      const tx = await credentialsUpdater.updateCredential(
+        signedAttestation.message.user,
+        signedAttestation.message.userPolicyId,
+        signedAttestation.message.admissionPolicyId,
+        timestamp,
+        signatures,
+      );
+      await tx.wait();
+
+      const credentialsTime = await credentials.getCredentialV1(
+        1,
+        user,
+        userPolicyId,
+        admissionPolicyId);
+      expect(credentialsTime.toNumber()).to.equal(timestamp);
+    });
+
     it("should reject invalid inputs in updateCredential", async function () {
       const user = this.alice;
       const userPolicyId = await policyManager.policyAtIndex(0);

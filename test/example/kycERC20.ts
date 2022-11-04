@@ -275,13 +275,12 @@ describe("Compliant Token", function () {
       );
 
       const credentialsAddress = await kycERC20.getKeyringCredentials();
-      const policyManagerAddress = await kycERC20.getPolicyManager();
-      const policyId = await kycERC20.getAdmissionPolicyId();
+      const policyManagerAddress = await kycERC20.getKeyringPolicyManager();
+      const policyId = await kycERC20.getKeyringAdmissionPolicyId();
       const getTokenDecimals = await kycERC20.decimals();
       const getTokenName = await kycERC20.name();
       const getTokenSymbol = await kycERC20.symbol();
-      const tokenGenesis = await kycERC20.genesis();
-      const collateral = await kycERC20.collateral();
+      const tokenGenesis = await kycERC20.getKeyringGenesisRules();
 
       expect(credentialsAddress).to.be.equal(credentials.address);
       expect(policyManagerAddress).to.be.equal(policyManager.address);
@@ -291,7 +290,6 @@ describe("Compliant Token", function () {
       expect(getTokenSymbol).to.equal(tokenSymbol);
       expect(tokenGenesis.universeRuleId).to.equal(await ruleRegistry.ruleAtIndex(0));
       expect(tokenGenesis.emptyRuleId).to.equal(await ruleRegistry.ruleAtIndex(1));
-      expect(collateral).to.be.equal(mockERC20.address);
     });
 
     it("should meet the ERC20 transfer and transferFrom requirements", async function () {
@@ -340,6 +338,9 @@ describe("Compliant Token", function () {
         signatures,
       );
       await tx0.wait();
+
+      const isCompliant = await kycERC20.checkKeyringCompliance(user);
+      expect(isCompliant).to.equal(true);
 
       const kycERC20WithAlice = kycERC20.connect(this.aliceAsSigner);
 
@@ -491,7 +492,7 @@ describe("Compliant Token", function () {
         tokenName,
         tokenSymbol,
       );
-      await kycERC20.genesis();
+      await kycERC20.getKeyringGenesisRules();
 
       await policyManager.setUserPolicy(universeRulePolicy);
       await policyManager.connect(this.aliceAsSigner).setUserPolicy(universeRulePolicy);
@@ -519,7 +520,7 @@ describe("Compliant Token", function () {
         tokenName,
         tokenSymbol,
       );
-      await kycERC20.genesis();
+      await kycERC20.getKeyringGenesisRules();
 
       await policyManager.setUserPolicy(emptyRulePolicy);
 

@@ -121,7 +121,7 @@ interface IPolicyManager {
             string memory description,
             uint128 requiredVerifiers,
             uint128 expiryTime,
-            uint256 verfierSetCount
+            uint256 verifierSetCount
         );
 
     function policyRuleId(bytes32 policyId) external view returns (bytes32 ruleId);

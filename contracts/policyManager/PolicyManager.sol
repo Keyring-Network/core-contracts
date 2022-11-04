@@ -40,7 +40,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      * @param policyId The unique identifier of a Policy.
      */
     modifier onlyPolicyAdmin(bytes32 policyId) {
-        _checkRole(policyId, _msgSender(), "policyManager:onlyPolicyAdmin");
+        _checkRole(policyId, _msgSender(), "PolicyManager:onlyPolicyAdmin");
         _;
     }
 
@@ -49,7 +49,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      * @dev Revert if the user doesn't have the global verifier admin role.
      */
     modifier onlyVerifierAdmin() {
-        _checkRole(ROLE_GLOBAL_VERIFIER_ADMIN, _msgSender(), "policyManager:onlyVerifierAdmin");
+        _checkRole(ROLE_GLOBAL_VERIFIER_ADMIN, _msgSender(), "PolicyManager:onlyVerifierAdmin");
         _;
     }
 
@@ -119,7 +119,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         nonce++;
         policyId = keccak256(abi.encodePacked(nonce, address(this)));
         bytes32 adminRole = keccak256(abi.encodePacked(policyId, SEED_POLICY_OWNER));
-        policySet.insert(policyId, "policyManager:createPolicy: 500 Duplicate policyId");
+        policySet.insert(policyId, "PolicyManager:createPolicy: 500 Duplicate policyId");
         _grantRole(policyId, _msgSender());
         _grantRole(adminRole, _msgSender());
         _setRoleAdmin(policyId, adminRole);
@@ -148,8 +148,8 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         address[] calldata verifiers
     ) external override returns (bytes32 policyId) {
         policyId = createPolicy(description, ruleId, expiryTime);
-        addPolicyVerifiers(policyId, verifiers);
-        updatePolicyRequiredVerifiers(policyId, requiredVerifiers);
+        _addPolicyVerifiers(policyId, verifiers);
+        _updatePolicyRequiredVerifiers(policyId, requiredVerifiers);
     }
 
     /**
@@ -167,10 +167,17 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         uint128 requiredVerifiers,
         uint128 expiryTime
     ) external override onlyPolicyAdmin(policyId) {
-        updatePolicyDescription(policyId, description);
-        updatePolicyRuleId(policyId, ruleId);
-        updatePolicyExpiryTime(policyId, expiryTime);
-        updatePolicyRequiredVerifiers(policyId, requiredVerifiers);
+        if (!isPolicy(policyId))
+            revert Unacceptable({
+                sender: _msgSender(),
+                module: MODULE,
+                method: "updatePolicy",
+                reason: "policyId not found"
+            });
+        _updatePolicyDescription(policyId, description);
+        _updatePolicyRuleId(policyId, ruleId);
+        _updatePolicyExpiryTime(policyId, expiryTime);
+        _updatePolicyRequiredVerifiers(policyId, requiredVerifiers);
     }
 
     /**
@@ -179,23 +186,27 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      * @param description The new policy description.
      */
     function updatePolicyDescription(bytes32 policyId, string memory description)
-        public
+        external
         override
         onlyPolicyAdmin(policyId)
     {
-        if (bytes(description).length == 0)
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "updatePolicyDescription",
-                reason: "description cannot be empty"
-            });
         if (!isPolicy(policyId))
             revert Unacceptable({
                 sender: _msgSender(),
                 module: MODULE,
                 method: "updatePolicyDescription",
                 reason: "policyId not found"
+            });
+        _updatePolicyDescription(policyId, description);
+    }
+
+    function _updatePolicyDescription(bytes32 policyId, string memory description) private {
+        if (bytes(description).length == 0)
+            revert Unacceptable({
+                sender: _msgSender(),
+                module: MODULE,
+                method: "_updatePolicyDescription",
+                reason: "description cannot be empty"
             });
         Policy storage p = _policies[policyId];
         p.description = description;
@@ -207,8 +218,8 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      * @param policyId The policy to update.
      * @param ruleId The new policy rule.
      */
-    function updatePolicyRuleId(bytes32 policyId, bytes32 ruleId)
-        public
+     function updatePolicyRuleId(bytes32 policyId, bytes32 ruleId)
+        external
         override
         onlyPolicyAdmin(policyId)
     {
@@ -219,11 +230,15 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
                 method: "updatePolicyRuleId",
                 reason: "policyId not found"
             });
+        _updatePolicyRuleId(policyId, ruleId);
+    }
+
+    function _updatePolicyRuleId(bytes32 policyId, bytes32 ruleId) private {
         if (!IRuleRegistry(ruleRegistry).isRule(ruleId))
             revert Unacceptable({
                 sender: _msgSender(),
                 module: MODULE,
-                method: "updatePolicyRuleId",
+                method: "_updatePolicyRuleId",
                 reason: "ruleId not found"
             });
         Policy storage p = _policies[policyId];
@@ -232,12 +247,38 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     }
 
     /**
+     * @notice Policy admins can update policy credential expiry times.
+     * @param policyId The policy to update.
+     * @param expiryTime The maximum acceptable credential age in seconds.
+     */
+    function updatePolicyExpiryTime(bytes32 policyId, uint128 expiryTime)
+        external
+        override
+        onlyPolicyAdmin(policyId)
+    {
+       if (!isPolicy(policyId))
+            revert Unacceptable({
+                sender: _msgSender(),
+                module: MODULE,
+                method: "updatePolicyExpiryTime",
+                reason: "policyId not found"
+            });
+        _updatePolicyExpiryTime(policyId, expiryTime);
+    }
+
+    function _updatePolicyExpiryTime(bytes32 policyId, uint128 expiryTime) private {
+        Policy storage p = _policies[policyId];
+        p.expiryTime = expiryTime;
+        emit UpdatePolicyExpiryTime(_msgSender(), policyId, expiryTime);
+    }
+
+    /**
      * @notice Policy admins can update policy required Verifiers.
      * @param policyId The policy to update.
      * @param requiredVerifiers The minimum number of signing Verifiers.
      */
     function updatePolicyRequiredVerifiers(bytes32 policyId, uint128 requiredVerifiers)
-        public
+        external
         override
         onlyPolicyAdmin(policyId)
     {
@@ -248,11 +289,15 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
                 method: "updatePolicyRequiredVerifiers",
                 reason: "policyId not found"
             });
+        _updatePolicyRequiredVerifiers(policyId, requiredVerifiers);
+    }
+   
+    function _updatePolicyRequiredVerifiers(bytes32 policyId, uint128 requiredVerifiers) private {
         if (policyVerifierCount(policyId) < requiredVerifiers)
             revert Unacceptable({
                 sender: _msgSender(),
                 module: MODULE,
-                method: "updatePolicyRequiredVerifiers",
+                method: "_updatePolicyRequiredVerifiers",
                 reason: "add verifiers first"
             });
         Policy storage p = _policies[policyId];
@@ -261,12 +306,12 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     }
 
     /**
-     * @notice Policy admins can update policy credential expiry times.
+     * @notice The Policy admin selects whitelisted Verifiers that are acceptable for their Policy.
      * @param policyId The policy to update.
-     * @param expiryTime The maximum acceptable credential age in seconds.
+     * @param verifiers The address of one or more Verifiers to add to the Policy.
      */
-    function updatePolicyExpiryTime(bytes32 policyId, uint128 expiryTime)
-        public
+    function addPolicyVerifiers(bytes32 policyId, address[] calldata verifiers)
+        external
         override
         onlyPolicyAdmin(policyId)
     {
@@ -274,24 +319,13 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
             revert Unacceptable({
                 sender: _msgSender(),
                 module: MODULE,
-                method: "updatePolicyExpiryTime",
+                method: "addPolicyVerifiers",
                 reason: "policyId not found"
             });
-        Policy storage p = _policies[policyId];
-        p.expiryTime = expiryTime;
-        emit UpdatePolicyExpiryTime(_msgSender(), policyId, expiryTime);
+        _addPolicyVerifiers(policyId, verifiers);
     }
 
-    /**
-     * @notice The Policy admin selects whitelisted Verifiers that are acceptable for their Policy.
-     * @param policyId The policy to update.
-     * @param verifiers The address of one or more Verifiers to add to the Policy.
-     */
-    function addPolicyVerifiers(bytes32 policyId, address[] calldata verifiers)
-        public
-        override
-        onlyPolicyAdmin(policyId)
-    {
+    function _addPolicyVerifiers(bytes32 policyId, address[] calldata verifiers) private {
         for (uint256 i = 0; i < verifiers.length; i++) {
             _addPolicyVerifier(policyId, verifiers[i]);
         }
@@ -300,17 +334,60 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     /**
      * @notice The Policy admin selects whitelisted Verifiers that are acceptable for their Policy.
      * @param policyId The policy to update.
+     * @param verifier The address of a Verifier to accept.
+     */
+    function _addPolicyVerifier(bytes32 policyId, address verifier) private {
+        if (!isVerifier(verifier))
+            revert Unacceptable({
+                sender: _msgSender(),
+                module: MODULE,
+                method: "_addPolicyVerifier",
+                reason: "verifier not found in the global list"
+            });
+        Policy storage p = _policies[policyId];
+        p.verifierSet.insert(verifier, "PolicyManager:_addPolicyVerifier: already added");
+        emit AddPolicyVerifier(_msgSender(), policyId, verifier);
+    }
+
+    /**
+     * @notice The Policy admin selects whitelisted Verifiers that are acceptable for their Policy.
+     * @param policyId The policy to update.
      * @param verifiers The address of one or more Verifiers to remove from the Policy.
      */
     function removePolicyVerifiers(bytes32 policyId, address[] calldata verifiers)
-        public
+        external
         override
         onlyPolicyAdmin(policyId)
     {
+        if (!isPolicy(policyId))
+            revert Unacceptable({
+                sender: _msgSender(),
+                module: MODULE,
+                method: "removePolicyVerifiers",
+                reason: "policyId not found"
+            });
         for (uint256 i = 0; i < verifiers.length; i++) {
             _removePolicyVerifier(policyId, verifiers[i]);
         }
-    }    
+    }
+
+    /**
+     * @notice The Policy admin can remove Verifiers from the list of acceptable Verifiers for the Policy.
+     * @param policyId The policy to update.
+     * @param verifier The address of a Verifier to remove.
+     */
+    function _removePolicyVerifier(bytes32 policyId, address verifier) private {
+        Policy storage p = _policies[policyId];
+        if (policyVerifierCount(policyId) <= p.requiredVerifiers)
+            revert Unacceptable({
+                sender: _msgSender(),
+                module: MODULE,
+                method: "_removePolicyVerifier",
+                reason: "lower requiredVerifiers first"
+            });
+        p.verifierSet.remove(verifier, "Policymanager:_removePolicyVerifier: verifier not found");
+        emit RemovePolicyVerifier(_msgSender(), policyId, verifier);
+    }
 
     /**
      * @notice Each user sets exactly one Policy to check when trading.
@@ -353,7 +430,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
                 method: "admitVerifier",
                 reason: "verifier uri cannot be empty"
             });
-        verifierSet.insert(verifier, "policymanager:admitVerifier: already admitted");
+        verifierSet.insert(verifier, "Policymanager:admitVerifier: already admitted");
         verifierUri[verifier] = uri;
         emit AdmitVerifier(_msgSender(), verifier, uri);
     }
@@ -392,63 +469,8 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      * @param verifier The address of a Verifier on the global whitelist.
      */
     function removeVerifier(address verifier) external override onlyVerifierAdmin {
-        verifierSet.remove(verifier, "policymanager:removeVerifier: not a policy verifier.");
+        verifierSet.remove(verifier, "PolicyManager:removeVerifier: verifier not admitted");
         emit RemoveVerifier(_msgSender(), verifier);
-    }
-
-    /**
-     * @notice The Policy admin selects whitelisted Verifiers that are acceptable for their Policy.
-     * @param policyId The policy to update.
-     * @param verifier The address of a Verifier to accept.
-     */
-    function _addPolicyVerifier(bytes32 policyId, address verifier)
-        internal
-    {
-        if (!isVerifier(verifier))
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "addPolicyVerifier",
-                reason: "verifier not found in the global list"
-            });
-        if (!isPolicy(policyId))
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "addPolicyVerifier",
-                reason: "policyId not found"
-            });
-        Policy storage p = _policies[policyId];
-        p.verifierSet.insert(verifier, "policyManager:addPolicyVerifier: already added");
-        emit AddPolicyVerifier(_msgSender(), policyId, verifier);
-    }
-
-
-    /**
-     * @notice The Policy admin can remove Verifiers from the list of acceptable Verifiers for the Policy.
-     * @param policyId The policy to update.
-     * @param verifier The address of a Verifier to remove.
-     */
-    function _removePolicyVerifier(bytes32 policyId, address verifier)
-        internal
-    {
-        if (!isPolicy(policyId))
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "removePolicyVerifier",
-                reason: "policyId not found"
-            });
-        Policy storage p = _policies[policyId];
-        if (policyVerifierCount(policyId) <= p.requiredVerifiers)
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "removePolicyVerifier",
-                reason: "lower requiredVerifiers first"
-            });
-        p.verifierSet.remove(verifier, "policymanager:removePolicyVerifier");
-        emit RemovePolicyVerifier(_msgSender(), policyId, verifier);
     }
 
     /**********************************************************

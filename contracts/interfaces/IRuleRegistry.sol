@@ -45,17 +45,17 @@ interface IRuleRegistry {
     event UpdateRuleUri(address indexed admin, bytes32 indexed ruleId, string uri);
 
     function init(
-        string memory universeDescription,
-        string memory universeUri,
-        string memory emptyDescription,
-        string memory emptyUri
+        string calldata universeDescription,
+        string calldata universeUri,
+        string calldata emptyDescription,
+        string calldata emptyUri
     ) external;
 
     function createRule(
-        string memory description,
-        string memory uri,
+        string calldata description,
+        string calldata uri,
         Operator operator,
-        bytes32[] memory operands
+        bytes32[] calldata operands
     ) external returns (bytes32 ruleId);
 
     function updateRuleUri(bytes32 ruleId, string memory uri) external;

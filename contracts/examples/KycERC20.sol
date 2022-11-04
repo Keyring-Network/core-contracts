@@ -18,7 +18,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuardV1Immutable {
     string private constant MODULE = "KycERC20";
     using SafeERC20 for IERC20;
-    IERC20 private immutable _collateral;
 
     /**
      @notice Specify the token to wrap and the new name / symbol of the wrapped token - then good to go!
@@ -63,12 +62,11 @@ contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuardV1Immutab
                 method: "constructor",
                 reason: "symbol_ cannot be empty"
             });
-        _collateral = IERC20(collateralToken);
     }
 
     /**
      @notice Returns decimals based on the underlying token decimals
-     @return uint18 decimals integer
+     @return uint8 decimals integer
      */
     function decimals() public view override(ERC20, ERC20Wrapper) returns (uint8) {
         return ERC20Wrapper.decimals();
@@ -135,13 +133,5 @@ contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuardV1Immutab
         returns (bool)
     {
         return ERC20.transferFrom(from, to, amount);
-    }
-
-    /**
-     * @notice The underlying collateral token
-     * @return tokenAddr The underlying collateral token
-     */
-    function collateral() external view returns(address tokenAddr) {
-        return address(_collateral);
     }
 }

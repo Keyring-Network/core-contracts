@@ -33,7 +33,7 @@ abstract contract KeyringGuardV1 {
         bytes32 emptyRule
     ) {
         if (
-            !isCompliant(user, keyringCredentials, policyManager, admissionPolicyId, universeRule, emptyRule)
+            !_isCompliant(user, keyringCredentials, policyManager, admissionPolicyId, universeRule, emptyRule)
         )
             revert Compliance({
                 sender: msg.sender,
@@ -54,7 +54,7 @@ abstract contract KeyringGuardV1 {
      * @param universeRule The id of the universe (everyone) Rule.
      * @param emptyRule The id of the empty (noone) Rule.
      */
-    function isCompliant(
+    function _isCompliant(
         address user,
         address keyringCredentials,
         address policyManager,
@@ -80,14 +80,5 @@ abstract contract KeyringGuardV1 {
             uint256 cacheAge = block.timestamp - timestamp;
             isIndeed = cacheAge <= expiryTime;
         }
-    }
-
-    /**
-     * @notice Checks the existence of policyId in the PolicyManager contract.
-     * @param policyManager The address for the deployed PolicyManager contract.
-     * @param policyId The unique identifier of a Policy.
-     */
-    function isPolicy(address policyManager, bytes32 policyId) public view returns (bool isIndeed) {
-        isIndeed = IPolicyManager(policyManager).isPolicy(policyId);
     }
 }

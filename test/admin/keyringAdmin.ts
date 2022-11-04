@@ -408,7 +408,7 @@ describe("Admin", function () {
         unacceptable(
           this.admin,
           "PolicyManager",
-          "updatePolicyDescription",
+          "_updatePolicyDescription",
           "description cannot be empty"
         )
       );
@@ -419,7 +419,7 @@ describe("Admin", function () {
         unacceptable(
           this.admin,
           "PolicyManager",
-          "updatePolicyRuleId",
+          "_updatePolicyRuleId",
           "ruleId not found"
         )
       );
@@ -434,7 +434,7 @@ describe("Admin", function () {
         unacceptable(
           this.admin,
           "PolicyManager",
-          "updatePolicyDescription",
+          "updatePolicy",
           "policyId not found"
         )
       );
@@ -445,7 +445,7 @@ describe("Admin", function () {
         unacceptable(
           this.admin,
           "PolicyManager",
-          "updatePolicyRequiredVerifiers",
+          "_updatePolicyRequiredVerifiers",
           "add verifiers first"
         )
       );
@@ -454,7 +454,7 @@ describe("Admin", function () {
         unacceptable(
           this.admin,
           "PolicyManager",
-          "addPolicyVerifier",
+          "_addPolicyVerifier",
           "verifier not found in the global list"
         )
       );
@@ -465,7 +465,7 @@ describe("Admin", function () {
         unacceptable(
           this.admin,
           "PolicyManager",
-          "addPolicyVerifier",
+          "addPolicyVerifiers",
           "policyId not found"
         )
       );
@@ -474,7 +474,7 @@ describe("Admin", function () {
         unacceptable(
           this.admin,
           "PolicyManager",
-          "removePolicyVerifier",
+          "removePolicyVerifiers",
           "policyId not found"
         )
       );
@@ -485,7 +485,7 @@ describe("Admin", function () {
         unacceptable(
           this.admin,
           "PolicyManager",
-          "removePolicyVerifier",
+          "_removePolicyVerifier",
           "lower requiredVerifiers first"
         )
       );
@@ -499,7 +499,6 @@ describe("Admin", function () {
         )
       );
 
-      // updatePolicyRuleId policyId not found
       await expect(policyManager.updatePolicyRuleId(bogusId, goodRuleId)).to.be.revertedWith(
         unacceptable(
           this.admin,
@@ -509,7 +508,6 @@ describe("Admin", function () {
         )
       );
 
-      // updatePolicyRequiredVerifiers policyId not found
       await expect(policyManager.updatePolicyRequiredVerifiers(bogusId, 1)).to.be.revertedWith(
         unacceptable(
           this.admin,
@@ -519,7 +517,6 @@ describe("Admin", function () {
         )
       );
 
-      // updatePolicyExpiryTime policyId not found
       await expect(policyManager.updatePolicyExpiryTime(bogusId, ONE_DAY_IN_SECONDS)).to.be.revertedWith(
         unacceptable(
           this.admin,
@@ -529,13 +526,33 @@ describe("Admin", function () {
         )
       );
 
-      // removeVerifier - AddressConsistency exist
       await expect(policyManager.admitVerifier(this.verifier1, "https://one.verifier")).to.be.revertedWith(
         "AddressConsistency",
       );
 
-      // removeVerifier - AddressConsistency does not exist
       await expect(policyManager.removeVerifier(this.admin)).to.be.revertedWith("AddressConsistency");
+
+      await policyManager.updatePolicyDescription(goodPolicyId, "new description");
+      const newDescription = await policyManager.policyDescription(goodPolicyId);
+      expect(newDescription).to.be.equal("new description");
+
+      const setRuleId = await ruleRegistry.ruleAtIndex(2);
+      await policyManager.updatePolicyRuleId(goodPolicyId, setRuleId);
+      const newRuleId = await policyManager.policyRuleId(goodPolicyId);
+      expect(newRuleId).to.be.equal(setRuleId);
+
+      await policyManager.updatePolicyExpiryTime(goodPolicyId, 600);
+      const newExpiryTime = await policyManager.policyExpiryTime(goodPolicyId);
+      expect(newExpiryTime.toString()).to.be.equal("600");
+
+      await expect(
+        policyManager.updatePolicyDescription(bogusId, "should fail")
+      ).to.be.revertedWith("Unacceptable");
+
+      await expect(
+        policyManager.policyVerifierAtIndex(goodPolicyId, 999)
+      ).to.be.revertedWith("Unacceptable");
+
     });
 
     it("should not let unauthorized users create base rules", async function () {

@@ -49,10 +49,10 @@ contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
      * @param emptyUri The empty Rule URI.
      */
     function init(
-        string memory universeDescription,
-        string memory universeUri,
-        string memory emptyDescription,
-        string memory emptyUri
+        string calldata universeDescription,
+        string calldata universeUri,
+        string calldata emptyDescription,
+        string calldata emptyUri
     ) external override initializer {
         bytes32[] memory emptyOperands;
         if (bytes(universeDescription).length == 0)
@@ -156,7 +156,10 @@ contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
      * @param uri The URI points to detailed information about the base rule.
      */
     function updateRuleUri(bytes32 ruleId, string calldata uri) external override {
-        _checkRole(ROLE_RULE_ADMIN, _msgSender(), "RuleRegisty:updateRuleUri: only rule admin can set a base rule uri");
+        _checkRole(
+            ROLE_RULE_ADMIN, 
+            _msgSender(), 
+            "RuleRegisty:updateRuleUri: only rule admin can set a base rule uri");
         if (!ruleSet.exists(ruleId))
             revert Unacceptable({
                 sender: _msgSender(),
@@ -195,7 +198,7 @@ contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
         string memory uri,
         Operator operator,
         uint256 operandCount
-    ) internal view {
+    ) private view {
         if (operator == Operator.Complement) {
             if (operandCount != 1) _validationError("complement must have exactly one operand");
         } else if (operator == Operator.Union) {
