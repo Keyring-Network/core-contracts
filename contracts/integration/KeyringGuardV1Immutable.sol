@@ -141,6 +141,11 @@ abstract contract KeyringGuardV1Immutable is IKeyringGuardV1Immutable, KeyringGu
         emptyRuleId = _emptyRule;
     }
 
+    /**
+     * @notice Checks user compliance status
+     * @param user User to check
+     * @return isCompliant true if the user can proceed
+     */
     function checkKeyringCompliance(address user) external view override returns (bool isCompliant) {
         isCompliant = _isCompliant(
             user,
