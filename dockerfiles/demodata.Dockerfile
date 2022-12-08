@@ -14,16 +14,11 @@ COPY ./package.json ${APP_ROOT}/package.json
 COPY ./bin/automation_demodata_deploy.sh ${APP_ROOT}/bin/automation_demodata_deploy.sh
 
 # add the deploy keys
-RUN echo '\
-PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80\n\
-INFURA_API_KEY=blank\n\
-' > ${APP_ROOT}/.env
-
 WORKDIR ${APP_ROOT}
 
 RUN yarn install
 
-RUN npx hardhat compile
+RUN apt update && apt install -y awscli
 
 EXPOSE 8545
 
