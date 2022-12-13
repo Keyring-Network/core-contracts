@@ -6,9 +6,7 @@ on:
       - feature/duplo-devops
 env:
   duplo_host: https://keyring.duplocloud.net
-  #duplo_token: "${{ secrets.DUPLO_SECRET }}"
-  # Temporary token for quick test
-  duplo_token: "AQAAANCMnd8BFdERjHoAwE_Cl-sBAAAAWsFeVD6QIkuCSelXtT1VBwAAAAACAAAAAAAQZgAAAAEAACAAAACthqWmVrgU6H6Lpx2rPrNxOTMvfHyi-Cgy9ESthFXHMwAAAAAOgAAAAAIAACAAAADYF80hIee6Lhl7tK_VfJS8qMUZnxUeks-qdGHytHkN2JAAAAAizUbrCEfrRchh0aaaGbCE0DgCv3QeKDDjv3xjTlAURlE0KEA4TZsbveN4B5sDC8WXCZfzTY5BfwbmRhUKfdvV00bIFxEtAvRLKY7qghAH3mC_sfss3biIJY11p3WUl6fFE7PKQnCIlEWd7p-U26R0K1VKvD_7zgHUGPlhvnzyyEopNzuxBX0ddeHTZTNpo-BAAAAAlvChdKI8004hastLDZG5mQg40ftSdQvCE5QLble7XImwDBVrru_KQ0EwbcPmtqJgq02yTSZMbplkJUgSn8eSww"
+  duplo_token: "${{ secrets.DUPLO_SECRET }}"
   SERVICE_NAME: core                      
   TENANT_NAME: dev01                             
 
@@ -38,40 +36,48 @@ jobs:
           push: true
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
-        # This part is important - it will be used by the deploy job
-    outputs:
-      image: "${{ steps.login-ecr.outputs.registry }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
-
-  container-test-job:
-    runs-on: ubuntu-latest
-    needs:
-      - build
-    container:
-      image: "${{ needs.build.outputs.image }}"
-      env:
-        foo: bar
-      volumes:
-        - "${{ github.workspace }}/generated-contracts:/app/artifacts/contracts"
-      options: --cpus 1
-    steps:
-      - name: Check for dockerenv file
-        run: (ls /.dockerenv && echo Found dockerenv) || (echo No dockerenv)
-            
-  publish:
-    runs-on: ubuntu-latest
-    needs:
-      - container-test-job
-    steps:
-      # - name: Checkout
-      #   uses: actions/checkout@v2
-
-      # Set up for docker build
-      - name: Get AWS credentials
-        uses: duplocloud/ghactions-aws-jit@master
+      - uses: addnab/docker-run-action@v3
         with:
-          tenant: ${{ env.TENANT_NAME }}
-
+          image: "${{ steps.login-ecr.outputs.registry }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
+          options: "-v ${{ github.workspace }}/generated-contracts:/app/artifacts/contracts"
       - name: listing generated contracts
         run: |-
           # listing generated contracts
           ls -lrt "${{ github.workspace }}/generated-contracts"
+        # This part is important - it will be used by the deploy job
+    outputs:
+      image: "${{ steps.login-ecr.outputs.registry }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
+
+  # container-test-job:
+  #   runs-on: ubuntu-latest
+  #   needs:
+  #     - build
+  #   container:
+  #     image: "${{ needs.build.outputs.image }}"
+  #     env:
+  #       foo: bar
+  #     volumes:
+  #       - "${{ github.workspace }}/generated-contracts:/app/artifacts/contracts"
+  #     options: --cpus 1
+  #   steps:
+  #     - name: Check for dockerenv file
+  #       run: (ls /.dockerenv && echo Found dockerenv) || (echo No dockerenv)
+            
+  # publish:
+  #   runs-on: ubuntu-latest
+  #   needs:
+  #     - container-test-job
+  #   steps:
+  #     # - name: Checkout
+  #     #   uses: actions/checkout@v2
+
+  #     # Set up for docker build
+  #     - name: Get AWS credentials
+  #       uses: duplocloud/ghactions-aws-jit@master
+  #       with:
+  #         tenant: ${{ env.TENANT_NAME }}
+
+      # - name: listing generated contracts
+      #   run: |-
+      #     # listing generated contracts
+      #     ls -lrt "${{ github.workspace }}/generated-contracts"
