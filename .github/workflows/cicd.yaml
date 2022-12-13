@@ -8,7 +8,8 @@ env:
   duplo_host: https://keyring.duplocloud.net
   duplo_token: "${{ secrets.DUPLO_SECRET }}"
   SERVICE_NAME: core                      
-  TENANT_NAME: dev01                             
+  TENANT_NAME: dev01
+  CONTRACT_BUCKET: duploservices-dev01-contracts-178195871625                            
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
