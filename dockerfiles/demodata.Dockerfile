@@ -24,5 +24,5 @@ EXPOSE 8545
 
 SHELL ["/bin/bash", "-c"]
 
-RUN ["chmod", "+x", "bin/*.sh"]
+RUN ["chmod", "-R", "+x", "bin/"]
 ENTRYPOINT bin/automation_demodata_deploy.sh
