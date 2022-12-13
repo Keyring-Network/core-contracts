@@ -6,7 +6,9 @@ on:
       - feature/duplo-devops
 env:
   duplo_host: https://keyring.duplocloud.net
-  duplo_token: "${{ secrets.DUPLO_SECRET }}"
+  #duplo_token: "${{ secrets.DUPLO_SECRET }}"
+  # Temporary token for quick test
+  duplo_token: "AQAAANCMnd8BFdERjHoAwE_Cl-sBAAAAWsFeVD6QIkuCSelXtT1VBwAAAAACAAAAAAAQZgAAAAEAACAAAACthqWmVrgU6H6Lpx2rPrNxOTMvfHyi-Cgy9ESthFXHMwAAAAAOgAAAAAIAACAAAADYF80hIee6Lhl7tK_VfJS8qMUZnxUeks-qdGHytHkN2JAAAAAizUbrCEfrRchh0aaaGbCE0DgCv3QeKDDjv3xjTlAURlE0KEA4TZsbveN4B5sDC8WXCZfzTY5BfwbmRhUKfdvV00bIFxEtAvRLKY7qghAH3mC_sfss3biIJY11p3WUl6fFE7PKQnCIlEWd7p-U26R0K1VKvD_7zgHUGPlhvnzyyEopNzuxBX0ddeHTZTNpo-BAAAAAlvChdKI8004hastLDZG5mQg40ftSdQvCE5QLble7XImwDBVrru_KQ0EwbcPmtqJgq02yTSZMbplkJUgSn8eSww"
   SERVICE_NAME: core                      
   TENANT_NAME: dev01                             
 
