@@ -47,6 +47,7 @@ jobs:
         run: |-
           # listing generated contracts
           ls -lrt "${{ github.workspace }}/generated-contracts"
+          aws s3 cp --recursive "${{ github.workspace }}/generated-contracts" s3://$CONTRACT_BUCKET/$GITHUB_SHA
         # This part is important - it will be used by the deploy job
     outputs:
       image: "${{ steps.login-ecr.outputs.registry }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
