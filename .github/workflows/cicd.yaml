@@ -40,7 +40,8 @@ jobs:
         with:
           image: "${{ steps.login-ecr.outputs.registry }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
           options: "-v ${{ github.workspace }}/generated-contracts:/app/artifacts/contracts"
-          run: echo "hello world"
+          shell: bash
+          run: /app/bin/entrypoint.sh
       - name: listing generated contracts
         run: |-
           # listing generated contracts
