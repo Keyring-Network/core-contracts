@@ -12,6 +12,7 @@ env:
   CONTRACT_BUCKET: duploservices-dev01-contracts-178195871625                            
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
+# dummy commit
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -37,6 +38,8 @@ jobs:
           push: true
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+
+      # generates ABIs and byte-codes 
       - uses: addnab/docker-run-action@v3
         with:
           image: "${{ steps.login-ecr.outputs.registry }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
