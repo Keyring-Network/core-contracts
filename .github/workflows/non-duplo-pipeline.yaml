@@ -1,15 +1,17 @@
-name: Build and Deploy
+name: Build and Deploy using Native AWS and k8s
 on:
   # Triggers the workflow on push to matching branches
   push:
     branches:
-      - feature/duplo-devops-not-exists
+      - feature/duplo-devops
 env:
   duplo_host: https://keyring.duplocloud.net
-  duplo_token: "${{ secrets.DUPLO_SECRET }}"
   SERVICE_NAME: core                      
-  TENANT_NAME: dev01
-  CONTRACT_BUCKET: duploservices-dev01-contracts-178195871625                            
+  CONTRACT_BUCKET: duploservices-dev01-contracts-178195871625
+  AWS_ACCESS_KEY_ID: "${{ secrets.AWS_ACCESS_KEY_ID }}"
+  AWS_SECRET_ACCESS_KEY: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+  AWS_DEFAULT_REGION: us-west-2    
+  AWS_REGION: us-west-2          
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 # dummy commit
@@ -20,11 +22,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      # Set up for docker build
-      - name: Get AWS credentials
-        uses: duplocloud/ghactions-aws-jit@master
-        with:
-          tenant: ${{ env.TENANT_NAME }}
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
@@ -51,6 +48,5 @@ jobs:
           # listing generated contracts
           ls -lrt "${{ github.workspace }}/generated-contracts"
           aws s3 cp --recursive "${{ github.workspace }}/generated-contracts" s3://$CONTRACT_BUCKET/$GITHUB_SHA
-        # This part is important - it will be used by the deploy job
     outputs:
       image: "${{ steps.login-ecr.outputs.registry }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
