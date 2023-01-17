@@ -12,7 +12,7 @@ env:
   CONTRACT_BUCKET: duploservices-dev01-contracts-178195871625                            
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
-# dummy commit
+# dummy commit 
 jobs:
   build:
     runs-on: ubuntu-latest
