@@ -2,161 +2,231 @@
 
 pragma solidity 0.8.14;
 
-import "../lib/AddressSet.sol";
+import "../lib/PolicyStorage.sol";
 
 interface IPolicyManager {
-    struct Policy {
-        bytes32 ruleId;
-        string description;
-        uint128 requiredVerifiers;
-        uint128 expiryTime;
-        AddressSet.Set verifierSet;
-    }
 
-    error Unacceptable(address sender, string module, string method, string reason);
+    error Unacceptable(string reason);
 
-    event PolicyManagerDeployed(address deployer, address trustedForwarder, address ruleRegistry_);
+    event PolicyManagerDeployed(
+        address deployer, 
+        address trustedForwarder, 
+        address ruleRegistry);
     
     event PolicyManagerInitialized(address admin);
 
     event CreatePolicy(
         address indexed owner,
-        bytes32 indexed policyId,
-        string description,
-        bytes32 indexed ruleId,
-        uint128 requiredVerifiers,
-        uint128 expiryTime,
-        bytes32 userAdminRole
+        uint32 indexed policyId,
+        PolicyStorage.PolicyScalar policyScalar,
+        address[] attestors,
+        address[] walletChecks,
+        bytes32 policyOwnerRole,
+        bytes32 policyUserAdminRole
     );
 
-    event UpdatePolicyDescription(address indexed owner, bytes32 indexed policyId, string description);
-    
-    event UpdatePolicyRuleId(address indexed owner, bytes32 indexed policyId, bytes32 indexed ruleId);
-    
-    event UpdatePolicyRequiredVerifiers(
+    event UpdatePolicyScalar(
         address indexed owner,
-        bytes32 indexed policyId,
-        uint128 requiredVerifiers
-    );
-    
-    event UpdatePolicyExpiryTime(address indexed owner, bytes32 indexed policyId, uint128 expiryTime);
+        uint32 indexed policyId,
+        PolicyStorage.PolicyScalar policyScalar,
+        uint256 deadline);
 
-    event AddPolicyVerifier(
-        address indexed owner,
-        bytes32 indexed policyId,
-        address indexed verifier
-    );
+    event UpdatePolicyDescription(address indexed owner, uint32 indexed policyId, string description, uint256 deadline);
     
-    event RemovePolicyVerifier(
-        address indexed owner,
-        bytes32 indexed policyId,
-        address indexed verifier
-    );
-    
-    event AdmitVerifier(address indexed owner, address indexed verifier, string uri);
-    
-    event UpdateVerifierUri(address indexed owner, address indexed verifier, string uri);
-    
-    event RemoveVerifier(address indexed owner, address indexed verifier);
-    
-    event SetUserPolicy(address indexed user, bytes32 indexed policyId);
+    event UpdatePolicyRuleId(address indexed owner, uint32 indexed policyId, bytes32 indexed ruleId, uint256 deadline);
 
-    function userPolicy(address user) external view returns (bytes32 policyId);
+    event UpdatePolicyGracePeriod(address indexed owner, uint32 policyId, uint128 gracePeriod, uint256 deadline);
+
+    event UpdatePolicyDeadline(address indexed owner, uint32 indexed policyId, uint256 deadline);
+    
+    event UpdatePolicyLock(address indexed owner, uint32 policyId, uint256 deadline);
+    
+    event UpdatePolicyTtl(address indexed owner, uint32 indexed policyId, uint128 ttl, uint256 deadline);
+
+    event AddPolicyAttestors(
+        address indexed owner,
+        uint32 indexed policyId,
+        address[] attestors,
+        uint256 deadline
+    );
+    
+    event RemovePolicyAttestors(
+        address indexed owner,
+        uint32 indexed policyId,
+        address[] attestor,
+        uint256 deadline
+    );
+
+    event AddPolicyWalletChecks(
+        address indexed owner,
+        uint32 indexed policyId,
+        address[] walletChecks,
+        uint256 deadline
+    );
+
+    event RemovePolicyWalletChecks(
+        address indexed owner,
+        uint32 indexed policyId,
+        address[] walletChecks,
+        uint256 deadline
+    );
+
+    event UpdatePolicyAcceptRoots(address owner, uint32 policyId, uint16 acceptRoots, uint256 deadline);
+
+    event PolicyLocked(address owner, uint32 policyId, uint256 deadline);
+
+    event PolicyLockCancelled(address indexed owner, uint32 policyId, uint256 deadline);
+
+    event AdmitAttestor(address indexed admin, address indexed attestor, string uri);
+    
+    event UpdateAttestorUri(address indexed admin, address indexed attestor, string uri);
+    
+    event RemoveAttestor(address indexed admin, address indexed attestor);
+
+    event AdmitWalletCheck(address indexed admin, address indexed walletCheck);
+
+    event RemoveWalletCheck(address indexed admin, address indexed walletCheck);
+
+    event SetUserPolicy(address indexed user, uint32 indexed policyId);
+
+    function SEED_POLICY_OWNER() external view returns (bytes32);
+
+    function ROLE_POLICY_CREATOR() external view returns (bytes32);
+
+    function ROLE_GLOBAL_ATTESTOR_ADMIN() external view returns (bytes32);
+
+    function ROLE_GLOBAL_WALLETCHECK_ADMIN() external view returns (bytes32);
 
     function ruleRegistry() external view returns (address);
-
-    function verifierUri(address) external view returns (string memory);
-
-    function nonce() external view returns (uint256);
 
     function init() external;
 
     function createPolicy(
-        string calldata description,
-        bytes32 ruleId,
-        uint128 expiryTime
-    ) external returns (bytes32 policyId);
+        PolicyStorage.PolicyScalar calldata policyScalar,
+        address[] calldata attestors,
+        address[] calldata walletChecks
+    ) external returns (uint32 policyId, bytes32 policyOwnerRoleId, bytes32 policyUserAdminRoleId);
 
-    function createPolicyWithVerifiers(
-        string calldata description,
-        bytes32 ruleId,
-        uint128 expiryTime,
-        uint128 requiredVerifiers,
-        address[] calldata verifiers
-    ) external returns (bytes32 policyId);
-
-    function updatePolicy(
-        bytes32 policyId,
-        string calldata description,
-        bytes32 ruleId,
-        uint128 requiredVerifiers,
-        uint128 expiryTime
+    function updatePolicyScalar(
+        uint32 policyId,
+        PolicyStorage.PolicyScalar calldata policyScalar,
+        uint256 deadline
     ) external;
 
-    function updatePolicyDescription(bytes32 policyId, string memory description) external;
+    function updatePolicyDescription(uint32 policyId, string memory descriptionUtf8, uint256 deadline) external;
 
-    function updatePolicyRuleId(bytes32 policyId, bytes32 ruleId) external;
+    function updatePolicyRuleId(uint32 policyId, bytes32 ruleId, uint256 deadline) external;
 
-    function updatePolicyRequiredVerifiers(bytes32 policyId, uint128 requiredVerifiers) external;
+    function updatePolicyTtl(uint32 policyId, uint32 ttl, uint256 deadline) external;
 
-    function updatePolicyExpiryTime(bytes32 policyId, uint128 expiryTime) external;
+    function updatePolicyGracePeriod(uint32 policyId, uint32 gracePeriod, uint256 deadline) external;
 
-    function addPolicyVerifiers(bytes32 policyId, address[] calldata verifiers) external;
+    function setDeadline(uint32 policyId, uint256 deadline) external;
+    
+    function lockPolicy(uint32 policyId, uint256 deadline) external;
 
-    function removePolicyVerifiers(bytes32 policyId, address[] calldata verifiers) external;
+    function cancelLockPolicy(uint32 policyId, uint256 deadline) external;
 
-    function setUserPolicy(bytes32 policyId) external;
+    function addPolicyAttestors(uint32 policyId, address[] calldata attestors, uint256 deadline) external;
 
-    function admitVerifier(address verifier, string memory uri) external;
+    function removePolicyAttestors(uint32 policyId, address[] calldata attestors, uint256 deadline) external;
 
-    function updateVerifierUri(address verifier, string memory uri) external;
+    function addPolicyWalletChecks(uint32 policyId, address[] calldata walletChecks, uint256 deadline) external;
 
-    function removeVerifier(address verifier) external;
+    function removePolicyWalletChecks(uint32 policyId, address[] calldata walletChecks, uint256 deadline) external;
 
-    function policy(bytes32 policyId)
+    function setUserPolicy(uint32 policyId) external;
+
+    function admitAttestor(address attestor, string memory uri) external;
+
+    function updateAttestorUri(address attestor, string memory uri) external;
+
+    function removeAttestor(address attestor) external;
+
+    function admitWalletCheck(address walletCheck) external;
+
+    function removeWalletCheck(address walletCheck) external;
+
+    function userPolicy(address user) external view returns (uint32 policyId);
+
+    function policy(uint32 policyId)
         external
-        view
         returns (
-            bytes32 ruleId,
-            string memory description,
-            uint128 requiredVerifiers,
-            uint128 expiryTime,
-            uint256 verifierSetCount
+            PolicyStorage.PolicyScalar memory scalar,
+            address[] memory attestors,
+            address[] memory walletChecks,
+            uint256 deadline
         );
 
-    function policyRuleId(bytes32 policyId) external view returns (bytes32 ruleId);
-
-    function policyDescription(bytes32 policyId) external view returns (string memory description);
-
-    function policyRequiredVerifiers(bytes32 policyId) external view returns (uint128 minimum);
-
-    function policyExpiryTime(bytes32 policyId) external view returns (uint128 expiryTime);
-
-    function policyVerifierCount(bytes32 policyId) external view returns (uint256 count);
-
-    function policyVerifierAtIndex(bytes32 policyId, uint256 index)
+    function policyRawData(uint32 policyId)
         external
         view
-        returns (address verifier);
+        returns(
+            uint256 deadline,
+            PolicyStorage.PolicyScalar memory scalarActive,
+            PolicyStorage.PolicyScalar memory scalarPending,
+            address[] memory attestorsActive,
+            address[] memory attestorsPendingAdditions,
+            address[] memory attestorsPendingRemovals,
+            address[] memory walletChecksActive,
+            address[] memory walletChecksPendingAdditions,
+            address[] memory walletChecksPendingRemovals);
 
-    function isPolicyVerifier(bytes32 policyId, address verifier)
+    function policyOwnerRole(uint32 policyId) external pure returns (bytes32 ownerRole);
+
+    function policyRuleId(uint32 policyId) external returns (bytes32 ruleId);
+
+    function policyDescription(uint32 policyId) external returns (string memory description);
+
+    function policyAcceptRoots(uint32 policyId) external returns (uint16 acceptRoots);
+    
+    function policyTtl(uint32 policyId) external returns (uint128 ttl);
+
+    function policyLocked(uint32 policyId) external returns (bool isLocked);
+
+    function policyGracePeriod(uint32 policyId) external returns(uint128 gracePeriod);
+
+    function policyAttestorCount(uint32 policyId) external returns (uint256 count);
+
+    function policyAttestorAtIndex(uint32 policyId, uint256 index)
         external
-        view
+        returns (address attestor);
+
+    function policyAttestors(uint32 policyId) external returns (address[] memory attestors);
+
+    function isPolicyAttestor(uint32 policyId, address attestor)
+        external
+        returns (bool isIndeed);
+
+    function policyWalletCheckCount(uint32 policyId) external returns (uint256 count);
+
+    function policyWalletCheckAtIndex(uint32 policyId, uint256 index)
+        external
+        returns (address walletCheck);
+
+    function policyWalletChecks(uint32 policyId) external returns (address[] memory walletChecks);
+
+    function isPolicyWalletCheck(uint32 policyId, address walletCheck)
+        external
         returns (bool isIndeed);
 
     function policyCount() external view returns (uint256 count);
 
-    function policyAtIndex(uint256 index) external view returns (bytes32 policyId);
+    function isPolicy(uint32 policyId) external view returns (bool isIndeed);
 
-    function isPolicy(bytes32 policyId) external view returns (bool isIndeed);
+    function globalAttestorCount() external view returns (uint256 count);
 
-    function verifierCount() external view returns (uint256 count);
+    function globalAttestorAtIndex(uint256 index) external view returns (address attestor);
 
-    function verifierAtIndex(uint256 index) external view returns (address verifier);
+    function isGlobalAttestor(address attestor) external view returns (bool isIndeed);
 
-    function isVerifier(address verifier) external view returns (bool isIndeed);
+    function globalWalletCheckCount() external view returns (uint256 count);
 
-    function policyOwnerSeed() external pure returns (bytes32 seed);
+    function globalWalletCheckAtIndex(uint256 index) external view returns(address walletCheck);
 
-    function roleGlobalVerifierAdmin() external pure returns (bytes32 role);
-}
+    function isGlobalWalletCheck(address walletCheck) external view returns (bool isIndeed);
+
+    function attestorUri(address attestor) external view returns (string memory);
+
+    function hasRole(bytes32 role, address user) external view returns (bool);
+  }

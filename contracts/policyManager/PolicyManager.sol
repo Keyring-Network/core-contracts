@@ -3,7 +3,7 @@
 pragma solidity 0.8.14;
 
 import "../interfaces/IPolicyManager.sol";
-import "../interfaces/IRuleRegistry.sol";
+import "../interfaces/IKeyringCredentials.sol";
 import "../access/KeyringAccessControl.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
@@ -15,41 +15,60 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
  */
 
 contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
-    string private constant MODULE = "PolicyManager";
-    address private constant NULL_ADDRESS = address(0);
-    using Bytes32Set for Bytes32Set.Set;
+    
+    using PolicyStorage for PolicyStorage.App;
+    using PolicyStorage for PolicyStorage.Policy;
     using AddressSet for AddressSet.Set;
 
-    bytes32 private constant SEED_POLICY_OWNER = keccak256("policy owner role seed");
-    bytes32 private constant ROLE_GLOBAL_VERIFIER_ADMIN = keccak256("global verifier admin");
+    uint256 private constant MAX_POLICIES = 2 ** 20;
+    uint32 private constant DEFAULT_TTL = 1440 * 60; 
+    address private constant NULL_ADDRESS = address(0);
+
+    bytes32 public constant override SEED_POLICY_OWNER = keccak256("spo");
+    bytes32 public constant override ROLE_POLICY_CREATOR = keccak256("rpc");
+    bytes32 public constant override ROLE_GLOBAL_ATTESTOR_ADMIN = keccak256("rgaa");
+    bytes32 public constant override ROLE_GLOBAL_WALLETCHECK_ADMIN = keccak256("rgwca");
+
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
     address public immutable override ruleRegistry;
+    // address public immutable override credentialCache;
 
-    Bytes32Set.Set private policySet;
-    mapping(bytes32 => Policy) private _policies;
-    mapping(address => bytes32) public override userPolicy;
-
-    AddressSet.Set private verifierSet;
-    mapping(address => string) public override verifierUri;
-
-    uint256 public override nonce;
+    PolicyStorage.App policyStorage;
 
     /**
      * @notice Policy admin role is initially granted during createPolicy.
      * @dev Revert if the msg sender doesn't have the policy admin role.
      * @param policyId The unique identifier of a Policy.
      */
-    modifier onlyPolicyAdmin(bytes32 policyId) {
-        _checkRole(policyId, _msgSender(), "PolicyManager:onlyPolicyAdmin");
+    modifier onlyPolicyAdmin(uint32 policyId) {
+        _checkRole(bytes32(uint256(policyId)), _msgSender(), "pm:opa");
         _;
     }
 
     /**
-     * @notice Keyring Governance has exclusive access to the global whitelist of Verifiers.
-     * @dev Revert if the user doesn't have the global verifier admin role.
+     * @notice Keyring Governance has exclusive access to the global whitelist of Attestors.
+     * @dev Revert if the user doesn't have the global attestor admin role.
      */
-    modifier onlyVerifierAdmin() {
-        _checkRole(ROLE_GLOBAL_VERIFIER_ADMIN, _msgSender(), "PolicyManager:onlyVerifierAdmin");
+    modifier onlyPolicyCreator() {
+        _checkRole(ROLE_POLICY_CREATOR, _msgSender(), "pm:opc");
+        _;
+    }
+
+    /**
+     * @notice Keyring Governance has exclusive access to the global whitelist of Attestors.
+     * @dev Revert if the user doesn't have the global attestor admin role.
+     */
+    modifier onlyAttestorAdmin() {
+        _checkRole(ROLE_GLOBAL_ATTESTOR_ADMIN, _msgSender(), "pm:oaa");
+        _;
+    }
+
+    /**
+     * @notice Keyring Governance has exclusive access to the global whitelist of Wallet Checks.
+     * @dev Revert if the user doesn't have the global attestor admin role.
+     */
+    modifier onlyWalletCheckAdmin() {
+        _checkRole(ROLE_GLOBAL_WALLETCHECK_ADMIN, _msgSender(), "pm:owca");
         _;
     }
 
@@ -57,22 +76,18 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      * @param trustedForwarder Contract address that is allowed to relay message signers.
      * @param ruleRegistryAddr The address of the deployed RuleRegistry contract.
      */
-    constructor(address trustedForwarder, address ruleRegistryAddr)
+    constructor(
+        address trustedForwarder, 
+        address ruleRegistryAddr)
         KeyringAccessControl(trustedForwarder)
     {
         if (trustedForwarder == NULL_ADDRESS)
             revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "constructor",
-                reason: "trustedForwarder cannot be empty"
+                reason: "forwarder"
             });
         if (ruleRegistryAddr == NULL_ADDRESS)
             revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "constructor",
-                reason: "ruleRegistryAddr cannot be empty"
+                reason: "ruleRegistry"
             });
         ruleRegistry = ruleRegistryAddr;
         emit PolicyManagerDeployed(_msgSender(), trustedForwarder, ruleRegistryAddr);
@@ -85,514 +100,674 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      */
     function init() external override initializer {
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        address[] memory emptyList;
+        (bytes32 universeRule, ) = IRuleRegistry(ruleRegistry).genesis();
+        // no one owns the default, permissive reserved Policy 0
+        PolicyStorage.PolicyScalar memory policyScalar = PolicyStorage.PolicyScalar({
+            ruleId: universeRule,
+            descriptionUtf8: "default user policy",
+            ttl: DEFAULT_TTL,
+            gracePeriod: 0,
+            acceptRoots: 0,
+            locked: true
+        });
+        policyStorage.newPolicy(
+            policyScalar,
+            emptyList,
+            emptyList,
+            ruleRegistry
+        );
         emit PolicyManagerInitialized(_msgSender());
     }
 
     /**
-     * @notice Anyone can create a Policy and is granted admin and user admin over the Policy.
-     * @dev requiredVerifiers is never higher than the number of Verifiers in the Policy.
-     * @param description The description of the Policy is not used for any logic.
-     * @param ruleId The unique identifier of a rule. Each Policy has exactly one rule.
-     * @param expiryTime The maximum acceptable credential age in seconds.
-     * Users are forced to refresh credentials older than this interval (time in seconds).
+     * @notice Anyone can create an admission Policy and is granted admin and user admin.
+     * @dev `requiredAttestors` is never higher than the number of Attestors in the Policy.
+     * @param policyScalar The policy object scalar values.
+     * @param attestors Acceptable attestors.
+     * @param walletChecks Policy wallet checks.
      * @return policyId The unique identifier of a Policy.
      */
     function createPolicy(
-        string calldata description,
-        bytes32 ruleId,
-        uint128 expiryTime
-    ) public override returns (bytes32 policyId) {
-        if (bytes(description).length == 0)
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "createPolicy",
-                reason: "description cannot be empty"
-            });
-        if (!IRuleRegistry(ruleRegistry).isRule(ruleId))
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "createPolicy",
-                reason: "ruleId not found"
-            });
-        nonce++;
-        policyId = keccak256(abi.encodePacked(nonce, address(this)));
-        bytes32 adminRole = keccak256(abi.encodePacked(policyId, SEED_POLICY_OWNER));
-        policySet.insert(policyId, "PolicyManager:createPolicy: 500 Duplicate policyId");
-        _grantRole(policyId, _msgSender());
-        _grantRole(adminRole, _msgSender());
-        _setRoleAdmin(policyId, adminRole);
-        Policy storage p = _policies[policyId];
-        p.description = description;
-        p.ruleId = ruleId;
-        p.expiryTime = expiryTime;
-        emit CreatePolicy(_msgSender(), policyId, description, ruleId, 0, expiryTime, adminRole);
+        PolicyStorage.PolicyScalar memory policyScalar,
+        address[] calldata attestors,
+        address[] calldata walletChecks
+    ) 
+        external 
+        override
+        onlyPolicyCreator 
+        returns 
+    (
+        uint32 policyId, 
+        bytes32 policyOwnerRoleId, 
+        bytes32 policyUserAdminRoleId) 
+    {
+        policyId = policyStorage.newPolicy(
+            policyScalar,
+            attestors,
+            walletChecks,
+            ruleRegistry
+        );
+
+        (policyOwnerRoleId, policyUserAdminRoleId) = grantPolicyRoles(policyId);
+
+        emit CreatePolicy(
+            _msgSender(), 
+            policyId, 
+            policyScalar, 
+            attestors, 
+            walletChecks, 
+            policyOwnerRoleId, 
+            policyUserAdminRoleId);
     }
 
-    /**
-     * @notice Anyone can create an admission Policy and is granted admin and user admin.
-     * @dev `requiredVerifiers` is never higher than the number of Verifiers in the Policy.
-     * @param description The description of the Policy is not used for any logic.
-     * @param ruleId The unique identifier of a rule. Each Policy has exactly one rule.
-     * @param expiryTime The maximum acceptable credential age in seconds.
-     * @param requiredVerifiers The minimum number of signing Verifiers.
-     * @param verifiers Acceptabpe verifiers
-     * @return policyId The unique identifier of a Policy.
-     */
-    function createPolicyWithVerifiers(
-        string calldata description,
-        bytes32 ruleId,
-        uint128 expiryTime,
-        uint128 requiredVerifiers,
-        address[] calldata verifiers
-    ) external override returns (bytes32 policyId) {
-        policyId = createPolicy(description, ruleId, expiryTime);
-        _addPolicyVerifiers(policyId, verifiers);
-        _updatePolicyRequiredVerifiers(policyId, requiredVerifiers);
+    function grantPolicyRoles(uint32 policyId) private returns (
+        bytes32 policyOwnerRoleId, 
+        bytes32 policyUserAdminRoleId)
+    {
+        policyOwnerRoleId = policyOwnerRole(policyId);
+        policyUserAdminRoleId = keccak256(abi.encodePacked(policyId, SEED_POLICY_OWNER));
+
+        _grantRole(policyOwnerRoleId, _msgSender());
+        _grantRole(policyUserAdminRoleId, _msgSender());
+        _setRoleAdmin(policyOwnerRoleId, policyUserAdminRoleId);
     }
 
     /**
      * @notice The Policy admin role can update the parameters.
      * @param policyId The unique identifier of a Policy.
-     * @param description The new description of the Policy.
-     * @param ruleId The unique identifier of the new rule. Each Policy has exactly one rule.
-     * @param requiredVerifiers The minimum number of signing Verifiers.
-     * @param expiryTime The maximum acceptable credential age in seconds.
+     * @param policyScalar The policy definition scalar values.
+     * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
      */
-    function updatePolicy(
-        bytes32 policyId,
-        string calldata description,
-        bytes32 ruleId,
-        uint128 requiredVerifiers,
-        uint128 expiryTime
+    function updatePolicyScalar(
+        uint32 policyId,
+        PolicyStorage.PolicyScalar calldata policyScalar,
+        uint256 deadline
     ) external override onlyPolicyAdmin(policyId) {
-        if (!isPolicy(policyId))
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "updatePolicy",
-                reason: "policyId not found"
-            });
-        _updatePolicyDescription(policyId, description);
-        _updatePolicyRuleId(policyId, ruleId);
-        _updatePolicyExpiryTime(policyId, expiryTime);
-        _updatePolicyRequiredVerifiers(policyId, requiredVerifiers);
-    }
-
-    /**
-     * @notice Policy admins can update policy descriptions.
-     * @param policyId The policy to update.
-     * @param description The new policy description.
-     */
-    function updatePolicyDescription(bytes32 policyId, string memory description)
-        external
-        override
-        onlyPolicyAdmin(policyId)
-    {
-        if (!isPolicy(policyId))
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "updatePolicyDescription",
-                reason: "policyId not found"
-            });
-        _updatePolicyDescription(policyId, description);
-    }
-
-    function _updatePolicyDescription(bytes32 policyId, string memory description) private {
-        if (bytes(description).length == 0)
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "_updatePolicyDescription",
-                reason: "description cannot be empty"
-            });
-        Policy storage p = _policies[policyId];
-        p.description = description;
-        emit UpdatePolicyDescription(_msgSender(), policyId, description);
+        policyStorage.writePolicyScalar(
+            policyId,
+            policyScalar,
+            ruleRegistry,
+            deadline
+        );
+        emit UpdatePolicyScalar(_msgSender(), policyId, policyScalar, deadline);
     }
 
     /**
      * @notice Policy admins can update policy rules.
      * @param policyId The policy to update.
      * @param ruleId The new policy rule.
+     * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
      */
-     function updatePolicyRuleId(bytes32 policyId, bytes32 ruleId)
+     function updatePolicyRuleId(uint32 policyId, bytes32 ruleId, uint256 deadline)
         external
         override
         onlyPolicyAdmin(policyId)
     {
-        if (!isPolicy(policyId))
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "updatePolicyRuleId",
-                reason: "policyId not found"
-            });
-        _updatePolicyRuleId(policyId, ruleId);
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        policyObj.writeRuleId(ruleId, ruleRegistry);
+        policyObj.setDeadline(deadline);
+        emit UpdatePolicyRuleId(_msgSender(), policyId, ruleId, deadline);
     }
 
-    function _updatePolicyRuleId(bytes32 policyId, bytes32 ruleId) private {
-        if (!IRuleRegistry(ruleRegistry).isRule(ruleId))
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "_updatePolicyRuleId",
-                reason: "ruleId not found"
-            });
-        Policy storage p = _policies[policyId];
-        p.ruleId = ruleId;
-        emit UpdatePolicyRuleId(_msgSender(), policyId, ruleId);
+    /**
+     * @notice Policy admins can update policy descriptions.
+     * @param policyId The policy to update.
+     * @param descriptionUtf8 The new policy description.
+     * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
+     */
+    function updatePolicyDescription(
+        uint32 policyId, 
+        string memory descriptionUtf8, 
+        uint256 deadline
+    )
+        external
+        override
+        onlyPolicyAdmin(policyId)
+    {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        policyObj.writeDescription(descriptionUtf8);
+        policyObj.setDeadline(deadline);
     }
 
     /**
      * @notice Policy admins can update policy credential expiry times.
      * @param policyId The policy to update.
-     * @param expiryTime The maximum acceptable credential age in seconds.
+     * @param ttl The maximum acceptable credential age in seconds.
+     * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline. 
      */
-    function updatePolicyExpiryTime(bytes32 policyId, uint128 expiryTime)
+    function updatePolicyTtl(uint32 policyId, uint32 ttl, uint256 deadline)
         external
         override
         onlyPolicyAdmin(policyId)
     {
-       if (!isPolicy(policyId))
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "updatePolicyExpiryTime",
-                reason: "policyId not found"
-            });
-        _updatePolicyExpiryTime(policyId, expiryTime);
-    }
-
-    function _updatePolicyExpiryTime(bytes32 policyId, uint128 expiryTime) private {
-        Policy storage p = _policies[policyId];
-        p.expiryTime = expiryTime;
-        emit UpdatePolicyExpiryTime(_msgSender(), policyId, expiryTime);
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        policyObj.writeTtl(ttl);
+        policyObj.setDeadline(deadline);
+        emit UpdatePolicyTtl(_msgSender(), policyId, ttl, deadline);
     }
 
     /**
-     * @notice Policy admins can update policy required Verifiers.
+     * @notice Policy admins can change the gracePeriod with delayed effect.
      * @param policyId The policy to update.
-     * @param requiredVerifiers The minimum number of signing Verifiers.
+     * @param gracePeriod The minimum acceptable deadline.
+     * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
      */
-    function updatePolicyRequiredVerifiers(bytes32 policyId, uint128 requiredVerifiers)
+    function updatePolicyGracePeriod(uint32 policyId, uint32 gracePeriod, uint256 deadline) 
         external
         override
-        onlyPolicyAdmin(policyId)
+        onlyPolicyAdmin(policyId) 
     {
-        if (!isPolicy(policyId))
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "updatePolicyRequiredVerifiers",
-                reason: "policyId not found"
-            });
-        _updatePolicyRequiredVerifiers(policyId, requiredVerifiers);
-    }
-   
-    function _updatePolicyRequiredVerifiers(bytes32 policyId, uint128 requiredVerifiers) private {
-        if (policyVerifierCount(policyId) < requiredVerifiers)
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "_updatePolicyRequiredVerifiers",
-                reason: "add verifiers first"
-            });
-        Policy storage p = _policies[policyId];
-        p.requiredVerifiers = requiredVerifiers;
-        emit UpdatePolicyRequiredVerifiers(_msgSender(), policyId, requiredVerifiers);
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        policyObj.writeGracePeriod(gracePeriod);
+        policyObj.setDeadline(deadline);
+        emit UpdatePolicyGracePeriod(_msgSender(), policyId, gracePeriod, deadline);
     }
 
     /**
-     * @notice The Policy admin selects whitelisted Verifiers that are acceptable for their Policy.
+     * @notice Policy admins can force acceptance of the last n identity tree roots. 
      * @param policyId The policy to update.
-     * @param verifiers The address of one or more Verifiers to add to the Policy.
+     * @param acceptRoots The depth of most recent roots to always accept.
      */
-    function addPolicyVerifiers(bytes32 policyId, address[] calldata verifiers)
+    function updatePolicyAcceptRoots(
+        uint32 policyId, 
+        uint16 acceptRoots, 
+        uint256 deadline
+    ) external onlyPolicyAdmin(policyId) {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        policyObj.writeAcceptRoots(acceptRoots);
+        policyObj.setDeadline(deadline);
+        emit UpdatePolicyAcceptRoots(_msgSender(), policyId, acceptRoots, deadline);
+    }
+
+    /**
+     * @notice Schedules policy locking if the policy is not already scheduled to be locked.
+     * @param policyId The policy to lock.
+     * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
+     */
+    function lockPolicy(uint32 policyId, uint256 deadline) 
         external
         override
         onlyPolicyAdmin(policyId)
     {
-        if (!isPolicy(policyId))
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "addPolicyVerifiers",
-                reason: "policyId not found"
-            });
-        _addPolicyVerifiers(policyId, verifiers);
-    }
-
-    function _addPolicyVerifiers(bytes32 policyId, address[] calldata verifiers) private {
-        for (uint256 i = 0; i < verifiers.length; i++) {
-            _addPolicyVerifier(policyId, verifiers[i]);
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        if(!policyObj.scalarPending.locked) {
+            policyObj.writePolicyLock(true);
+            policyObj.setDeadline(deadline);
+            emit UpdatePolicyLock(_msgSender(), policyId, deadline);
         }
     }
 
     /**
-     * @notice The Policy admin selects whitelisted Verifiers that are acceptable for their Policy.
-     * @param policyId The policy to update.
-     * @param verifier The address of a Verifier to accept.
+     * @notice Unschedules policy locking.
+     * @param policyId The policy to abort locking.
+     * @param deadline Overrides previous deadline.
      */
-    function _addPolicyVerifier(bytes32 policyId, address verifier) private {
-        if (!isVerifier(verifier))
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "_addPolicyVerifier",
-                reason: "verifier not found in the global list"
-            });
-        Policy storage p = _policies[policyId];
-        p.verifierSet.insert(verifier, "PolicyManager:_addPolicyVerifier: already added");
-        emit AddPolicyVerifier(_msgSender(), policyId, verifier);
-    }
-
-    /**
-     * @notice The Policy admin selects whitelisted Verifiers that are acceptable for their Policy.
-     * @param policyId The policy to update.
-     * @param verifiers The address of one or more Verifiers to remove from the Policy.
-     */
-    function removePolicyVerifiers(bytes32 policyId, address[] calldata verifiers)
+    function cancelLockPolicy(uint32 policyId, uint256 deadline) 
         external
         override
         onlyPolicyAdmin(policyId)
     {
-        if (!isPolicy(policyId))
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "removePolicyVerifiers",
-                reason: "policyId not found"
-            });
-        for (uint256 i = 0; i < verifiers.length; i++) {
-            _removePolicyVerifier(policyId, verifiers[i]);
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        if(policyObj.scalarPending.locked) {
+            policyObj.writePolicyLock(false);
+            policyObj.setDeadline(deadline);
+            emit PolicyLockCancelled(_msgSender(), policyId, deadline);
         }
     }
 
     /**
-     * @notice The Policy admin can remove Verifiers from the list of acceptable Verifiers for the Policy.
-     * @param policyId The policy to update.
-     * @param verifier The address of a Verifier to remove.
+     * @notice Update the deadline for staged policy changes to take effect.
+     * @param policyId The policyId to update.
+     * @param deadline Must be >= graceTime seconds past block time or 0 to unschedule staged policy changes.
      */
-    function _removePolicyVerifier(bytes32 policyId, address verifier) private {
-        Policy storage p = _policies[policyId];
-        if (policyVerifierCount(policyId) <= p.requiredVerifiers)
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "_removePolicyVerifier",
-                reason: "lower requiredVerifiers first"
-            });
-        p.verifierSet.remove(verifier, "Policymanager:_removePolicyVerifier: verifier not found");
-        emit RemovePolicyVerifier(_msgSender(), policyId, verifier);
+    function setDeadline(uint32 policyId, uint256 deadline) 
+        external 
+        override 
+        onlyPolicyAdmin(policyId) 
+    {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        policyObj.setDeadline(deadline);
+        emit UpdatePolicyDeadline(_msgSender(), policyId, deadline);
     }
 
     /**
-     * @notice Each user sets exactly one Policy to check when trading.
+     * @notice The Policy admin selects whitelisted Attestors that are acceptable for their Policy.
+     * @param policyId The policy to update.
+     * @param attestors The address of one or more Attestors to add to the Policy.
+     * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
+     */
+    function addPolicyAttestors(uint32 policyId, address[] calldata attestors, uint256 deadline)
+        external
+        override
+        onlyPolicyAdmin(policyId)
+    {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        policyStorage.writeAttestorAdditions(policyObj, attestors);
+        policyObj.setDeadline(deadline);
+        emit AddPolicyAttestors(_msgSender(), policyId, attestors, deadline);
+    }
+
+    /**
+     * @notice The Policy admin selects whitelisted Attestors that are acceptable for their Policy.
+     * @param policyId The policy to update.
+     * @param attestors The address of one or more Attestors to remove from the Policy.
+     * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
+     */
+    function removePolicyAttestors(uint32 policyId, address[] calldata attestors, uint256 deadline)
+        external
+        override
+        onlyPolicyAdmin(policyId)
+    {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        policyObj.writeAttestorRemovals(attestors);
+        policyObj.setDeadline(deadline);
+        emit RemovePolicyAttestors(_msgSender(), policyId, attestors, deadline);
+    }
+
+    /**
+     * @notice The Policy admin selects whitelisted Attestors that are acceptable for their Policy.
+     * @param policyId The policy to update.
+     * @param walletChecks The address of one or more Wallet Checks to add to the Policy.
+     * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
+     */
+    function addPolicyWalletChecks(uint32 policyId, address[] calldata walletChecks, uint256 deadline)
+        external
+        override
+        onlyPolicyAdmin(policyId)
+    {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        policyStorage.writeWalletCheckAdditions(policyObj, walletChecks);
+        policyObj.setDeadline(deadline);
+        emit AddPolicyWalletChecks(_msgSender(), policyId, walletChecks, deadline);
+    }
+
+    /**
+     * @notice The Policy admin selects whitelisted Attestors that are acceptable for their Policy.
+     * @param policyId The policy to update.
+     * @param walletChecks The address of one or more Attestors to remove from the Policy.
+     * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
+     */
+    function removePolicyWalletChecks(uint32 policyId, address[] calldata walletChecks, uint256 deadline)
+        external
+        override
+        onlyPolicyAdmin(policyId)
+    {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        policyObj.writeWalletCheckRemovals(walletChecks);
+        policyObj.setDeadline(deadline);
+        emit RemovePolicyWalletChecks(_msgSender(), policyId, walletChecks, deadline);
+    }
+
+    /**
+     * @notice Each user sets exactly one Policy to compare with admission policies.
      * @param policyId The unique identifier of a Policy.
      */
-    function setUserPolicy(bytes32 policyId) external override {
-        address sender = _msgSender();
-        if (!isPolicy(policyId))
-            revert Unacceptable({
-                sender: sender,
-                module: MODULE,
-                method: "setUserPolicy",
-                reason: "policyId not found"
-            });
-        userPolicy[sender] = policyId;
-        emit SetUserPolicy(sender, policyId);
+    function setUserPolicy(uint32 policyId) external override {
+        policyStorage.setUserPolicy(_msgSender(), policyId);
+        emit SetUserPolicy(_msgSender(), policyId);
     }
 
+    /***************************************************
+     Global Governance
+     ***************************************************/
+
     /**
-     * @notice The Global Verifier Admin can admit Verifiers to the global whitelist.
-     * @param verifier The address of a Verifier to admit into the global whitelist.
-     * @param uri The URI points to detailed information about the verifier.
+     * @notice The Global Attestor Admin can admit Attestors to the global whitelist.
+     * @param attestor The address of a Attestor to admit into the global whitelist.
+     * @param uri The URI points to detailed information about the attestor.
      */
-    function admitVerifier(address verifier, string calldata uri)
+    function admitAttestor(address attestor, string calldata uri)
         external
         override
-        onlyVerifierAdmin
+        onlyAttestorAdmin
     {
-        if (verifier == NULL_ADDRESS)
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "admitVerifier",
-                reason: "verifier address cannot be empty"
-            });
-        if (bytes(uri).length == 0)
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "admitVerifier",
-                reason: "verifier uri cannot be empty"
-            });
-        verifierSet.insert(verifier, "Policymanager:admitVerifier: already admitted");
-        verifierUri[verifier] = uri;
-        emit AdmitVerifier(_msgSender(), verifier, uri);
+        policyStorage.insertGlobalAttestor(attestor, uri);
+        emit AdmitAttestor(_msgSender(), attestor, uri);
     }
 
     /**
-     * @notice The Global Verifier Admin can update the uris for Verifiers on the global whitelist.
-     * @param verifier The address of a Verifier in the global whitelist.
-     * @param uri The new uri for the Verifier.
+     * @notice The Global Attestor Admin can update the uris for Attestors on the global whitelist.
+     * @param attestor The address of a Attestor in the global whitelist.
+     * @param uri The new uri for the Attestor.
      */
-    function updateVerifierUri(address verifier, string calldata uri)
+
+    function updateAttestorUri(address attestor, string calldata uri)
         external
         override
-        onlyVerifierAdmin
+        onlyAttestorAdmin
     {
-        if (bytes(uri).length == 0)
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "updateVerifierUri",
-                reason: "verifier uri cannot be empty"
-            });
-        if (!verifierSet.exists(verifier))
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "updateVerifierUri",
-                reason: "verifier not found"
-            });
-        verifierUri[verifier] = uri;
-        emit UpdateVerifierUri(_msgSender(), verifier, uri);
+        policyStorage.updateGlobalAttestorUri(attestor, uri);
+        emit UpdateAttestorUri(_msgSender(), attestor, uri);
     }
 
     /**
-     * @notice The Global Verifier Admin can remove Verifiers from the global whitelist.
-     * @dev Does not automatically remove Verifiers from affected Policies.
-     * @param verifier The address of a Verifier on the global whitelist.
+     * @notice The Global Attestor Admin can remove Attestors from the global whitelist.
+     * @dev Does not automatically remove Attestors from affected Policies.
+     * @param attestor The address of a Attestor on the global whitelist.
      */
-    function removeVerifier(address verifier) external override onlyVerifierAdmin {
-        verifierSet.remove(verifier, "PolicyManager:removeVerifier: verifier not admitted");
-        emit RemoveVerifier(_msgSender(), verifier);
+    function removeAttestor(address attestor) 
+        external 
+        override 
+        onlyAttestorAdmin 
+    {
+        policyStorage.removeGlobalAttestor(attestor);
+        emit RemoveAttestor(_msgSender(), attestor);
+    }
+
+    /**
+     * @notice The Global Wallet Check Admin can admit Wallet Checks to the global whitelist.
+     * @param walletCheck The address of a Wallet Check to admit into the global whitelist.
+     */
+    function admitWalletCheck(address walletCheck)
+        external
+        override
+        onlyWalletCheckAdmin
+    {
+        policyStorage.insertGlobalWalletCheck(walletCheck);
+        emit AdmitWalletCheck(_msgSender(), walletCheck);
+    }
+
+    /**
+     * @notice The Global Wallet Check Admin can remove Wallet Checks from the global whitelist.
+     * @dev Does not automatically remove Wallet Checks from affected Policies.
+     * @param walletCheck The address of a Wallet Check contract in the global whitelist.
+     */
+    function removeWalletCheck(address walletCheck) 
+        external 
+        override 
+        onlyAttestorAdmin 
+    {
+        policyStorage.removeGlobalWalletCheck(walletCheck);
+        emit RemoveWalletCheck(_msgSender(), walletCheck);
     }
 
     /**********************************************************
-     VIEW FUNCTIONS
+     Inspection
      **********************************************************/
 
     /**
-     * @param policyId The unique identifier of a Policy.
-     * @dev Does not check existance. 
-     * @return ruleId Enforced Rule from RuleRegistry.
-     * @return description The policy description.
-     * @return requiredVerifiers Minimum verifier signatures needed to update a Credential.
-     * @return expiryTime The maximum age of acceptable credentials, in seconds.
-     * @return verifierSetCount The number of verifiers added to the Policy.
+     * @notice Each user has a user policy that is compared to admission policies.
+     * @param user The user to inspect.
+     * @param policyId The user's current user policy. Default policy 0 is the permissive policy.
      */
-    function policy(bytes32 policyId)
-        external
-        view
+    function userPolicy(address user) external view override returns (uint32 policyId) {
+        policyId = policyStorage.userPolicy(user);
+    }     
+
+    /**
+     * @param policyId The unique identifier of a Policy.
+     * @dev Use static calls to inspect current information.
+     * @return config The configuration of the policy.
+     * @return attestors The authorized attestors for the policy.
+     * @return walletChecks The policy wallet checks.
+     * @return deadline The timestamp when staged changes will take effect.
+     */
+    function policy(uint32 policyId)
+        public
         override
         returns (
-            bytes32 ruleId,
-            string memory description,
-            uint128 requiredVerifiers,
-            uint128 expiryTime,
-            uint256 verifierSetCount
+            PolicyStorage.PolicyScalar memory config,
+            address[] memory attestors,
+            address[] memory walletChecks,
+            uint256 deadline
         )
     {
-        Policy storage p = _policies[policyId];
-        return (p.ruleId, p.description, p.requiredVerifiers, p.expiryTime, p.verifierSet.count());
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        config = policyObj.scalarActive;
+        attestors = policyObj.attestors.activeSet.keyList;
+        walletChecks = policyObj.walletChecks.activeSet.keyList;
+        deadline = policyObj.deadline;
+    }
+
+    /**
+     * @notice Reveals the internal state of the policy object without processing staged changes.
+     * @dev non-zero deadline in the past indicated staged object is in effect.
+     * @param policyId The policy to inspect.
+     * @param deadline Timestamp for staged changes to take effect, or 0 if unscheduled.
+     * @param scalarActive The active scalar variables object.
+     * @param scalarPending The staged scalar variables object.
+     * @param attestorsActive The active policy attestors.
+     * @param attestorsPendingAdditions Attestors staged to add to the policy.
+     * @param attestorsPendingRemovals Attestors staged to remove from the policy.
+     */
+    function policyRawData(uint32 policyId)
+        external
+        view
+        override 
+        returns(
+            uint256 deadline,
+            PolicyStorage.PolicyScalar memory scalarActive,
+            PolicyStorage.PolicyScalar memory scalarPending,
+            address[] memory attestorsActive,
+            address[] memory attestorsPendingAdditions,
+            address[] memory attestorsPendingRemovals,
+            address[] memory walletChecksActive,
+            address[] memory walletChecksPendingAdditions,
+            address[] memory walletChecksPendingRemovals)
+    {
+        PolicyStorage.Policy storage p = policyStorage.policyRawData(policyId);
+        deadline = p.deadline;
+        scalarActive = p.scalarActive;
+        scalarPending = p.scalarPending;
+        attestorsActive = p.attestors.activeSet.keyList;
+        attestorsPendingAdditions = p.attestors.pendingAdditionSet.keyList;
+        attestorsPendingRemovals = p.attestors.pendingRemovalSet.keyList;
+        walletChecksActive = p.walletChecks.activeSet.keyList;
+        walletChecksPendingAdditions = p.walletChecks.pendingAdditionSet.keyList;
+        walletChecksPendingRemovals = p.walletChecks.pendingRemovalSet.keyList;
+    }
+
+    /**
+     * @notice Generate corresponding admin role for a policyId
+     * @param policyId The policyId
+     * @return ownerRole The bytes32 owner role that corresponds to the policyId
+      */
+    function policyOwnerRole(uint32 policyId) public pure override returns (bytes32 ownerRole) {
+        ownerRole = bytes32(uint256(uint32(policyId)));
     }
 
     /**
      * @param policyId The unique identifier of a Policy.
-     * @dev Does not check existance.
+     * @dev Use static calls to inspect current information.
      * @return ruleId Enforced Rule from RuleRegistry.
      */
-    function policyRuleId(bytes32 policyId) external view override returns (bytes32 ruleId) {
-        ruleId = _policies[policyId].ruleId;
+    function policyRuleId(uint32 policyId) external override returns (bytes32 ruleId) {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        ruleId = policyObj.scalarActive.ruleId;
     }
 
     /**
      * @param policyId The unique identifier of a Policy.
-     * @dev Does not check existance.
-     * @return description Not used for any on-chain logic.
+     * @dev Use static calls to inspect current information.
+     * @return descriptionUtf8 Not used for any on-chain logic.
      */
-    function policyDescription(bytes32 policyId)
+    function policyDescription(uint32 policyId)
         external
-        view
         override
-        returns (string memory description)
+        returns (string memory descriptionUtf8)
     {
-        description = _policies[policyId].description;
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        descriptionUtf8 = policyObj.scalarActive.descriptionUtf8;
     }
 
     /**
      * @param policyId The unique identifier of a Policy.
-     * @dev Does not check existance.     
-     * @return minimum The number of Verifier signatures needed to update a Credential.
+     * @dev Use static calls to inspect current information.
+     * @return ttl The maximum age of acceptable credentials.
      */
-    function policyRequiredVerifiers(bytes32 policyId)
+    function policyTtl(uint32 policyId) external override returns (uint128 ttl) {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        ttl = policyObj.scalarActive.ttl;
+    }
+
+    /**
+     * @notice Inspect a policy grace period.
+     * @dev Use static calls to inspect current information.
+     * @return gracePeriod Seconds until policy changes take effect.
+     */
+    function policyGracePeriod(uint32 policyId) external override returns(uint128 gracePeriod) {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        gracePeriod = policyObj.scalarActive.gracePeriod;
+    }
+
+    /**
+     * @notice Check the number of latest identity roots to accept, regardless of age.
+     * @param policyId The policy to inspect.
+     * @return acceptRoots The number of latest identity roots to accept unconditionally.
+     */
+    function policyAcceptRoots(uint32 policyId)
         external
-        view
         override
-        returns (uint128 minimum)
+        returns (uint16 acceptRoots)
     {
-        minimum = _policies[policyId].requiredVerifiers;
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        acceptRoots = policyObj.scalarActive.acceptRoots;
     }
 
     /**
-     * @param policyId The unique identifier of a Policy.
-     * @dev Does not check existance.
-     * @return expiryTime The maximum age of acceptable credentials.
+     * @notice Check if the policy is locked.
+     * @dev Use static calls to inspect current information.
+     * @return isLocked True if the policy cannot be changed
      */
-    function policyExpiryTime(bytes32 policyId) external view override returns (uint128 expiryTime) {
-        expiryTime = _policies[policyId].expiryTime;
+    function policyLocked(uint32 policyId) external override returns (bool isLocked) {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        isLocked = policyObj.scalarActive.locked;
     }
 
     /**
      * @param policyId The policy to inspect.
-     * @dev Does not check existance.
-     * @return count The count of acceptable Verifiers for the Policy.
+     * @dev Use static calls to inspect current information.
+     * @return count The count of acceptable Attestors for the Policy.
      */
-    function policyVerifierCount(bytes32 policyId) public view override returns (uint256 count) {
-        count = _policies[policyId].verifierSet.count();
+    function policyAttestorCount(uint32 policyId) public override returns (uint256 count) {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        count = policyObj.attestors.activeSet.count();
     }
 
     /**
      * @param policyId The Policy to inspect.
-     * @dev Does not check Policy existance.
+     * @dev Use static calls to inspect current information.
      * @param index The list index to inspect.
-     * @return verifier The address of a Verifier that is acceptable for the Policy.
+     * @return attestor The address of a Attestor that is acceptable for the Policy.
      */
-    function policyVerifierAtIndex(bytes32 policyId, uint256 index)
+    function policyAttestorAtIndex(uint32 policyId, uint256 index)
         external
-        view
         override
-        returns (address verifier)
+        returns (address attestor)
     {
-        Policy storage p = _policies[policyId];
-        if (index >= p.verifierSet.count())
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        if (index >= policyObj.attestors.activeSet.count())
             revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "policyVerifierAtIndex",
-                reason: "index out of range"
+                reason: "index"
             });
-        verifier = p.verifierSet.keyAtIndex(index);
+        attestor = policyObj.attestors.activeSet.keyAtIndex(index);
+    }
+
+    /**
+     * @param policyId The policy to inspect.
+     * @dev Use static calls to inspect current information.
+     * @return attestors The list of attestors that are authoritative for the policy.
+     */
+    function policyAttestors(uint32 policyId) external override returns (address[] memory attestors) {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        attestors = policyObj.attestors.activeSet.keyList;
     }
 
     /**
      * @param policyId The Policy to inspect.
-     * @param verifier The address to inspect.
-     * @dev Does not check Policy existance.
-     * @return isIndeed True if verifier is acceptable for the Policy, otherwise false.
+     * @param attestor The address to inspect.
+     * @dev Use static calls to inspect current information.
+     * @return isIndeed True if attestor is acceptable for the Policy, otherwise false.
      */
-    function isPolicyVerifier(bytes32 policyId, address verifier)
+    function isPolicyAttestor(uint32 policyId, address attestor)
         external
-        view
         override
         returns (bool isIndeed)
     {
-        isIndeed = _policies[policyId].verifierSet.exists(verifier);
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        isIndeed = policyObj.attestors.activeSet.exists(attestor);
+    }    
+
+    /**
+     * @param policyId The policy to inspect.
+     * @dev Use static calls to inspect current information.
+     * @return count The count of wallet checks for the Policy.
+     */
+    function policyWalletCheckCount(uint32 policyId) public override returns (uint256 count) {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        count = policyObj.walletChecks.activeSet.count();
+    }
+
+    /**
+     * @param policyId The Policy to inspect.
+     * @dev Use static calls to inspect current information.
+     * @param index The list index to inspect.
+     * @return walletCheck The address of a wallet check for the policy.
+     */
+    function policyWalletCheckAtIndex(uint32 policyId, uint256 index)
+        external
+        override
+        returns (address walletCheck)
+    {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        if (index >= policyObj.walletChecks.activeSet.count())
+            revert Unacceptable({
+                reason: "index"
+            });
+        walletCheck = policyObj.walletChecks.activeSet.keyAtIndex(index);
+    }
+
+    /**
+     * @param policyId The policy to inspect.
+     * @dev Use static calls to inspect current information.
+     * @return walletChecks The list of walletCheck contracts that apply to the policy.
+     */
+    function policyWalletChecks(uint32 policyId) external override returns (address[] memory walletChecks) {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        walletChecks = policyObj.walletChecks.activeSet.keyList;
+    }
+
+    /**
+     * @dev Use static calls to inspect current information.
+     * @param policyId The Policy to inspect.
+     * @param walletCheck The address to inspect.
+     * @return isIndeed True if attestor is acceptable for the Policy, otherwise false.
+     */
+    function isPolicyWalletCheck(uint32 policyId, address walletCheck)
+        external
+        override
+        returns (bool isIndeed)
+    {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        isIndeed = policyObj.walletChecks.activeSet.exists(walletCheck);
     }    
 
     /**
@@ -600,73 +775,86 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      * @return count Existing policies in PolicyManager.
      */
     function policyCount() public view override returns (uint256 count) {
-        count = policySet.count();
-    }
-
-    /**
-     * @param index The list index to inspect.
-     * @return policyId The unique identifier of a Policy.
-     */
-    function policyAtIndex(uint256 index) external view override returns (bytes32 policyId) {
-        if (index >= policyCount())
-            revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "policyAtIndex",
-                reason: "index out of range"
-            });
-        policyId = policySet.keyAtIndex(index);
+        count = policyStorage.policies.length;
     }
 
     /**
      * @param policyId The unique identifier of a Policy.
      * @return isIndeed True if Policy with policyId exists, otherwise false.
      */
-    function isPolicy(bytes32 policyId) public view override returns (bool isIndeed) {
-        isIndeed = policySet.exists(policyId);
+    function isPolicy(uint32 policyId) public view override returns (bool isIndeed) {
+        isIndeed = policyId < policyCount();
     }
 
     /**
-     * @return count Total count of Verifiers admitted to the global whitelist.
+     * @return count Total count of Attestors admitted to the global whitelist.
      */
-    function verifierCount() external view override returns (uint256 count) {
-        count = verifierSet.count();
+    function globalAttestorCount() external view override returns (uint256 count) {
+        count = policyStorage.globalAttestorSet.count();
     }
 
     /**
      * @param index The list index to inspect.
-     * @return verifier A Verifier address from the global whitelist.
+     * @return attestor An Attestor address from the global whitelist.
      */
-    function verifierAtIndex(uint256 index) external view override returns (address verifier) {
-        if (index >= verifierSet.count())
+    function globalAttestorAtIndex(uint256 index) external view override returns (address attestor) {
+        if (index >= policyStorage.globalAttestorSet.count())
             revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "verifierAtIndex",
-                reason: "index out of range"
+                reason: "index"
             });
-        verifier = verifierSet.keyAtIndex(index);
+        attestor = policyStorage.globalAttestorSet.keyAtIndex(index);
     }
 
     /**
-     * @param verifier An address
-     * @return isIndeed True if the verifier is admitted to the global whitelist.
+     * @param attestor An address.
+     * @return isIndeed True if the attestor is admitted to the global whitelist.
      */
-    function isVerifier(address verifier) public view override returns (bool isIndeed) {
-        isIndeed = verifierSet.exists(verifier);
+    function isGlobalAttestor(address attestor) public view override returns (bool isIndeed) {
+        isIndeed = policyStorage.globalAttestorSet.exists(attestor);
     }
 
     /**
-     * @return seed The constant SEED_POLICY_OWNER.
+     * @return count Total count of wallet checks admitted to the global whitelist.
      */
-    function policyOwnerSeed() external pure override returns (bytes32 seed) {
-        seed = SEED_POLICY_OWNER;
+    function globalWalletCheckCount() external view override returns (uint256 count) {
+        count = policyStorage.globalWalletCheckSet.count();
     }
 
     /**
-     * @return role  The constant ROLE_GLOBAL_VERIFIER_ADMIN.
+     * @param index The list index to inspect.
+     * @return walletCheck A wallet check contract address from the global whitelist. 
      */
-    function roleGlobalVerifierAdmin() external pure override returns (bytes32 role) {
-        role = ROLE_GLOBAL_VERIFIER_ADMIN;
+    function globalWalletCheckAtIndex(uint256 index) external view override returns (address walletCheck) {
+        walletCheck = policyStorage.globalWalletCheckSet.keyAtIndex(index);
+    }
+
+    function isGlobalWalletCheck(address walletCheck) external view override returns (bool isIndeed) {
+        isIndeed = policyStorage.globalWalletCheckSet.exists(walletCheck);
+    }
+
+    /**
+     * @param attestor An address.
+     * @return uri The uri if the address is an attestor.
+     */
+
+    function attestorUri(address attestor) external view override returns(string memory uri) {
+        uri = policyStorage.attestorUris[attestor];
+    }
+
+    /**
+     * @param role Access control role to check.
+     * @param user Address to check.
+     * @return doesIndeed True if the user has the role.
+     */
+    function hasRole(
+        bytes32 role, 
+        address user
+    ) 
+        public 
+        view 
+        override(AccessControl, IPolicyManager) 
+        returns (bool doesIndeed)
+    {
+        doesIndeed = AccessControl.hasRole(role, user);
     }
 }

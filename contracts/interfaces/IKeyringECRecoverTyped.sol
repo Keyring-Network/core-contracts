@@ -3,10 +3,11 @@
 pragma solidity 0.8.14;
 
 interface IKeyringECRecoverTyped {
+
     function getSignerFromSig(
         address user,
-        bytes32 userPolicyId,
-        bytes32 admissionPolicyId,
+        uint32 userPolicyId,
+        uint32 admissionPolicyId,
         uint256 timestamp,
         bool isRequest,
         bytes memory signature
@@ -14,8 +15,8 @@ interface IKeyringECRecoverTyped {
 
     function getHashFromAttestation(
         address user,
-        bytes32 userPolicyId,
-        bytes32 admissionPolicyId,
+        uint32 userPolicyId,
+        uint32 admissionPolicyId,
         uint256 timestamp,
         bool isRequest
     ) external view returns (bytes32 message);

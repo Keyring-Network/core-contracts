@@ -16,7 +16,7 @@ library AddressSet {
 
     string private constant MODULE = "AddressSet";
 
-    error AddressConsistency(string module, string method, string reason, string context);
+    error AddressSetConsistency(string module, string method, string reason, string context);
 
     /**
      * @notice Insert a key to store.
@@ -31,7 +31,7 @@ library AddressSet {
         string memory context
     ) internal {
         if (exists(self, key))
-            revert AddressConsistency({
+            revert AddressSetConsistency({
                 module: MODULE,
                 method: "insert",
                 reason: "exists",
@@ -54,7 +54,7 @@ library AddressSet {
         string memory context
     ) internal {
         if (!exists(self, key))
-            revert AddressConsistency({
+            revert AddressSetConsistency({
                 module: MODULE,
                 method: "remove",
                 reason: "does not exist",

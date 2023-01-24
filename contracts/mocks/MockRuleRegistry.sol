@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
  * expression using an operator and existing Rules as operands.
  */
 
-contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
+contract MockRuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
     using Bytes32Set for Bytes32Set.Set;
 
     string private constant MODULE = "RuleRegistry";
@@ -22,18 +22,21 @@ contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
     bytes32 private _emptyRule;
 
     bytes32 public constant override ROLE_RULE_ADMIN = keccak256("role rule admin");
-    
+
     Bytes32Set.Set private ruleSet;
     mapping(bytes32 => Rule) private rules;
 
     /**
      * @param trustedForwarder Contract address that is allowed to relay message signers.
      */
-    constructor(address trustedForwarder) KeyringAccessControl(trustedForwarder) {
-        if (trustedForwarder == NULL_ADDRESS)
-            revert Unacceptable({
-                reason: "trustedForwarder cannot be empty"
-            });
+    constructor(
+        address trustedForwarder,
+        bytes32 universeRule,
+        bytes32 emptyRule
+    ) KeyringAccessControl(trustedForwarder) {
+        if (trustedForwarder == NULL_ADDRESS) revert Unacceptable({ reason: "trustedForwarder cannot be empty" });
+        _universeRule = universeRule;
+        _emptyRule = emptyRule;
         emit RuleRegistryDeployed(_msgSender(), trustedForwarder);
     }
 
@@ -54,21 +57,10 @@ contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
     ) external override initializer {
         bytes32[] memory emptyOperands;
         if (bytes(universeDescription).length == 0)
-            revert Unacceptable({
-                reason: "universeDescription cannot be empty"
-            });
-        if (bytes(universeUri).length == 0)
-            revert Unacceptable({
-                reason: "universeUri cannot be empty"
-            });
-        if (bytes(emptyDescription).length == 0)
-            revert Unacceptable({
-                reason: "emptyDescription cannot be empty"
-            });
-        if (bytes(emptyUri).length == 0)
-            revert Unacceptable({
-                reason: "emptyUri cannot be empty"
-            });
+            revert Unacceptable({ reason: "universeDescription cannot be empty" });
+        if (bytes(universeUri).length == 0) revert Unacceptable({ reason: "universeUri cannot be empty" });
+        if (bytes(emptyDescription).length == 0) revert Unacceptable({ reason: "emptyDescription cannot be empty" });
+        if (bytes(emptyUri).length == 0) revert Unacceptable({ reason: "emptyUri cannot be empty" });
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(ROLE_RULE_ADMIN, _msgSender());
         _universeRule = createRule(universeDescription, universeUri, Operator.Base, emptyOperands);
@@ -118,18 +110,14 @@ contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
         bool toxic = false;
         for (uint256 i = 0; i < operands.length; i++) {
             if (operands[i] <= lastOperand)
-                revert Unacceptable({
-                    reason: "operands must be declared in ascending ruleId order"
-                });
-            if (!isRule(operands[i]))
-                revert Unacceptable({
-                    reason: "operand not found"
-                });
+                revert Unacceptable({ reason: "operands must be declared in ascending ruleId order" });
+            if (!isRule(operands[i])) revert Unacceptable({ reason: "operand not found" });
             lastOperand = operands[i];
-            if(!toxic) if(ruleIsToxic(operands[i])) toxic = true;
+            if (!toxic)
+                if (ruleIsToxic(operands[i])) toxic = true;
             r.operandSet.insert(operands[i], "RuleRegistry:createRule: 500 duplicate operand");
         }
-        if(toxic) r.toxic = true;
+        if (toxic) r.toxic = true;
         emit CreateRule(_msgSender(), ruleId, description, uri, toxic, operator, operands);
     }
 
@@ -139,15 +127,8 @@ contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
      * @param toxic True if the rule is to be set as toxic
      */
     function setToxic(bytes32 ruleId, bool toxic) external override {
-        _checkRole(
-            ROLE_RULE_ADMIN,
-            _msgSender(),
-            "RuleRegistry:setToxic: only the RuleAdmin role can set isToxic"
-        );
-        if (!isRule(ruleId))
-            revert Unacceptable({
-                reason: "ruleId not found"
-            });
+        _checkRole(ROLE_RULE_ADMIN, _msgSender(), "RuleRegistry:setToxic: only the RuleAdmin role can set isToxic");
+        if (!isRule(ruleId)) revert Unacceptable({ reason: "ruleId not found" });
         rules[ruleId].toxic = toxic;
         emit SetToxic(_msgSender(), ruleId, toxic);
     }
@@ -171,24 +152,20 @@ contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
             if (operandCount < 2) _validationError("union must have two or more operands");
         } else if (operator == Operator.Intersection) {
             if (operandCount < 2) _validationError("intersection must have two or more operands");
-        } 
-        
+        }
+
         if (operator != Operator.Base) {
-            if (bytes(description).length != 0)
-                _validationError("only base rules can have a description");
+            if (bytes(description).length != 0) _validationError("only base rules can have a description");
             if (bytes(uri).length != 0) _validationError("only base rules can have a uri");
         } else {
             if (operandCount != 0) _validationError("base rules cannot have operands");
-            if (bytes(description).length == 0)
-                _validationError("base rules must have a description");
+            if (bytes(description).length == 0) _validationError("base rules must have a description");
             if (bytes(uri).length == 0) _validationError("base rules must have a uri");
         }
     }
 
     function _validationError(string memory reason) private pure {
-        revert Unacceptable({
-            reason: reason
-        });
+        revert Unacceptable({ reason: reason });
     }
 
     /**********************************************************
@@ -216,10 +193,7 @@ contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
      * @return ruleId The Id of a rule in the global list.
      */
     function ruleAtIndex(uint256 index) external view override returns (bytes32 ruleId) {
-        if (index >= ruleSet.count())
-            revert Unacceptable({
-                reason: "index out of range"
-            });
+        if (index >= ruleSet.count()) revert Unacceptable({ reason: "index out of range" });
         ruleId = ruleSet.keyAtIndex(index);
     }
 
@@ -228,7 +202,7 @@ contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
      * @return isIndeed True value if Rule exists, otherwise False.
      */
     function isRule(bytes32 ruleId) public view override returns (bool isIndeed) {
-        isIndeed = ruleSet.exists(ruleId);
+        isIndeed = true;
     }
 
     /**
@@ -256,15 +230,10 @@ contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
 
     /**
      * @param ruleId The Rule to inspect.
-     * @dev Does not check existance.     
+     * @dev Does not check existance.
      * @return description The Rule description.
      */
-    function ruleDescription(bytes32 ruleId)
-        external
-        view
-        override
-        returns (string memory description)
-    {
+    function ruleDescription(bytes32 ruleId) external view override returns (string memory description) {
         description = rules[ruleId].description;
     }
 
@@ -288,7 +257,7 @@ contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
 
     /**
      * @param ruleId The Rule to inspect.
-     * @dev Does not check existance.     
+     * @dev Does not check existance.
      * @return operator The Rule operator.
      */
     function ruleOperator(bytes32 ruleId) external view override returns (Operator operator) {
@@ -310,17 +279,9 @@ contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
      * @dev Does not check Rule existance.
      * @return operandId A Rule id.
      */
-    function ruleOperandAtIndex(bytes32 ruleId, uint256 index)
-        external
-        view
-        override
-        returns (bytes32 operandId)
-    {
+    function ruleOperandAtIndex(bytes32 ruleId, uint256 index) external view override returns (bytes32 operandId) {
         Rule storage r = rules[ruleId];
-        if (index >= r.operandSet.count())
-            revert Unacceptable({
-                reason: "index out of range"
-            });
+        if (index >= r.operandSet.count()) revert Unacceptable({ reason: "index out of range" });
         operandId = rules[ruleId].operandSet.keyAtIndex(index);
     }
 

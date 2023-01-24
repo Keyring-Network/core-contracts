@@ -3,7 +3,7 @@
 pragma solidity 0.8.14;
 
 import "../interfaces/IKycERC20.sol";
-import "../integration/KeyringGuardV1Immutable.sol";
+import "../integration/KeyringGuardImmutable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Wrapper.sol";
@@ -15,7 +15,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  policy.
  */
 
-contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuardV1Immutable {
+contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuardImmutable {
+    
     string private constant MODULE = "KycERC20";
     using SafeERC20 for IERC20;
 
@@ -32,34 +33,25 @@ contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuardV1Immutab
         address collateralToken,
         address keyringCredentials,
         address policyManager,
-        bytes32 policyId,
+        uint32 policyId,
         string memory name_,
         string memory symbol_
     )
         ERC20(name_, symbol_)
         ERC20Permit(name_)
         ERC20Wrapper(IERC20(collateralToken))
-        KeyringGuardV1Immutable(keyringCredentials, policyManager, policyId)
+        KeyringGuardImmutable(keyringCredentials, policyManager, policyId)
     {
         if (collateralToken == NULL_ADDRESS)
             revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "constructor",
                 reason: "collateral token cannot be empty"
             });
         if (bytes(name_).length == 0)
             revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "constructor",
                 reason: "name_ cannot be empty"
             });
         if (bytes(symbol_).length == 0)
             revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "constructor",
                 reason: "symbol_ cannot be empty"
             });
     }

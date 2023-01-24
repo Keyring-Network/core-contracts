@@ -5,6 +5,7 @@ pragma solidity 0.8.14;
 import "../lib/Bytes32Set.sol";
 
 interface IRuleRegistry {
+
     enum Operator {
         Base,
         Union,
@@ -17,9 +18,10 @@ interface IRuleRegistry {
         string uri;
         Operator operator;
         Bytes32Set.Set operandSet;
+        bool toxic;
     }
 
-    error Unacceptable(address sender, string module, string method, string reason);
+    error Unacceptable(string reason);
 
     event RuleRegistryDeployed(address deployer, address trustedForwarder);
 
@@ -38,11 +40,14 @@ interface IRuleRegistry {
         bytes32 indexed ruleId,
         string description,
         string uri,
+        bool toxic,
         Operator operator,
         bytes32[] operands
     );
-    
-    event UpdateRuleUri(address indexed admin, bytes32 indexed ruleId, string uri);
+
+    event SetToxic(address admin, bytes32 ruleId, bool isToxic);
+
+    function ROLE_RULE_ADMIN() external view returns (bytes32);
 
     function init(
         string calldata universeDescription,
@@ -58,7 +63,7 @@ interface IRuleRegistry {
         bytes32[] calldata operands
     ) external returns (bytes32 ruleId);
 
-    function updateRuleUri(bytes32 ruleId, string memory uri) external;
+    function setToxic(bytes32 ruleId, bool toxic) external;
 
     function genesis() external view returns (bytes32 universeRule, bytes32 emptyRule);
 
@@ -82,6 +87,8 @@ interface IRuleRegistry {
 
     function ruleUri(bytes32 ruleId) external view returns (string memory uri);
 
+    function ruleIsToxic(bytes32 ruleId) external view returns (bool isIndeed);
+
     function ruleOperator(bytes32 ruleId) external view returns (Operator operator);
 
     function ruleOperandCount(bytes32 ruleId) external view returns (uint256 count);
@@ -97,5 +104,4 @@ interface IRuleRegistry {
         bytes32[] calldata operands
     ) external pure returns (bytes32 ruleId);
 
-    function roleRuleAdmin() external pure returns (bytes32 role);
 }

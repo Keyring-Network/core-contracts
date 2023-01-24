@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  */
 
 interface IKycERC20 is IERC20 {
+    
     function depositFor(address account, uint256 amount) external returns (bool);
     
     function withdrawTo(address account, uint256 amount) external returns (bool);

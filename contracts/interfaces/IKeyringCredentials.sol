@@ -3,34 +3,44 @@
 pragma solidity 0.8.14;
 
 interface IKeyringCredentials {
-    error Unacceptable(address sender, string module, string method, string reason);
+    
+    error Unacceptable(string reason);
 
-    event CredentialsDeployed(address deployer, address trustedForwarder);
+    event CredentialsDeployed(address deployer, address trustedForwarder, address policyManager);
 
     event CredentialsInitialized(address admin);
-    
+
+    event TearDownAdmissionPolicyCredentials(address sender, uint32 policyId);
+
     event UpdateCredential(
         uint8 version, 
         address updater, 
-        address indexed user, 
-        bytes32 indexed userPolicyId, 
-        bytes32 indexed admissionPolicyId);
+        address indexed trader, 
+        uint32 indexed admissionPolicyId,
+        uint256 admissionPolicyEpoch);
+
+    function ROLE_CREDENTIAL_UPDATER() external view returns (bytes32);
 
     function init() external;
 
-    function getCredentialV1(
+    function tearDownAdmissionPolicyCredentials(uint32 policyId) external;
+
+    function cache(
         uint8 version, 
-        address user, 
-        bytes32 userPolicyId, 
-        bytes32 admissionPolicyId
+        address trader, 
+        uint32 admissionPolicyId,
+        uint256 admissionPolicyEpoch
     ) external view returns (uint256);
 
-    function setCredentialV1(
-        address user,
-        bytes32 userPolicyId,        
-        bytes32 admissionPolicyId,
+    function setCredential(
+        address trader,  
+        uint32 admissionPolicyId,
         uint256 timestamp
     ) external;
 
-    function roleCredentialsUpdater() external pure returns (bytes32 role);
+    function getCredential(
+        uint8 version, 
+        address trader, 
+        uint32 admissionPolicyId
+    ) external view returns (uint256);
 }

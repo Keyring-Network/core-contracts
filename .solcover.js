@@ -7,6 +7,8 @@ module.exports = {
   },
   skipFiles: [
     "./forwarder/NoImplementation.sol",
-    "./mocks/MockERC20.sol"
+    "./mocks/MockERC20.sol",
+    "./mocks/MockRuleRegistry.sol",
+    "./zkVerifiers"
   ]
 };

@@ -2,19 +2,20 @@
 
 pragma solidity 0.8.14;
 
-import "./KeyringGuardV1.sol";
-import "../interfaces/IKeyringGuardV1Immutable.sol";
+import "./KeyringGuard.sol";
+import "../interfaces/IKeyringGuardImmutable.sol";
 import "../interfaces/IRuleRegistry.sol";
 
 /**
  * @notice KeyringGuard implementation that uses immutables and presents a simplified modifier.
  */
 
-abstract contract KeyringGuardV1Immutable is IKeyringGuardV1Immutable, KeyringGuardV1 {
+abstract contract KeyringGuardImmutable is IKeyringGuardImmutable, KeyringGuard {
+
     string private constant MODULE = "KeyringGuardImmutable";
     address private immutable _keyringCredentials;
     address private immutable _policyManager;
-    bytes32 private immutable _admissionPolicyId;
+    uint32 private immutable _admissionPolicyId;
     bytes32 private immutable _universeRule;
     bytes32 private immutable _emptyRule;
 
@@ -54,34 +55,18 @@ abstract contract KeyringGuardV1Immutable is IKeyringGuardV1Immutable, KeyringGu
     constructor(
         address keyringCredentials,
         address policyManager,
-        bytes32 admissionPolicyId
+        uint32 admissionPolicyId
     ) {
         if (keyringCredentials == NULL_ADDRESS)
             revert Unacceptable({
-                sender: msg.sender,
-                module: MODULE,
-                method: "constructor",
                 reason: "credentials cannot be empty"
             });
         if (policyManager == NULL_ADDRESS)
             revert Unacceptable({
-                sender: msg.sender,
-                module: MODULE,
-                method: "constructor",
                 reason: "policyManager cannot be empty"
-            });
-        if (admissionPolicyId == NULL_BYTES32)
-            revert Unacceptable({
-                sender: msg.sender,
-                module: MODULE,
-                method: "constructor",
-                reason: "admissionPolicyId cannot be empty"
             });
         if (!_isPolicy(policyManager, admissionPolicyId))
             revert Unacceptable({
-                sender: msg.sender,
-                module: MODULE,
-                method: "constructor",
                 reason: "admissionPolicyId not found"
             });
         _keyringCredentials = keyringCredentials;
@@ -90,16 +75,10 @@ abstract contract KeyringGuardV1Immutable is IKeyringGuardV1Immutable, KeyringGu
         (_universeRule, _emptyRule) = IRuleRegistry(IPolicyManager(policyManager).ruleRegistry()).genesis();
         if (_universeRule == NULL_BYTES32)
             revert Unacceptable({
-                sender: msg.sender,
-                module: MODULE,
-                method: "constructor",
                 reason: "the universe rule is not defined in the PolicyManager's RuleRegistry"
             });
         if (_emptyRule == NULL_BYTES32)
             revert Unacceptable({
-                sender: msg.sender,
-                module: MODULE,
-                method: "constructor",
                 reason: "the empty rule is not defined in the PolicyManager's RuleRegistry"
             });
         emit KeyringGuardConfigured(
@@ -128,13 +107,13 @@ abstract contract KeyringGuardV1Immutable is IKeyringGuardV1Immutable, KeyringGu
     /**
      * @return admissionPolicyId The unique identifier of the admission Policy.
      */
-    function getKeyringAdmissionPolicyId() external view override returns (bytes32 admissionPolicyId) {
+    function getKeyringAdmissionPolicyId() external view override returns (uint32 admissionPolicyId) {
         admissionPolicyId = _admissionPolicyId;
     }
 
     /**
-     * @return universeRuleId The id of the universal set Rule (everyone)
-     * @return emptyRuleId The id of the empty set Rule (no one)
+     * @return universeRuleId The id of the universal set Rule (everyone),
+     * @return emptyRuleId The id of the empty set Rule (no one),
      */
     function getKeyringGenesisRules() external view override returns (bytes32 universeRuleId, bytes32 emptyRuleId) {
         universeRuleId = _universeRule;
@@ -142,11 +121,12 @@ abstract contract KeyringGuardV1Immutable is IKeyringGuardV1Immutable, KeyringGu
     }
 
     /**
-     * @notice Checks user compliance status
+     * @notice Checks user compliance status,
      * @param user User to check
-     * @return isCompliant true if the user can proceed
+     * @dev Use static call to inspect,
+     * @return isCompliant true if the user can proceed,
      */
-    function checkKeyringCompliance(address user) external view override returns (bool isCompliant) {
+    function checkKeyringCompliance(address user) external override returns (bool isCompliant) {
         isCompliant = _isCompliant(
             user,
             _keyringCredentials,
@@ -162,7 +142,7 @@ abstract contract KeyringGuardV1Immutable is IKeyringGuardV1Immutable, KeyringGu
      * @param policyManager The address for the deployed PolicyManager contract.
      * @param policyId The unique identifier of a Policy.
      */
-    function _isPolicy(address policyManager, bytes32 policyId) internal view returns (bool isIndeed) {
+    function _isPolicy(address policyManager, uint32 policyId) internal view returns (bool isIndeed) {
         isIndeed = IPolicyManager(policyManager).isPolicy(policyId);
     }      
 }

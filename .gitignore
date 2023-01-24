@@ -14,7 +14,7 @@
 **/dist
 **/node_modules
 **/stash
-**/src 
+**/src/types
 **/artifacts
 **/bin
 **/.openzeppelin

@@ -12,6 +12,7 @@ PolicyManager, RuleRegistry, KeyringCredentials and KeyringCredentialUpdater con
 */
 
 abstract contract KeyringAccessControl is ERC2771Context, AccessControl {
+
     // These reservations hold space for future versions of this module
     bytes32[50] private _reservedSlots;
 

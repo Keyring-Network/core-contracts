@@ -10,7 +10,8 @@ import "../interfaces/IPolicyManager.sol";
  * @dev Add the modifier to functions to protect.
  */
 
-abstract contract KeyringGuardV1 {
+abstract contract KeyringGuard {
+
     string private constant MODULE = "KeyringGuardV1";
 
     error Compliance(address sender, address user, string module, string method, string reason);
@@ -28,7 +29,7 @@ abstract contract KeyringGuardV1 {
         address user,
         address keyringCredentials,
         address policyManager,
-        bytes32 admissionPolicyId,
+        uint32 admissionPolicyId,
         bytes32 universeRule,
         bytes32 emptyRule
     ) {
@@ -53,16 +54,18 @@ abstract contract KeyringGuardV1 {
      * @param admissionPolicyId The unique identifier of a Policy.
      * @param universeRule The id of the universe (everyone) Rule.
      * @param emptyRule The id of the empty (noone) Rule.
+     * @dev Use static call to inspect.
+     * @return isIndeed True if a valid credential is found,
      */
     function _isCompliant(
         address user,
         address keyringCredentials,
         address policyManager,
-        bytes32 admissionPolicyId,
+        uint32 admissionPolicyId,
         bytes32 universeRule,
         bytes32 emptyRule
-    ) internal view returns (bool isIndeed) {
-        bytes32 userPolicyId = IPolicyManager(policyManager).userPolicy(user);
+    ) internal returns (bool isIndeed) {
+        uint32 userPolicyId = IPolicyManager(policyManager).userPolicy(user);
         bytes32 userRuleId = IPolicyManager(policyManager).policyRuleId(userPolicyId);
         bytes32 admissionPolicyRuleId = IPolicyManager(policyManager).policyRuleId(admissionPolicyId);
         if (admissionPolicyRuleId == universeRule && userRuleId == universeRule) {
@@ -70,13 +73,12 @@ abstract contract KeyringGuardV1 {
         } else if (admissionPolicyRuleId == emptyRule || userRuleId == emptyRule) {
             isIndeed = false;
         } else {
-            uint256 timestamp = IKeyringCredentials(keyringCredentials).getCredentialV1(
+            uint256 timestamp = IKeyringCredentials(keyringCredentials).getCredential(
                 1,
                 user,
-                userPolicyId,
                 admissionPolicyId
             );
-            uint256 expiryTime = IPolicyManager(policyManager).policyExpiryTime(admissionPolicyId);
+            uint256 expiryTime = IPolicyManager(policyManager).policyTtl(admissionPolicyId);
             uint256 cacheAge = block.timestamp - timestamp;
             isIndeed = cacheAge <= expiryTime;
         }

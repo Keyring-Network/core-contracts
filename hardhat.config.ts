@@ -8,6 +8,8 @@ import "hardhat-spdx-license-identifier";
 import "solidity-coverage";
 import "hardhat-deploy";
 import "@nomiclabs/hardhat-ethers";
+import "solidity-docgen";
+
 import { HardhatUserConfig } from "hardhat/config";
 import { resolve } from "path";
 import { config as dotenvConfig } from "dotenv";
@@ -28,6 +30,7 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       chainId: chainIds.hardhat,
+      allowUnlimitedContractSize: false,
     },
   },
   namedAccounts: {
@@ -40,20 +43,36 @@ const config: HardhatUserConfig = {
     tests: "./test",
   },
   solidity: {
-    version: "0.8.14",
-    settings: {
-      metadata: {
-        // Not including the metadata hash
-        // https://github.com/paulrberg/solidity-template/issues/31
-        bytecodeHash: "none",
+    compilers: [
+      {
+        version: "0.8.14",
+        settings: {
+          metadata: {
+            // Not including the metadata hash
+            // https://github.com/paulrberg/solidity-template/issues/31
+            bytecodeHash: "none",
+          },
+          // Disable the optimizer when debugging
+          // https://hardhat.org/hardhat-network/#solidity-optimizer-support
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
       },
-      // Disable the optimizer when debugging
-      // https://hardhat.org/hardhat-network/#solidity-optimizer-support
-      optimizer: {
-        enabled: true,
-        runs: 200,
+      {
+        version: "0.6.11",
+        settings: {
+          metadata: {
+            bytecodeHash: "none",
+          },
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
       },
-    },
+    ],
   },
   typechain: {
     outDir: "src/types",
@@ -62,6 +81,7 @@ const config: HardhatUserConfig = {
   spdxLicenseIdentifier: {
     overwrite: false,
     runOnCompile: true,
+    except: ["contracts/zkVerifiers", "contracts/interfaces"],
   },
 };
 

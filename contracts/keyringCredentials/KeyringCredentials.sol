@@ -3,6 +3,7 @@
 pragma solidity 0.8.14;
 
 import "../interfaces/IKeyringCredentials.sol";
+import "../interfaces/IPolicyManager.sol";
 import "../access/KeyringAccessControl.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
@@ -15,15 +16,19 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
  */
 
 contract KeyringCredentials is IKeyringCredentials, KeyringAccessControl, Initializable {
+
     string private constant MODULE = "KeyringCredentials";
     address private constant NULL_ADDRESS = address(0);
-    bytes32 private constant ROLE_CREDENTIAL_UPDATER = keccak256("Credentials updater");
+    bytes32 public constant ROLE_CREDENTIAL_UPDATER = keccak256("Credentials updater");
+    address public immutable policyManager;
+
+    mapping(uint32 => uint256) public policyEpochs;
 
     /**
-     @notice (version => user => userPolicyId => admissionPolicyId) => updateTime
+     @notice (version => trader => admissionPolicyId) => epoch => updateTime
      */
-    mapping(uint8 => mapping(address => mapping(bytes32 => mapping(bytes32 => uint256)))) 
-        public override getCredentialV1;
+    mapping(uint8 => mapping(address => mapping(uint32 => mapping(uint256 => uint256))))
+        public override cache;
 
     /**
      @notice Revert if the message sender doesn't have the Credentials updater role.
@@ -34,17 +39,32 @@ contract KeyringCredentials is IKeyringCredentials, KeyringAccessControl, Initia
     }
 
     /**
+     * @notice Only the PolicyAdmin can tear down user credentials.
+     */
+    modifier onlyPolicyAdmin(uint32 policyId) {
+        bytes32 ownerRole = IPolicyManager(policyManager).policyOwnerRole(policyId);
+        if(!IPolicyManager(policyManager).hasRole(ownerRole, _msgSender())) {
+           revert Unacceptable({
+                reason: "unauthorized"
+            }); 
+        }
+        _;
+    }
+
+    /**
      @param trustedForwarder Contract address that is allowed to relay message signers.
      */
-    constructor(address trustedForwarder) KeyringAccessControl(trustedForwarder) {
+    constructor(address trustedForwarder, address policyManager_) KeyringAccessControl(trustedForwarder) {
         if (trustedForwarder == NULL_ADDRESS)
             revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "constructor",
                 reason: "trustedForwarder cannot be empty"
             });
-        emit CredentialsDeployed(_msgSender(), trustedForwarder);
+        if (policyManager_ == NULL_ADDRESS)
+            revert Unacceptable({
+                reason: "policyManager_ cannot be empty"
+            });
+        policyManager = policyManager_;
+        emit CredentialsDeployed(_msgSender(), trustedForwarder, policyManager);
     }
 
     /**
@@ -58,33 +78,47 @@ contract KeyringCredentials is IKeyringCredentials, KeyringAccessControl, Initia
     }
 
     /**
+     * @notice The policy admin can force all users to refresh their cache immediately
+     * @param policyId The policy with credentials to tear down
+     */
+    function tearDownAdmissionPolicyCredentials(uint32 policyId) external override onlyPolicyAdmin(policyId) {
+        policyEpochs[policyId]++;
+        emit TearDownAdmissionPolicyCredentials(_msgSender(), policyId);
+    }
+
+    /**
      @notice This function is usually executed by a trusted and permitted contract.
-     @param user The user address for the Credential update.
-     @param userPolicyId The user policy for the Credential update.
+     @param trader The user address for the Credential update.
      @param admissionPolicyId The unique identifier of a Policy.
      @param timestamp The timestamp established when the user requested a credential.
      */
-    function setCredentialV1(
-        address user,
-        bytes32 userPolicyId,
-        bytes32 admissionPolicyId,
+    function setCredential(
+        address trader,
+        uint32 admissionPolicyId,
         uint256 timestamp
     ) external override onlyUpdater {
         if (timestamp > block.timestamp)
             revert Unacceptable({
-                sender: _msgSender(),
-                module: MODULE,
-                method: "setCredential",
                 reason: "timestamp must be in the past"
             });
-        getCredentialV1[1][user][userPolicyId][admissionPolicyId] = timestamp;
-        emit UpdateCredential(1, _msgSender(), user, userPolicyId, admissionPolicyId);
+        uint256 admissionPolicyEpoch = policyEpochs[admissionPolicyId];
+        cache[1][trader][admissionPolicyId][admissionPolicyEpoch] = timestamp;
+        emit UpdateCredential(1, _msgSender(), trader, admissionPolicyId, admissionPolicyEpoch);
     }
 
     /**
-     @return role The constant ROLE_CREDENTIAL_UPDATER.
+     @notice This function is usually executed by a trusted and permitted contract.
+     @param version Cache organization version.
+     @param trader The user to inspect.
+     @param admissionPolicyId The admission policy for the credential to inspect.
+     @return timestamp The timestamp established when the user refreshed the credential.
      */
-    function roleCredentialsUpdater() external pure override returns (bytes32 role) {
-        role = ROLE_CREDENTIAL_UPDATER;
+    function getCredential(
+        uint8 version, 
+        address trader, 
+        uint32 admissionPolicyId
+    ) external view returns (uint256 timestamp) {
+        uint256 admissionPolicyEpoch = policyEpochs[admissionPolicyId];
+        timestamp = cache[version][trader][admissionPolicyId][admissionPolicyEpoch];
     }
 }
