@@ -44,7 +44,7 @@ interface IKeyringZkVerifier {
         IdentityAuthorisationProof calldata authorisationProof
     ) external view returns (bool verified);
 
-    function checkIdentityConstructionProof(IdentityConstructionProof calldata constructionProof, uint256 maxAddresses)
+    function checkIdentityConstructionProof(IdentityConstructionProof calldata constructionProof)
         external
         view
         returns (bool verified);

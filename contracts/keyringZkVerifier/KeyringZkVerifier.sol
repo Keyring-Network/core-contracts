@@ -108,8 +108,8 @@ contract KeyringZkVerifier is IKeyringZkVerifier {
     }
 
     /**
-     @notice Check if the policies disclosed are included in the identity commitment.
-     @param authorisationProof Proof of authorisation.
+     @notice Check that the policies disclosed are included in the identity commitment.
+     @param authorisationProof Proof of authorisation as defined in IKeyringZkVerifier.
      @return verified True if the trader wallet is authorised for all policies in the disclosure.
      */
     function checkIdentityAuthorisationProof(IdentityAuthorisationProof calldata authorisationProof)

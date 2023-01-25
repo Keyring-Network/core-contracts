@@ -9,8 +9,8 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 /**
  * @notice PolicyManager holds the policies managed by DeFi Protocol Operators and users. 
- When used by a KeyringGuard, policies describe admission rules that will be enforced. 
- When used by a Trader, policies describe the rules that compliant DeFi Protocol Operators 
+ When used by a KeyringGuard, policies describe admission policies that will be enforced. 
+ When used by a user, policies describe the rules that compliant DeFi Protocol Operators 
  must enforce in order for their contracts to be compatible with the user policy. 
  */
 
@@ -31,13 +31,12 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
 
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
     address public immutable override ruleRegistry;
-    // address public immutable override credentialCache;
 
     PolicyStorage.App policyStorage;
 
     /**
-     * @notice Policy admin role is initially granted during createPolicy.
-     * @dev Revert if the msg sender doesn't have the policy admin role.
+     * @notice The policy admin role is initially granted during createPolicy.
+     * @dev Reverts if the msg signer doesn't have the policy admin role.
      * @param policyId The unique identifier of a Policy.
      */
     modifier onlyPolicyAdmin(uint32 policyId) {
@@ -46,8 +45,8 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     }
 
     /**
-     * @notice Keyring Governance has exclusive access to the global whitelist of Attestors.
-     * @dev Revert if the user doesn't have the global attestor admin role.
+     * @notice Only policy creators can create new policies. 
+     * @dev Reverts if the user doesn't have the policy creator role.
      */
     modifier onlyPolicyCreator() {
         _checkRole(ROLE_POLICY_CREATOR, _msgSender(), "pm:opc");
@@ -55,8 +54,8 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     }
 
     /**
-     * @notice Keyring Governance has exclusive access to the global whitelist of Attestors.
-     * @dev Revert if the user doesn't have the global attestor admin role.
+     * @notice Keyring Governance has exclusive control of the global whitelist of Attestors.
+     * @dev Reverts if the user doesn't have the global attestor admin role.
      */
     modifier onlyAttestorAdmin() {
         _checkRole(ROLE_GLOBAL_ATTESTOR_ADMIN, _msgSender(), "pm:oaa");
@@ -65,7 +64,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
 
     /**
      * @notice Keyring Governance has exclusive access to the global whitelist of Wallet Checks.
-     * @dev Revert if the user doesn't have the global attestor admin role.
+     * @dev Reverts if the user doesn't have the global wallet check admin role.
      */
     modifier onlyWalletCheckAdmin() {
         _checkRole(ROLE_GLOBAL_WALLETCHECK_ADMIN, _msgSender(), "pm:owca");
@@ -96,13 +95,13 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     /**
      * @notice This upgradeable contract must be initialized.
      * @dev Initializer function MUST be called directly after deployment.
-     * because anyone can call it but overall only once.
+     because anyone can call it but overall only once.
      */
     function init() external override initializer {
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         address[] memory emptyList;
         (bytes32 universeRule, ) = IRuleRegistry(ruleRegistry).genesis();
-        // no one owns the default, permissive reserved Policy 0
+        // no one owns the default, permissive user policy, which is always policy 0
         PolicyStorage.PolicyScalar memory policyScalar = PolicyStorage.PolicyScalar({
             ruleId: universeRule,
             descriptionUtf8: "default user policy",
@@ -121,12 +120,15 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     }
 
     /**
-     * @notice Anyone can create an admission Policy and is granted admin and user admin.
-     * @dev `requiredAttestors` is never higher than the number of Attestors in the Policy.
-     * @param policyScalar The policy object scalar values.
-     * @param attestors Acceptable attestors.
-     * @param walletChecks Policy wallet checks.
-     * @return policyId The unique identifier of a Policy.
+     * @notice A policy creater can create a policy and is granted the admin and user admin roles.
+     * @param policyScalar The policy object scalar values as defined in PolicyStorage.
+     * @param attestors Acceptable attestors correspond to identity trees that will be used in
+     zero-knowledge proofs. Proofs cannot be generated, and therefore credentials cannot be
+     generated using roots that do not originate in an identity tree that is not explicitly
+     acceptable. 
+     * @param walletChecks Trader wallets are optionally checked againt on-chain wallet checks on
+     a just-in-time basis. 
+     * @return policyId The unique identifier of a new Policy.
      */
     function createPolicy(
         PolicyStorage.PolicyScalar memory policyScalar,
@@ -174,7 +176,8 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     }
 
     /**
-     * @notice The Policy admin role can update the parameters.
+     * @notice The Policy admin role can update a policy's scalar values one step.
+     * @dev Deadlines must always be >= the active policy grace period. 
      * @param policyId The unique identifier of a Policy.
      * @param policyScalar The policy definition scalar values.
      * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
@@ -195,6 +198,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
 
     /**
      * @notice Policy admins can update policy rules.
+     * @dev Deadlines must always be >= the active policy grace period. 
      * @param policyId The policy to update.
      * @param ruleId The new policy rule.
      * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
@@ -213,6 +217,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
 
     /**
      * @notice Policy admins can update policy descriptions.
+     * @dev Deadlines must always be >= the active policy grace period. 
      * @param policyId The policy to update.
      * @param descriptionUtf8 The new policy description.
      * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
@@ -234,6 +239,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
 
     /**
      * @notice Policy admins can update policy credential expiry times.
+     * @dev Deadlines must always be >= the active policy grace period. 
      * @param policyId The policy to update.
      * @param ttl The maximum acceptable credential age in seconds.
      * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline. 
@@ -252,6 +258,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
 
     /**
      * @notice Policy admins can change the gracePeriod with delayed effect.
+     * @dev Deadlines must always be >= the active policy grace period. 
      * @param policyId The policy to update.
      * @param gracePeriod The minimum acceptable deadline.
      * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
@@ -269,7 +276,10 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     }
 
     /**
-     * @notice Policy admins can force acceptance of the last n identity tree roots. 
+     * @notice Policy admins can force acceptance of the last n identity tree roots. This facility
+     provides protection for traders in the event that circumstances prevent the publication of 
+     new identity tree roots.
+     * @dev Deadlines must always be >= the active policy grace period. 
      * @param policyId The policy to update.
      * @param acceptRoots The depth of most recent roots to always accept.
      */
@@ -287,6 +297,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
 
     /**
      * @notice Schedules policy locking if the policy is not already scheduled to be locked.
+     * @dev Deadlines must always be >= the active policy grace period. 
      * @param policyId The policy to lock.
      * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
      */
@@ -306,6 +317,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
 
     /**
      * @notice Unschedules policy locking.
+     * @dev Deadlines must always be >= the active policy grace period. 
      * @param policyId The policy to abort locking.
      * @param deadline Overrides previous deadline.
      */
@@ -325,6 +337,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
 
     /**
      * @notice Update the deadline for staged policy changes to take effect.
+     * @dev Deadlines must always be >= the active policy grace period. 
      * @param policyId The policyId to update.
      * @param deadline Must be >= graceTime seconds past block time or 0 to unschedule staged policy changes.
      */
@@ -341,6 +354,8 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
 
     /**
      * @notice The Policy admin selects whitelisted Attestors that are acceptable for their Policy.
+     * @dev Deadlines must always be >= the active policy grace period. Attestors must be absent from
+     the active attestors set, or present in the staged removals. 
      * @param policyId The policy to update.
      * @param attestors The address of one or more Attestors to add to the Policy.
      * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
@@ -359,6 +374,8 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
 
     /**
      * @notice The Policy admin selects whitelisted Attestors that are acceptable for their Policy.
+     * @dev Deadlines must always be >= the active policy grace period. The attestors must be present
+     in the active attestor set or staged updates. 
      * @param policyId The policy to update.
      * @param attestors The address of one or more Attestors to remove from the Policy.
      * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
@@ -377,6 +394,8 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
 
     /**
      * @notice The Policy admin selects whitelisted Attestors that are acceptable for their Policy.
+     * @dev Deadlines must always be >= the active policy grace period. The wallet checks must be absent
+     from the active wallet check set, or present in the staged removals. 
      * @param policyId The policy to update.
      * @param walletChecks The address of one or more Wallet Checks to add to the Policy.
      * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
@@ -395,6 +414,8 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
 
     /**
      * @notice The Policy admin selects whitelisted Attestors that are acceptable for their Policy.
+     * @dev Deadlines must always be >= the active policy grace period. The wallet checks must be present
+     in the active wallet checks set or staged additions. 
      * @param policyId The policy to update.
      * @param walletChecks The address of one or more Attestors to remove from the Policy.
      * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
@@ -412,7 +433,8 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     }
 
     /**
-     * @notice Each user sets exactly one Policy to compare with admission policies.
+     * @notice Each user sets exactly one Policy that attestors are required to compare with admission 
+     policies.
      * @param policyId The unique identifier of a Policy.
      */
     function setUserPolicy(uint32 policyId) external override {
@@ -427,7 +449,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     /**
      * @notice The Global Attestor Admin can admit Attestors to the global whitelist.
      * @param attestor The address of a Attestor to admit into the global whitelist.
-     * @param uri The URI points to detailed information about the attestor.
+     * @param uri The URI refers to detailed information about the attestor.
      */
     function admitAttestor(address attestor, string calldata uri)
         external
@@ -456,7 +478,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     /**
      * @notice The Global Attestor Admin can remove Attestors from the global whitelist.
      * @dev Does not automatically remove Attestors from affected Policies.
-     * @param attestor The address of a Attestor on the global whitelist.
+     * @param attestor The address of an Attestor on the global whitelist.
      */
     function removeAttestor(address attestor) 
         external 
@@ -501,7 +523,11 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     /**
      * @notice Each user has a user policy that is compared to admission policies.
      * @param user The user to inspect.
-     * @param policyId The user's current user policy. Default policy 0 is the permissive policy.
+     * @param policyId The user's current user policy. The default policy 0 is permissive policy. Attestors are 
+     required to defer to admission policy details when the user does not explicitly select a non-default policy. 
+     For example, the general rule that admission policies must be at least as restrictive as user policies does
+     not apply to parameters such as TTL, gracetime, attestors and wallet checks when the user relies on the default
+     policy which uses zero values and empty lists to represent agreement with admission policy details.
      */
     function userPolicy(address user) external view override returns (uint32 policyId) {
         policyId = policyStorage.userPolicy(user);
@@ -510,9 +536,9 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     /**
      * @param policyId The unique identifier of a Policy.
      * @dev Use static calls to inspect current information.
-     * @return config The configuration of the policy.
+     * @return config The scalar values that form part of the policy definition.
      * @return attestors The authorized attestors for the policy.
-     * @return walletChecks The policy wallet checks.
+     * @return walletChecks The policy trader wallet checks that will be performed on a just-in-time basis.
      * @return deadline The timestamp when staged changes will take effect.
      */
     function policy(uint32 policyId)
@@ -535,7 +561,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
 
     /**
      * @notice Reveals the internal state of the policy object without processing staged changes.
-     * @dev non-zero deadline in the past indicated staged object is in effect.
+     * @dev A non-zero deadline in the past indicates that staged updates are already in effect.
      * @param policyId The policy to inspect.
      * @param deadline Timestamp for staged changes to take effect, or 0 if unscheduled.
      * @param scalarActive The active scalar variables object.
@@ -572,7 +598,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     }
 
     /**
-     * @notice Generate corresponding admin role for a policyId
+     * @notice Generate the corresponding admin/owner role for a policyId
      * @param policyId The policyId
      * @return ownerRole The bytes32 owner role that corresponds to the policyId
       */
@@ -583,7 +609,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     /**
      * @param policyId The unique identifier of a Policy.
      * @dev Use static calls to inspect current information.
-     * @return ruleId Enforced Rule from RuleRegistry.
+     * @return ruleId Rule to enforce, defined in the RuleRegistry.
      */
     function policyRuleId(uint32 policyId) external override returns (bytes32 ruleId) {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
@@ -631,7 +657,8 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     /**
      * @notice Check the number of latest identity roots to accept, regardless of age.
      * @param policyId The policy to inspect.
-     * @return acceptRoots The number of latest identity roots to accept unconditionally.
+     * @return acceptRoots The number of latest identity roots to accept unconditionally for the construction
+     of zero-knowledge proofs.
      */
     function policyAcceptRoots(uint32 policyId)
         external
@@ -758,7 +785,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      * @dev Use static calls to inspect current information.
      * @param policyId The Policy to inspect.
      * @param walletCheck The address to inspect.
-     * @return isIndeed True if attestor is acceptable for the Policy, otherwise false.
+     * @return isIndeed True if wallet check applies to the Policy, otherwise false.
      */
     function isPolicyWalletCheck(uint32 policyId, address walletCheck)
         external
@@ -780,7 +807,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
 
     /**
      * @param policyId The unique identifier of a Policy.
-     * @return isIndeed True if Policy with policyId exists, otherwise false.
+     * @return isIndeed True if a Policy with policyId exists, otherwise false.
      */
     function isPolicy(uint32 policyId) public view override returns (bool isIndeed) {
         isIndeed = policyId < policyCount();
@@ -828,13 +855,17 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         walletCheck = policyStorage.globalWalletCheckSet.keyAtIndex(index);
     }
 
+    /**
+     * @param walletCheck A wallet check contract address to search for.
+     * @return isIndeed True if the wallet check exists in the global whitelist, otherwise false.
+     */
     function isGlobalWalletCheck(address walletCheck) external view override returns (bool isIndeed) {
         isIndeed = policyStorage.globalWalletCheckSet.exists(walletCheck);
     }
 
     /**
      * @param attestor An address.
-     * @return uri The uri if the address is an attestor.
+     * @return uri The attestor uri if the address is an attestor.
      */
 
     function attestorUri(address attestor) external view override returns(string memory uri) {
@@ -842,8 +873,9 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     }
 
     /**
+     * @notice Inspect user roles.
      * @param role Access control role to check.
-     * @param user Address to check.
+     * @param user User address to check.
      * @return doesIndeed True if the user has the role.
      */
     function hasRole(

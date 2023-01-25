@@ -13,9 +13,10 @@ import "../lib/Pack12x20.sol";
 import "../access/KeyringAccessControl.sol";
 
 /**
- * @notice This contract acts as a Credentials Updater, which needs to have ROLE_CREDENTIAL_UPDATER 
- permission in the KeyringCredentials contract in order to record Credentials. The contract checks 
- signatures via the getSignerFromSig function and therefore enforces the protocol.
+ @notice This contract acts as a credentials cache updater. It needs the ROLE_CREDENTIAL_UPDATER 
+ permission in the KeyringCredentials contract in order to record credentials. The contract checks 
+ client-generated zero-knowledge proofs of attestations about admission policy eligibility and 
+ therefore enforces the protocol.
  */
 
 contract KeyringZkCredentialUpdater is
@@ -34,8 +35,9 @@ contract KeyringZkCredentialUpdater is
 
     /**
      * @param trustedForwarder Contract address that is allowed to relay message signers.
-     * @param keyringCredentials The address for the deployed {KeyringCredentials} contract.
-     * @param policyManager The address for the deployed PolicyManager contract.
+     * @param keyringCredentials The address for the deployed KeyringCredentials contract to write to.
+     * @param policyManager The address for the deployed PolicyManager contract to read from.
+     * @param keyringZkVerifier On-chain instance of the stateless Keyring ZK verifier contract.
      */
     constructor(
         address trustedForwarder,
@@ -76,9 +78,15 @@ contract KeyringZkCredentialUpdater is
 
     /**
      * @notice Updates the credential cache if the request is acceptable.
-     * @param attestor The identityTree contract with a root that contains the hash of identity + userPolicy hash.
-     * @param membershipProof The zero-knowledge proof of membership in the tree.
-     * @param authorizationProof The zero-knowledge of compliance with up to 24 policy disclosures.
+     * @dev The attestor must be valid for all policy disclosures. For this to be possible, it must have been admitted
+     to the system globally before it was selected for a policy. The two zero-knowledge proof share parameters that ensure
+     that both proofs were derived from the same identity commitment. 
+     * @param attestor The identityTree contract with a root that contains the user's identity commitment. Must be present
+     in the current attestor list for all policy disclosures in the authorization proof. 
+     * @param membershipProof A zero-knowledge proof of identity commitment membership in the identity tree. Contains an
+     external nullifier and nullifier hash that must match the parameters of the authorization proof. 
+     * @param authorizationProof A zero-knowledge proof of compliance with up to 24 policy disclosures. Contains an
+     external nullifier and nullifier hash that must match the parameters of the membershiip proof. 
      */
     function updateCredentials(
         address attestor,
@@ -129,12 +137,13 @@ contract KeyringZkCredentialUpdater is
     }
 
     /**
-     * @notice Identity tree must be a policy attestor, the wallet must not be flagged by any policy wallet
+     * @notice The identity tree must be a policy attestor, the wallet must not be flagged by any policy wallet
      * check and the policy rule cannot be toxic.
      * @param trader The trader wallet to inspect.
      * @param policyId The policy to inspect.
      * @param attestor The identity tree contract address to compare to the policy attestors.
-     * @return acceptable True if the policy rule is not toxic, the tree is authoritative and the wallet is not flagged.
+     * @return acceptable True if the policy rule is not toxic, the identity tree is authoritative for the poliy 
+     and the wallet is not flagged in any wallet check contract that is authoritative for the policy. 
      */
     function checkPolicyAndWallet(
         address trader, 
@@ -156,8 +165,9 @@ contract KeyringZkCredentialUpdater is
 
     /**
      * @notice Packs uint32[12] into uint256 with 20-bit precision.
-     * @param input 20 bit unsigned integers.
-     * @return packed Uint256 packed format.
+     * @dev This function will disregard bits greater than 20 bits of magnitude.
+     * @param input 20 bit unsigned integers cast as uint32.
+     * @return packed Uint256 packed format contained encoding of 12 20-bit uints. 
      */
     function pack12x20(uint32[12] calldata input) public pure override returns (uint256 packed) {
         packed = input.pack();
@@ -165,7 +175,7 @@ contract KeyringZkCredentialUpdater is
 
     /**
      * @notice Unpacks packed elements as 20-bit uint32[12].
-     * @param packed Packed format, 12 x 20-bit unsigned integers.
+     * @param packed Packed format, 12 x 20-bit unsigned integers, tightly packed. 
      * @return unpacked Uint32[12], 20-bit precision.
      */
     function unpack12x20(uint256 packed) public pure override returns (uint32[12] memory unpacked) {

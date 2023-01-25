@@ -5,10 +5,12 @@ pragma solidity 0.8.14;
 /**
  * @notice Key sets with enumeration. Uses mappings for random and existence checks
  * and dynamic arrays for enumeration. Key uniqueness is enforced.
- * @dev Sets are unordered.
+ * @dev This implementation has deletion disabled (removed) because doesn't require it. Therefore, keys
+ are organized in order of insertion.
  */
 
 library Bytes32Set {
+
     struct Set {
         mapping(bytes32 => uint256) keyPointers;
         bytes32[] keyList;
@@ -21,9 +23,9 @@ library Bytes32Set {
     /**
      * @notice Insert a key to store.
      * @dev Duplicate keys are not permitted.
-     * @param self A Bytes32Set struct - similar syntax to python classes.
-     * @param key A value in the Bytes32Set.
-     * @param context A message string about interpretation of the issue.
+     * @param self A Set struct - similar syntax to python classes.
+     * @param key A value in the Set.
+     * @param context A message string about interpretation of the issue. Normally the calling function.
      */
     function insert(
         Set storage self,
@@ -43,9 +45,8 @@ library Bytes32Set {
 
     /**
      * @notice Count the keys.
-     * @param self A Bytes32Set struct - similar syntax to python classes.
-     * @return uint256 Length of the `keyList`, which correspond to the number of elements
-     * stored in the `keyPointers` mapping.
+     * @param self A Set struct - similar syntax to python classes.
+     * @return uint256 Length of the `keyList` which is the count of keys contained in the Set.
      */
     function count(Set storage self) internal view returns (uint256) {
         return (self.keyList.length);
@@ -53,9 +54,9 @@ library Bytes32Set {
 
     /**
      * @notice Check if a key exists in the Set.
-     * @param self A Bytes32Set struct - similar syntax to python classes.
-     * @param key A value in the Bytes32Set.
-     * @return bool True if key exists in the Set, otherwise false.
+     * @param self A Set struct - similar syntax to python classes.
+     * @param key A key to look for.
+     * @return bool True if the key exists in the Set, otherwise false.
      */
     function exists(Set storage self, bytes32 key) internal view returns (bool) {
         if (self.keyList.length == 0) return false;
@@ -63,10 +64,10 @@ library Bytes32Set {
     }
 
     /**
-     * @notice Retrieve an bytes32 by its key.
-     * @param self A Bytes32Set struct - similar syntax to python classes.
-     * @param index The internal index of the keys
-     * @return bytes32 The bytes32 value stored in a `keyList`.
+     * @notice Retrieve an bytes32 by its position in the Set. Use for enumeration.
+     * @param self A Set struct - similar syntax to python classes.
+     * @param index The position in the Set to inspect.
+     * @return bytes32 The key stored in the Set at the index position.
      */
     function keyAtIndex(Set storage self, uint256 index) internal view returns (bytes32) {
         return self.keyList[index];

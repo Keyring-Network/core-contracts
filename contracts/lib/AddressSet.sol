@@ -3,12 +3,13 @@
 pragma solidity 0.8.14;
 
 /**
- * @notice Key sets with enumeration and delete. Uses mappings for random and existence checks
+ * @notice Key sets with enumeration and delete. Uses mappings for random access and existence checks,
  * and dynamic arrays for enumeration. Key uniqueness is enforced.
  * @dev Sets are unordered. Delete operations reorder keys.
  */
 
 library AddressSet {
+
     struct Set {
         mapping(address => uint256) keyPointers;
         address[] keyList;
@@ -21,9 +22,9 @@ library AddressSet {
     /**
      * @notice Insert a key to store.
      * @dev Duplicate keys are not permitted.
-     * @param self A Address32Set struct - similar syntax to python classes.
-     * @param key A key to the Address32Set.
-     * @param context A message string about interpretation of the issue.
+     * @param self An Set struct - similar syntax to python classes.
+     * @param key An key to insert cast as an address.
+     * @param context A message string about interpretation of the issue. Normally the calling function.
      */
     function insert(
         Set storage self,
@@ -43,10 +44,10 @@ library AddressSet {
 
     /**
      * @notice Remove a key from the store.
-     * @dev key to remove must exist.
-     * @param self A Address32Set struct - similar syntax to python classes.
-     * @param key A key to the Address32Set.
-     * @param context A message string about interpretation of the issue.
+     * @dev The key to remove must exist.
+     * @param self A Set struct - similar syntax to python classes.
+     * @param key An address to remove from the Set.
+     * @param context A message string about interpretation of the issue. Normally the calling function.
      */
     function remove(
         Set storage self,
@@ -70,7 +71,7 @@ library AddressSet {
 
     /**
      * @notice Count the keys.
-     * @param self A Address32Set struct - similar syntax to python classes.
+     * @param self A Set struct - similar syntax to python classes.
      * @return uint256 Length of the `keyList`, which correspond to the number of elements
      * stored in the `keyPointers` mapping.
      */
@@ -80,9 +81,9 @@ library AddressSet {
 
     /**
      * @notice Check if a key exists in the Set.
-     * @param self A Address32Set struct - similar syntax to python classes
-     * @param key A key to the Address32Set.
-     * @return bool True if key exists in the Set, otherwise false.
+     * @param self A Set struct - similar syntax to python classes
+     * @param key An address to look for in the Set.
+     * @return bool True if the key exists in the Set, otherwise false.
      */
     function exists(Set storage self, address key) internal view returns (bool) {
         if (self.keyList.length == 0) return false;
@@ -90,10 +91,10 @@ library AddressSet {
     }
 
     /**
-     * @notice Retrieve an address by its key.
-     * @param self A Address32Set struct - similar syntax to python classes.
-     * @param index The internal index of the keys
-     * @return address Address value stored in a `keyList`.
+     * @notice Retrieve an address by its position in the set. Use for enumeration.
+     * @param self A Set struct - similar syntax to python classes.
+     * @param index The internal index to inspect.
+     * @return address Address value stored at the index position in the Set.
      */
     function keyAtIndex(Set storage self, uint256 index) internal view returns (address) {
         return self.keyList[index];

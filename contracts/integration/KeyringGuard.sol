@@ -6,8 +6,8 @@ import "../interfaces/IKeyringCredentials.sol";
 import "../interfaces/IPolicyManager.sol";
 
 /**
- * @notice Adds Keyring compliance support to derived contracts.
- * @dev Add the modifier to functions to protect.
+ * @notice Provides the core support for functions and modifiers that inspect trader compliance
+ with admission policies using the credential cache. 
  */
 
 abstract contract KeyringGuard {
@@ -17,45 +17,17 @@ abstract contract KeyringGuard {
     error Compliance(address sender, address user, string module, string method, string reason);
 
     /**
-     * @dev Use this flexible modifier to enforce distinct policies on functions within the same contract.
-     * @param user The User address for the Credentials update.
-     * @param keyringCredentials The address for the deployed KeyringCredentials contract.
-     * @param policyManager The address for the deployed PolicyManager contract.
-     * @param admissionPolicyId The unique identifier of a Policy.
-     * @param universeRule The id of the universe (everyone) Rule.
-     * @param emptyRule The id of the empty (noone) Rule.
-     */
-    modifier checkKeyring(
-        address user,
-        address keyringCredentials,
-        address policyManager,
-        uint32 admissionPolicyId,
-        bytes32 universeRule,
-        bytes32 emptyRule
-    ) {
-        if (
-            !_isCompliant(user, keyringCredentials, policyManager, admissionPolicyId, universeRule, emptyRule)
-        )
-            revert Compliance({
-                sender: msg.sender,
-                user: user,
-                module: MODULE,
-                method: "checkKeyring",
-                reason: "stale credential or no credential"
-            });
-        _;
-    }
-
-    /**
-     * @notice Checks if the given user is Keyring Compliant.
-     * @param user The User address for the Credentials update.
-     * @param keyringCredentials The address for the deployed KeyringCredentials contract.
-     * @param policyManager The address for the deployed PolicyManager contract.
-     * @param admissionPolicyId The unique identifier of a Policy.
-     * @param universeRule The id of the universe (everyone) Rule.
-     * @param emptyRule The id of the empty (noone) Rule.
+     * @notice Checks if the given user has a stored, fresh credential for the admission policy in the
+     credential cache.
      * @dev Use static call to inspect.
-     * @return isIndeed True if a valid credential is found,
+     * @param user The user address, normally a trading wallet, to check.
+     * @param keyringCredentials The address for the deployed KeyringCredentials contract.
+     * @param policyManager The address of the deployed PolicyManager contract to rely on.
+     * @param admissionPolicyId The unique identifier of a Policy.
+     * @param universeRule The id of the universe (everyone) Rule.
+     * @param emptyRule The id of the empty (noone) Rule.
+     * @return isIndeed True if a valid credential is found and its age is less than or equal to
+     the admission policy's TTL. 
      */
     function _isCompliant(
         address user,

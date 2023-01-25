@@ -6,6 +6,13 @@ import "../interfaces/IIdentityTree.sol";
 import "../access/KeyringAccessControl.sol";
 import "../lib/Bytes32Set.sol";
 
+/**
+ @notice This contract holds the history of identity tree merkle roots announced by the aggregator. 
+ Each root has an associated birthday that records when it was created. Zero-knowledge proofs rely
+ on these roots. Claims supported by proofs are considered to be of the same age as the roots they
+ rely on for validity. 
+ */
+
 contract IdentityTree is IIdentityTree, KeyringAccessControl {
     
     using Bytes32Set for Bytes32Set.Set;
@@ -23,12 +30,16 @@ contract IdentityTree is IIdentityTree, KeyringAccessControl {
         _;
     }
 
+    /**
+     @param trustedForwarder Contract address that is allowed to relay message signers.
+     */
     constructor(address trustedForwarder) KeyringAccessControl(trustedForwarder) {
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 
     /**
-     * @notice The aggretator can set roots with non-zero birthdays.
+     * @notice The aggregator can set roots with non-zero birthdays.
+     * @dev Explicit birthday declaration ensures that root age is not extended by mining delays. 
      * @param merkleRoot The merkleRoot to set.
      * @param birthday The timestamp of the merkleRoot. 0 to invalidate the root.
      */
@@ -59,7 +70,7 @@ contract IdentityTree is IIdentityTree, KeyringAccessControl {
     }
 
     /**
-     * @notice Check for existence in history. Ignore purged entries.
+     * @notice Check for existence in history.
      * @param merkleRoot The root to check.
      * @return isIndeed True if the root has been recorded.
      */

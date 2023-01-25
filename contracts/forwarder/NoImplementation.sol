@@ -4,9 +4,10 @@ pragma solidity 0.8.14;
 
 /**
  * @notice This stub provides a hint for hardhat artifacts and typings. It is a non-functional
- * implementation to deploy behind a TransparentUpgradeableProxy which address will be passed
- * to constructors that expect an immutable address to trust for future gasless transaction
- * support (trustedForwarder).
+ implementation to deploy behind a TransparentUpgradeableProxy. The proxy address will be passed
+ to constructors that expect an immutable trusted forwarder for future gasless transaction
+ support (trustedForwarder). This contract implements the essential functions as stubs that
+ fail harmlessly. 
  */
 
 contract NoImplementation {

@@ -6,14 +6,15 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 
 /**
-* @notice This contract manages the role-based access control via _checkRole() with meaningful 
-error messages if the user does not have the requested role. This Contract is inherited by the 
-PolicyManager, RuleRegistry, KeyringCredentials and KeyringCredentialUpdater contract.
-*/
+ @notice This contract manages the role-based access control via _checkRole() with meaningful 
+ error messages if the user does not have the requested role. This contract is inherited by 
+ PolicyManager, RuleRegistry, KeyringCredentials, IdentityTree, WalletCheck and 
+ KeyringZkCredentialUpdater.
+ */
 
 abstract contract KeyringAccessControl is ERC2771Context, AccessControl {
 
-    // These reservations hold space for future versions of this module
+    // Reservations hold space in upgradeable contracts for future versions of this module.
     bytes32[50] private _reservedSlots;
 
     error Unauthorized(
@@ -31,11 +32,11 @@ abstract contract KeyringAccessControl is ERC2771Context, AccessControl {
     constructor(address trustedForwarder) ERC2771Context(trustedForwarder) {}
 
     /**
-     * @notice Role-based access control
-     * @dev Revert if account is missing role
-     * @param role Verify the account has this role
-     * @param account A DeFi address to check for the role
-     * @param context The function that requested the permission check
+     * @notice Role-based access control.
+     * @dev Reverts if the account is missing the role.
+     * @param role The role to check. 
+     * @param account An address to check for the role.
+     * @param context For reporting purposes. Usually the function that requested the permission check.
      */
     function _checkRole(
         bytes32 role,
@@ -68,8 +69,9 @@ abstract contract KeyringAccessControl is ERC2771Context, AccessControl {
     }
 
     /**
-     * @notice Returns msg.data if not from a trusted forwarder,
-     * or truncated msg.data if the signer was appended to msg.data
+     * @notice Returns msg.data if not from a trusted forwarder, or truncated msg.data if the signer was 
+     appended to msg.data
+     * @dev Although not currently used, this function forms part of ERC2771 so is included for completeness.
      * @return data Data deemed to be the msg.data
      */
     function _msgData()

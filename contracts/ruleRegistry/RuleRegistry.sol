@@ -8,9 +8,19 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 /**
  * @notice The RuleRegistry holds the global list of all existing Policy rules, which
- * can be applied in the PolicyManager contract via the createPolicy and updatePolicy
- * functions. Base Rules are managed by the Rule Admin role. Anyone can create an
- * expression using an operator and existing Rules as operands.
+ can be applied in the PolicyManager contract via the createPolicy and updatePolicy
+ functions. Base Rules are managed by the Rule Admin role. Anyone can create an
+ expression using an operator and existing Rules as operands.
+
+ Rule toxicity indicates that a rule is deemed to be too precise to use safely on its own
+ because doing so would possibly compromise user privacy. Toxicity is inherited by 
+ expressions that consume toxic rules. It is not possible to trade where a policy enforces
+ toxic rule. 
+
+ An expression that consumes a toxic rule can be declared non-toxic after human review. This
+ privilege is reserved for Keyring governance. An expression that is toxic due to inheritance
+ can become non-toxic when the expression generalizes the criteria in a way that reduces
+ the risks to user privacy, usually by being more inclusive of more qualifying users. 
  */
 
 contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
@@ -91,7 +101,7 @@ contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
      * @param uri Detailed information Uri for a Base Rule. Empty for expressions.
      * @param operator The expression operator (1-3, or Base (0)
      * @param operands The list of the ruleId’s in the expression. Empty for Base Rules.
-     * @return ruleId The unique identifier of Rule. Each Policy has exactly one Rule.
+     * @return ruleId The unique identifier of the new Rule. Each Policy has exactly one Rule.
      */
     function createRule(
         string memory description,

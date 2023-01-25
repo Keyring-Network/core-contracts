@@ -8,8 +8,8 @@ library PackLib {
 
     /**
      @notice Pack 12 20-bit integers into a 240-bit object.
-     @dev uint32 Inputs are truncated after 20 bits.
-     @param input Array of integers to pack. 
+     @dev uint32 Inputs are truncated above 20 bits of magnitude.
+     @param input Array of 20-bit integers to pack cast as an array of uint32. 
      **/
     function pack(uint32[12] calldata input) 
         internal pure returns(uint256 packed) 
@@ -41,9 +41,9 @@ library PackLib {
 
     /**
      @notice Unpack 12 20-bit integers from 240-bit input
-     @dev Packed input is truncated after 240 bits.
+     @dev Data beyond the first 240 bits is ignored.
      @param packed 12 20-bit integers packed into 240 bits.
-     @return output 12 20-bit integers cast as 32-bit integers.
+     @return output 12 20-bit integers cast as an array of 32-bit integers.
      **/
     function unpack(uint256 packed) 
         public pure 

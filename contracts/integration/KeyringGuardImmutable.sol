@@ -7,7 +7,8 @@ import "../interfaces/IKeyringGuardImmutable.sol";
 import "../interfaces/IRuleRegistry.sol";
 
 /**
- * @notice KeyringGuard implementation that uses immutables and presents a simplified modifier.
+ * @notice KeyringGuard implementation that uses immutable configuration parameters and presents 
+ a simplified modifier for use in derived contracts.
  */
 
 abstract contract KeyringGuardImmutable is IKeyringGuardImmutable, KeyringGuard {
@@ -23,7 +24,7 @@ abstract contract KeyringGuardImmutable is IKeyringGuardImmutable, KeyringGuard 
     bytes32 internal constant NULL_BYTES32 = bytes32(0);
 
     /**
-     * @dev Use this modifier to enforce distinct Policies on functions within the same contract.
+     * @dev Use this modifier in derived contracts to enforce user compliance with the admission policy.
      * @param user User address to check.
      */
     modifier keyringCompliance(address user) {
@@ -49,8 +50,8 @@ abstract contract KeyringGuardImmutable is IKeyringGuardImmutable, KeyringGuard 
 
     /**
      * @param keyringCredentials The KeyringCredentials contract to rely on.
-     * @param policyManager The address for the deployed PolicyManager contract.
-     * @param admissionPolicyId The unique identifier of a Policy.
+     * @param policyManager The address of the deployed PolicyManager to rely on.
+     * @param admissionPolicyId The unique identifier of a Policy against which user accounts will be compared.
      */
     constructor(
         address keyringCredentials,
@@ -113,7 +114,7 @@ abstract contract KeyringGuardImmutable is IKeyringGuardImmutable, KeyringGuard 
 
     /**
      * @return universeRuleId The id of the universal set Rule (everyone),
-     * @return emptyRuleId The id of the empty set Rule (no one),
+     * @return emptyRuleId The id of the null set Rule (no one),
      */
     function getKeyringGenesisRules() external view override returns (bytes32 universeRuleId, bytes32 emptyRuleId) {
         universeRuleId = _universeRule;
@@ -121,10 +122,10 @@ abstract contract KeyringGuardImmutable is IKeyringGuardImmutable, KeyringGuard 
     }
 
     /**
-     * @notice Checks user compliance status,
-     * @param user User to check
-     * @dev Use static call to inspect,
-     * @return isCompliant true if the user can proceed,
+     * @notice Checks user compliance status.
+     * @dev Use static call to inspect.
+     * @param user User to check.
+     * @return isCompliant True if the user would be permitted to proceed. 
      */
     function checkKeyringCompliance(address user) external override returns (bool isCompliant) {
         isCompliant = _isCompliant(
@@ -138,9 +139,9 @@ abstract contract KeyringGuardImmutable is IKeyringGuardImmutable, KeyringGuard 
     }
 
     /**
-     * @notice Checks the existence of policyId in the PolicyManager contract.
-     * @param policyManager The address for the deployed PolicyManager contract.
-     * @param policyId The unique identifier of a Policy.
+     * @notice Checks the existence of a policy in the PolicyManager contract.
+     * @param policyManager The address of the deployed PolicyManager contract to query.
+     * @param policyId The unique identifier of a policy.
      */
     function _isPolicy(address policyManager, uint32 policyId) internal view returns (bool isIndeed) {
         isIndeed = IPolicyManager(policyManager).isPolicy(policyId);
