@@ -7,6 +7,15 @@ import "../interfaces/IIdentityConstructionProofVerifier.sol";
 import "../interfaces/IIdentityMembershipProofVerifier.sol";
 import "../interfaces/IKeyringZkVerifier.sol";
 
+/**
+ @notice Binds the on-chain zero-knowledge verifiers, which are generated from circuits, together and
+ applies additional constraints such as requiring that users generate membership proofs and
+ authorization proofs from the same identity commitments. Includes a function inspect identity
+ commitments and confirm correct construction. This is presumed to occur before identity commitments
+ are included in identity trees and is thus a courtesy function in service to the aggregator which is
+ required to validate identity commitments submmitted by authorization wallets. 
+ */
+
 contract KeyringZkVerifier is IKeyringZkVerifier {
 
     address public immutable override IDENTITY_MEMBERSHIP_PROOF_VERIFIER;
@@ -24,7 +33,8 @@ contract KeyringZkVerifier is IKeyringZkVerifier {
     }
 
     /**
-     @notice Check identity construction, membership and authorization.
+     @notice Check membership and authorization proofs using circom verifiers. Both proofs must be
+     generated from the same identity commitment. 
      @param membershipProof Proof of inclusion in an identity tree.
      @param authorisationProof Proof of policyId inclusions in the identity commitment.
      @return verified True if the claim is valid. 
@@ -46,18 +56,16 @@ contract KeyringZkVerifier is IKeyringZkVerifier {
 
     /**
      @notice Check correct construction of an identity commitment.
-     @param constructionProof Proof of correct construction of the identity commitment.
-     @param maxAddresses The maximum addresses included in the identity commitment.
-     @return verified True if the proof is valid.
+     @param constructionProof Proof of correct construction of the identity commitment as defined in 
+     IKeyringZkVerifier.
+     @return verified True if the construction proof is valid.
      */
-    function checkIdentityConstructionProof(IdentityConstructionProof calldata constructionProof, uint256 maxAddresses)
+    function checkIdentityConstructionProof(IdentityConstructionProof calldata constructionProof)
         external
         view
         override
         returns (bool verified)
     {
-        if (!(constructionProof.maxAddresses <= maxAddresses)) return false;
-
         bool valid = IIdentityConstructionProofVerifier(IDENTITY_CONSTRUCTION_PROOF_VERIFIER).verifyProof(
             constructionProof.proof.a,
             constructionProof.proof.b,
@@ -71,7 +79,7 @@ contract KeyringZkVerifier is IKeyringZkVerifier {
 
     /**
      @notice Check that the identity commitment is a member of the identity tree.
-     @param membershipProof Proof of membership.
+     @param membershipProof Proof of membership as defined in IKeyringZkVerifier.
      @return verified True if the identity commitment is a member of the identity tree.
      */
     function checkIdentityMembershipProof(IdentityMembershipProof calldata membershipProof)

@@ -185,7 +185,6 @@ describe("Zero-knowledge", function () {
 
       result = await keyringZkVerifier.checkIdentityConstructionProof(
         constructionProof,
-        constructionProof.maxAddresses,
       );
       expect(result).to.be.equal(true);
 
@@ -237,10 +236,6 @@ describe("Zero-knowledge", function () {
       expect(await keyringZkVerifier.checkClaim(membershipProof, invalidAuthorisationProof)).to.be.equal(false);
 
       const proofMaxAddresses = Ethers.BigNumber.from(constructionProof.maxAddresses);
-      const maxAddresse = proofMaxAddresses.sub(1);
-      expect(
-        await keyringZkVerifier.checkIdentityConstructionProof(constructionProof, maxAddresse.toString()),
-      ).to.be.equal(false);
 
       const invalidPolicyCommitment = "0x28a907f8ab71f2626449579031ed7d886cd6a9f64d3472832c9faba87eb1a06c";
       const invalidConstructionProof: IKeyringZkVerifier.IdentityConstructionProofStruct = {
@@ -249,8 +244,7 @@ describe("Zero-knowledge", function () {
       };
       expect(
         await keyringZkVerifier.checkIdentityConstructionProof(
-          invalidConstructionProof,
-          constructionProof.maxAddresses,
+          invalidConstructionProof
         ),
       ).to.be.equal(false);
     });
