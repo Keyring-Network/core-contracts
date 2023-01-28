@@ -1,4 +1,4 @@
-import { Signer } from "ethers";
+import { BigNumber, BigNumberish, Signer } from "ethers";
 import { createFixtureLoader } from "ethereum-waffle";
 import { ethers as Ethers } from "ethers";
 import { getNamedAccounts, ethers, waffle } from "hardhat";
@@ -26,6 +26,7 @@ import {
   proofMerkleRoot2,
   trader2,
   ROLE_AGGREGATOR,
+  proofMerkleRoot3,
 } from "../../constants";
 import {
   AuthorizationProofVerifier,
@@ -183,9 +184,7 @@ describe("Zero-knowledge", function () {
       );
       expect(result).to.be.equal(true);
 
-      result = await keyringZkVerifier.checkIdentityConstructionProof(
-        constructionProof,
-      );
+      result = await keyringZkVerifier.checkIdentityConstructionProof(constructionProof);
       expect(result).to.be.equal(true);
 
       // now check both proofs (membership + authorisation)
@@ -225,7 +224,7 @@ describe("Zero-knowledge", function () {
       const invalidProof = membershipProof2.proof;
       const invalidMembershipProof5 = {
         ...membershipProof,
-        proof: invalidProof
+        proof: invalidProof,
       };
       expect(await keyringZkVerifier.checkClaim(invalidMembershipProof5, authorisationProof)).to.be.equal(false);
 
@@ -242,11 +241,7 @@ describe("Zero-knowledge", function () {
         ...constructionProof,
         policyCommitment: invalidPolicyCommitment,
       };
-      expect(
-        await keyringZkVerifier.checkIdentityConstructionProof(
-          invalidConstructionProof
-        ),
-      ).to.be.equal(false);
+      expect(await keyringZkVerifier.checkIdentityConstructionProof(invalidConstructionProof)).to.be.equal(false);
     });
   });
 
@@ -348,6 +343,86 @@ describe("Zero-knowledge", function () {
         unacceptable("unauthorized"),
       );
     });
+
+    it("should allow extend validity of credentials to forever in case of attestor failure", async function () {
+      // user with valid proofs and get valid credentials even if the timestamp comming from the latest root are stale
+      // if acceptRoot property is set on the policy by the policy admin
+
+      const now = await helpers.time.latest();
+      await identityTree.setMerkleRootBirthday(proofMerkleRoot2, now);
+
+      const policyScalarEvenNumbers = {
+        ...policyScalar,
+        acceptRoots: 0,
+      };
+
+      // current policy count 2, create policyId 2 to 21
+      const numberOfPolices = 20;
+      for (let i = 0; i < numberOfPolices; i++) {
+        const index = i + 2; // policyId starts from 2
+        if (index % 2 === 0) {
+          // create even policies
+          await policyManager.createPolicy(policyScalarEvenNumbers, [identityTree.address], [walletCheck.address]);
+        } else {
+          // create odd policies
+          await policyManager.createPolicy(policyScalar, [identityTree.address], [walletCheck.address]);
+        }
+      }
+
+      await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
+
+      // check if credentials are set properly
+      const version = 1;
+      const unpacked1 = await credentialsUpdater.unpack12x20(authorisationProof2.policyDisclosures[0]);
+      const unpacked2 = await credentialsUpdater.unpack12x20(authorisationProof2.policyDisclosures[1]);
+      // e.g. policies: [ 1,  2,  3,  4,  5,  6,  7,  8, 9, 10, 11, 12, 13, 14, 15, 16, 0,  0,  0,  0,  0,  0,  0,  0 ]
+      const policies = [...unpacked1, ...unpacked2];
+      // check for valid credentials
+      for (let i = 0; i < policies.length; i++) {
+        const timestamp = await credentials.getCredential(version, trader2.address, policies[i]);
+        if (policies[i] === 0) {
+          expect(timestamp.toNumber()).to.be.equal(0);
+        } else {
+          expect(timestamp.toNumber()).to.be.equal(now);
+          expect(await isCompliant(timestamp, policyScalar.ttl)).to.be.true;
+        }
+      }
+
+      const staleTime = BigNumber.from(policyScalar.ttl).add(100);
+      await helpers.time.increase(staleTime);
+
+      // check for stale credentials
+      for (let i = 0; i < policies.length; i++) {
+        const timestamp = await credentials.getCredential(version, trader2.address, policies[i]);
+        if (policies[i] === 0) {
+          expect(timestamp.toNumber()).to.be.equal(0);
+        } else {
+          expect(timestamp.toNumber()).to.be.equal(now);
+          expect(await isCompliant(timestamp, policyScalar.ttl)).to.be.false;
+        }
+      }
+
+      // update credentials with old merkle root
+      await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
+
+      console.log("check for updated credentials without new merkle root");
+      for (let i = 0; i < policies.length; i++) {
+        if (policies[i] === 0 || policies[i] === 1) continue;
+        // set the merkleRootSuccessors to 1, after 10 policies
+        if (i === 10) await identityTree.setMerkleRootBirthday(proofMerkleRoot3, now);
+        const timestamp = await credentials.getCredential(version, trader2.address, policies[i]);
+        const acceptRoots = await policyManager.callStatic.policyAcceptRoots(policies[i]);
+        if (policies[i] % 2 === 0) {
+          // even policies greater from 2 should be invalid (acceptRoots: 0)
+          expect(await isCompliant(timestamp, policyScalar.ttl)).to.be.false;
+          expect(acceptRoots).to.be.equal(0);
+        } else {
+          // odd policies greater from 2 should be valid (acceptRoots: 1)
+          expect(await isCompliant(timestamp, policyScalar.ttl)).to.be.true;
+          expect(acceptRoots).to.be.equal(1);
+        }
+      }
+    });
   });
 
   /* --------------------------- KeyringCredentials --------------------------- */
@@ -421,4 +496,11 @@ const verifyMembershipProof = async (
   } catch {
     return false;
   }
+};
+
+const isCompliant = async (timestamp: BigNumberish, ttl: BigNumberish) => {
+  const now = BigNumber.from(await helpers.time.latest());
+  const cacheAge = now.sub(timestamp);
+  const isIndeed = cacheAge.lte(ttl);
+  return isIndeed;
 };
