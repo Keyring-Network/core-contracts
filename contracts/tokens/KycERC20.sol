@@ -21,7 +21,7 @@ contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuardImmutable
     using SafeERC20 for IERC20;
 
     /**
-     @notice Specify the token to wrap and the new name / symbol of the wrapped token - then good to go!
+     @notice Specify the token to wrap and the new name/symbol of the wrapped token - then good to go!
      @param collateralToken The contract address of the token that is to be wrapped
      @param keyringCredentials The address for the deployed KeyringCredentials contract.
      @param policyManager The address for the deployed PolicyManager contract.
@@ -97,7 +97,7 @@ contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuardImmutable
     /**
      @notice Wraps the inherited ERC20.transfer function with the keyringCompliance guard.
      @param to The recipient of amount 
-     @param amount The amount to be deducted from the to's allowance.
+     @param amount The amount to transfer.
      @return bool True if successfully executed.
      */
     function transfer(address to, uint256 amount)

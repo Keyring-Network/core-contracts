@@ -271,7 +271,7 @@ describe("Zero-knowledge", function () {
       const version = 1;
       const unpacked1 = await credentialsUpdater.unpack12x20(authorisationProof2.policyDisclosures[0]);
       const unpacked2 = await credentialsUpdater.unpack12x20(authorisationProof2.policyDisclosures[1]);
-      // e.g. policies: [ 1,  2,  3,  4,  5,  6,  7,  8, 9, 10, 11, 12, 13, 14, 15, 16, 0,  0,  0,  0,  0,  0,  0,  0 ]
+      // policies: [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 0,  0,  0,  0,  0,  0,  0,  0 ]
       const policies = [...unpacked1, ...unpacked2];
       for (let i = 0; i < policies.length; i++) {
         const timestamp = await credentials.getCredential(version, trader2.address, policies[i]);

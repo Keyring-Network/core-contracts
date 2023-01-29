@@ -198,10 +198,10 @@ contract MockRuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable 
     }
 
     /**
-     * @param ruleId The unique identifier of a rule. Each Policy has exactly one rule.
-     * @return isIndeed True value if Rule exists, otherwise False.
+     * @return isIndeed Usually true value if Rule exists, otherwise False. Always true in this case.
      */
-    function isRule(bytes32 ruleId) public view override returns (bool isIndeed) {
+    
+    function isRule(bytes32 /* ruleId */) public pure override returns (bool isIndeed) {
         isIndeed = true;
     }
 
