@@ -4,6 +4,14 @@ pragma solidity 0.8.14;
 
 interface IKeyringZkVerifier {
     
+    error Unacceptable(string reason);
+
+    event Deployed(
+        address deployer,         
+        address identityConstructionProofVerifier,
+        address membershipProofVerifier,
+        address authorisationProofVerifier);
+    
     function IDENTITY_MEMBERSHIP_PROOF_VERIFIER() external returns (address);
 
     function IDENTITY_CONSTRUCTION_PROOF_VERIFIER() external returns (address);

@@ -4,7 +4,6 @@ import { createFixtureLoader } from "ethereum-waffle";
 import * as helpers from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
 import { keyringTestFixture } from "../shared/fixtures";
-import _RuleRegistry from "../../artifacts/contracts/ruleRegistry/RuleRegistry.sol/RuleRegistry.json";
 import type {
   KeyringCredentials,
   RuleRegistry,
@@ -14,6 +13,7 @@ import type {
   IdentityTree,
   MockERC20,
   KycERC20,
+  UserPolicies,
 } from "../../src/types";
 import { PolicyStorage } from "../../src/types/PolicyManager";
 import {
@@ -28,6 +28,7 @@ import {
   membershipProof3,
   NULL_ADDRESS,
   NULL_BYTES32,
+  THIRTY_DAYS_IN_SECONDS,
 } from "../../constants";
 
 const TOKEN_NAME = "Mock ERC20 token";
@@ -48,6 +49,7 @@ describe("Compliant Token", function () {
   // prepare contracts with interfaces
   let credentials: KeyringCredentials;
   let ruleRegistry: RuleRegistry;
+  let userPolicies: UserPolicies;
   let policyManager: PolicyManager;
   let credentialsUpdater: KeyringZkCredentialUpdater;
   let walletCheck: WalletCheck;
@@ -61,12 +63,16 @@ describe("Compliant Token", function () {
 
   // accounts in this test
   let admin: string;
+  let bob: string;
+  let bobAsSigner: Signer;
   let traderAsSigner2: Signer;
   let traderAsSigner3: Signer;
 
   before(async () => {
-    const { admin: adminAddress } = await getNamedAccounts();
+    const { admin: adminAddress, bob: bobAddress } = await getNamedAccounts();
     admin = adminAddress;
+    bob = bobAddress;
+    bobAsSigner = ethers.provider.getSigner(bob);
     // set up trader wallets with 2000 ETH each
     traderAsSigner2 = new Wallet(trader2.priv, provider);
     traderAsSigner3 = new Wallet(trader3.priv, provider);
@@ -83,6 +89,7 @@ describe("Compliant Token", function () {
       const fixture = await loadFixture(keyringTestFixture);
       credentials = fixture.contracts.credentials;
       ruleRegistry = fixture.contracts.ruleRegistry;
+      userPolicies = fixture.contracts.userPolicies;
       policyManager = fixture.contracts.policyManager;
       credentialsUpdater = fixture.contracts.credentialsUpdater;
       walletCheck = fixture.contracts.walletCheck;
@@ -125,35 +132,105 @@ describe("Compliant Token", function () {
       }
     });
 
+    it("should allow to set a whitelisting option", async function () {
+      // add trader/bob to whitelist of admin
+      expect(await userPolicies.isWhitelisted(admin, bob)).to.be.false;
+      await userPolicies.addWhitelistedTrader(bob);
+      expect(await userPolicies.isWhitelisted(admin, bob)).to.be.true;
+      const traderWhitelistedCount = await userPolicies.whitelistedTraderCount(admin);
+      expect(traderWhitelistedCount.toString()).to.be.equal("1");
+      expect(await userPolicies.whitelistedTraderAtIndex(admin, traderWhitelistedCount.sub(1))).to.be.equal(bob);
+
+      // if policy is not allowing whitelisting, it should ignore the whitelist
+      const admissionPolicyId = 1;
+      const mockERC20 = await deployMockERC20();
+      const kycERC20 = await deployKycERC20(
+        mockERC20,
+        credentials,
+        userPolicies,
+        policyManager,
+        admissionPolicyId,
+        TOKEN_NAME,
+        TOKEN_SYMBOL,
+      );
+      await mockERC20.approve(kycERC20.address, 100);
+      await expect(kycERC20.depositFor(admin, 100)).to.be.revertedWith(
+        unacceptable("trader not authorized and not whitelisted"),
+      );
+
+      // if policy is allowing whitelisting, it should allow the transfer
+      // BUT only when parties are whitelisted
+
+      // first set policy to allow whitelisting
+      const now = await helpers.time.latest();
+      const timeToNextBlock = 1; // 1 second, because the next block is happening 1 second after now
+      const deadline = now + THIRTY_DAYS_IN_SECONDS + timeToNextBlock;
+      await policyManager.updatePolicyAllowWhitelists(admissionPolicyId, true, deadline);
+      await helpers.time.increaseTo(deadline);
+      await policyManager.policy(admissionPolicyId);
+      expect(await policyManager.callStatic.policyAllowWhitelists(admissionPolicyId)).to.be.true;
+
+      await expect(kycERC20.transfer(bob, 50)).to.be.revertedWith(
+        unacceptable("trader not authorized and not whitelisted"),
+      );
+
+      // NOTE trader needs to whitelist themself for depositFor
+      await expect(kycERC20.depositFor(admin, 100)).to.be.revertedWith(
+        unacceptable("trader not authorized and not whitelisted"),
+      );
+      await userPolicies.addWhitelistedTrader(admin);
+      await kycERC20.depositFor(admin, 100);
+
+      await userPolicies.connect(bobAsSigner).addWhitelistedTrader(admin);
+      await kycERC20.transfer(bob, 40);
+
+      const adminKycBalance = await kycERC20.balanceOf(admin);
+      const bobKycBalance = await kycERC20.balanceOf(bob);
+      expect(adminKycBalance.toString()).to.equal("60");
+      expect(bobKycBalance.toString()).to.equal("40");
+
+      // remove trader from whitelist
+      await userPolicies.removeWhitelistedTrader(bob);
+      expect(await userPolicies.isWhitelisted(admin, bob)).to.be.false;
+      await expect(kycERC20.transfer(bob, 50)).to.be.revertedWith(
+        unacceptable("trader not authorized and not whitelisted"),
+      );
+    });
+
     it("should not permit deployment of an invalid configuration", async function () {
       const mockERC20 = await deployMockERC20();
 
       const nullCredentials = (await ethers.getContractAt("KeyringCredentials", NULL_ADDRESS)) as KeyringCredentials;
       await expect(
-        deployKycERC20(mockERC20, nullCredentials, policyManager, 0, TOKEN_NAME, TOKEN_SYMBOL),
+        deployKycERC20(mockERC20, nullCredentials, userPolicies, policyManager, 0, TOKEN_NAME, TOKEN_SYMBOL),
       ).to.be.revertedWith(unacceptable("credentials cannot be empty"));
+
+      const nullUserPolicies = (await ethers.getContractAt("UserPolicies", NULL_ADDRESS)) as UserPolicies;
+      await expect(
+        deployKycERC20(mockERC20, credentials, nullUserPolicies, policyManager, 0, TOKEN_NAME, TOKEN_SYMBOL),
+      ).to.be.revertedWith(unacceptable("userPolicies cannot be empty"));
 
       const nullPolicyManager = (await ethers.getContractAt("PolicyManager", NULL_ADDRESS)) as PolicyManager;
       await expect(
-        deployKycERC20(mockERC20, credentials, nullPolicyManager, await 0, TOKEN_NAME, TOKEN_SYMBOL),
+        deployKycERC20(mockERC20, credentials, userPolicies, nullPolicyManager, 0, TOKEN_NAME, TOKEN_SYMBOL),
       ).to.be.revertedWith(unacceptable("policyManager cannot be empty"));
 
       await expect(
-        deployKycERC20(mockERC20, credentials, policyManager, 99, TOKEN_NAME, TOKEN_SYMBOL),
+        deployKycERC20(mockERC20, credentials, userPolicies, policyManager, 99, TOKEN_NAME, TOKEN_SYMBOL),
       ).to.be.revertedWith(unacceptable("admissionPolicyId not found"));
 
       const nullCollateral = (await ethers.getContractAt("MockERC20", NULL_ADDRESS)) as MockERC20;
       await expect(
-        deployKycERC20(nullCollateral, credentials, policyManager, 0, TOKEN_NAME, TOKEN_SYMBOL),
+        deployKycERC20(nullCollateral, credentials, userPolicies, policyManager, 0, TOKEN_NAME, TOKEN_SYMBOL),
       ).to.be.revertedWith(unacceptable("collateral token cannot be empty"));
 
-      await expect(deployKycERC20(mockERC20, credentials, policyManager, 0, "", TOKEN_SYMBOL)).to.be.revertedWith(
-        unacceptable("name_ cannot be empty"),
-      );
+      await expect(
+        deployKycERC20(mockERC20, credentials, userPolicies, policyManager, 0, "", TOKEN_SYMBOL),
+      ).to.be.revertedWith(unacceptable("name_ cannot be empty"));
 
-      await expect(deployKycERC20(mockERC20, credentials, policyManager, 0, TOKEN_NAME, "")).to.be.revertedWith(
-        unacceptable("symbol_ cannot be empty"),
-      );
+      await expect(
+        deployKycERC20(mockERC20, credentials, userPolicies, policyManager, 0, TOKEN_NAME, ""),
+      ).to.be.revertedWith(unacceptable("symbol_ cannot be empty"));
 
       // empty genesis rules
       const universeRule = "0x0000000000000000000000000000000000000000000000000000000000000001";
@@ -162,7 +239,7 @@ describe("Compliant Token", function () {
       const { _policyManager, _mockERC20 } = await mockInvalidRuleRegistry(NULL_BYTES32, emptyRule);
 
       await expect(
-        deployKycERC20(_mockERC20, credentials, _policyManager, 0, TOKEN_NAME, TOKEN_SYMBOL),
+        deployKycERC20(_mockERC20, credentials, userPolicies, _policyManager, 0, TOKEN_NAME, TOKEN_SYMBOL),
       ).to.be.revertedWith(unacceptable("the universe rule is not defined in the PolicyManager's RuleRegistry"));
 
       const { _policyManager: __policyManager, _mockERC20: __mockERC20 } = await mockInvalidRuleRegistry(
@@ -171,7 +248,7 @@ describe("Compliant Token", function () {
       );
 
       await expect(
-        deployKycERC20(__mockERC20, credentials, __policyManager, 0, TOKEN_NAME, TOKEN_SYMBOL),
+        deployKycERC20(__mockERC20, credentials, userPolicies, __policyManager, 0, TOKEN_NAME, TOKEN_SYMBOL),
       ).to.be.revertedWith(unacceptable("the empty rule is not defined in the PolicyManager's RuleRegistry"));
     });
 
@@ -181,19 +258,21 @@ describe("Compliant Token", function () {
       const kycERC20 = await deployKycERC20(
         mockERC20,
         credentials,
+        userPolicies,
         policyManager,
         admissionPolicyId,
         TOKEN_NAME,
         TOKEN_SYMBOL,
       );
 
-      const credentialsAddress = await kycERC20.getKeyringCredentials();
-      const policyManagerAddress = await kycERC20.getKeyringPolicyManager();
-      const policyId = await kycERC20.getKeyringAdmissionPolicyId();
+      const credentialsAddress = await kycERC20.keyringCredentials();
+      const policyManagerAddress = await kycERC20.policyManager();
+      const policyId = await kycERC20.admissionPolicyId();
       const getTokenDecimals = await kycERC20.decimals();
       const getTokenName = await kycERC20.name();
       const getTokenSymbol = await kycERC20.symbol();
-      const tokenGenesis = await kycERC20.getKeyringGenesisRules();
+      const universeRuleId = await kycERC20.universeRule();
+      const emptyRuleId = await kycERC20.emptyRule();
 
       expect(credentialsAddress).to.be.equal(credentials.address);
       expect(policyManagerAddress).to.be.equal(policyManager.address);
@@ -201,8 +280,8 @@ describe("Compliant Token", function () {
       expect(getTokenDecimals.toString()).to.equal("18");
       expect(getTokenName).to.equal(TOKEN_NAME);
       expect(getTokenSymbol).to.equal(TOKEN_SYMBOL);
-      expect(tokenGenesis.universeRuleId).to.equal(await ruleRegistry.ruleAtIndex(0));
-      expect(tokenGenesis.emptyRuleId).to.equal(await ruleRegistry.ruleAtIndex(1));
+      expect(universeRuleId).to.equal(await ruleRegistry.ruleAtIndex(0));
+      expect(emptyRuleId).to.equal(await ruleRegistry.ruleAtIndex(1));
     });
 
     it("should meet the ERC20 transfer and transferFrom requirements", async function () {
@@ -216,6 +295,7 @@ describe("Compliant Token", function () {
       const kycERC20 = await deployKycERC20(
         mockERC20,
         credentials,
+        userPolicies,
         policyManager,
         admissionPolicyId,
         TOKEN_NAME,
@@ -223,7 +303,7 @@ describe("Compliant Token", function () {
       );
 
       // check isCompliant
-      expect(await kycERC20.callStatic.checkKeyringCompliance(trader2.address)).to.be.equal(true);
+      expect(await kycERC20.callStatic.checkCache(trader2.address)).to.be.equal(true);
 
       const kycERC20WithTrader = kycERC20.connect(traderAsSigner2);
 
@@ -248,6 +328,7 @@ describe("Compliant Token", function () {
       const kycERC20 = await deployKycERC20(
         mockERC20,
         credentials,
+        userPolicies,
         policyManager,
         admissionPolicyId,
         TOKEN_NAME,
@@ -283,6 +364,7 @@ describe("Compliant Token", function () {
       const kycERC20 = await deployKycERC20(
         mockERC20,
         credentials,
+        userPolicies,
         policyManager,
         admissionPolicyId,
         TOKEN_NAME,
@@ -293,7 +375,9 @@ describe("Compliant Token", function () {
       await mockERC20.approve(kycERC20.address, 100);
       await kycERC20.depositFor(trader2.address, 100);
 
-      await expect(kycERC20.transfer(aliceWallet.address, 50)).to.be.revertedWith("stale credential or no credential");
+      await expect(kycERC20.transfer(aliceWallet.address, 50)).to.be.revertedWith(
+        unacceptable("trader not authorized and not whitelisted"),
+      );
     });
 
     it("should allow a transfer to a compliant wallet", async function () {
@@ -304,6 +388,7 @@ describe("Compliant Token", function () {
       const kycERC20 = await deployKycERC20(
         mockERC20,
         credentials,
+        userPolicies,
         policyManager,
         admissionPolicyId,
         TOKEN_NAME,
@@ -346,12 +431,12 @@ describe("Compliant Token", function () {
       const kycERC20 = await deployKycERC20(
         mockERC20,
         credentials,
+        userPolicies,
         policyManager,
         universeRulePolicy,
         TOKEN_NAME,
         TOKEN_SYMBOL,
       );
-      await kycERC20.getKeyringGenesisRules();
 
       await mockERC20.approve(kycERC20.address, 100);
       await kycERC20.depositFor(admin, 100);
@@ -380,6 +465,7 @@ describe("Compliant Token", function () {
       const kycERC20 = await deployKycERC20(
         mockERC20,
         credentials,
+        userPolicies,
         policyManager,
         emptyRulePolicy,
         TOKEN_NAME,
@@ -387,10 +473,12 @@ describe("Compliant Token", function () {
         traderAsSigner2,
       );
 
-      await policyManager.connect(traderAsSigner2).setUserPolicy(emptyRulePolicy);
+      await userPolicies.connect(traderAsSigner2).setUserPolicy(emptyRulePolicy);
 
       await mockERC20.approve(kycERC20.address, 100);
-      await expect(kycERC20.depositFor(trader2.address, 100)).to.be.revertedWith("stale credential or no credential");
+      await expect(kycERC20.depositFor(trader2.address, 100)).to.be.revertedWith(
+        unacceptable("trader not authorized and not whitelisted"),
+      );
     });
   });
 });
@@ -402,6 +490,7 @@ describe("Compliant Token", function () {
 const deployKycERC20 = async function (
   collateral: MockERC20,
   credentials: KeyringCredentials,
+  userPolicies: UserPolicies,
   policyManager: PolicyManager,
   policyId: number,
   name: string,
@@ -414,11 +503,20 @@ const deployKycERC20 = async function (
     deployer
       ? await kycERC20Factory
           .connect(deployer)
-          .deploy(collateral.address, credentials.address, policyManager.address, policyId, name, symbol)
+          .deploy(
+            collateral.address,
+            credentials.address,
+            policyManager.address,
+            userPolicies.address,
+            policyId,
+            name,
+            symbol,
+          )
       : await kycERC20Factory.deploy(
           collateral.address,
           credentials.address,
           policyManager.address,
+          userPolicies.address,
           policyId,
           name,
           symbol,

@@ -129,14 +129,16 @@ function updateCredentials(address attestor, struct IKeyringZkVerifier.IdentityM
 Updates the credential cache if the request is acceptable.
 
 _The attestor must be valid for all policy disclosures. For this to be possible, it must have been admitted
-     to the system globally before it was selected for a policy. The two zero-knowledge proof share parameters that ensure
-     that both proofs were derived from the same identity commitment._
+     to the system globally before it was selected for a policy. The two zero-knowledge proof share parameters that 
+     ensure that both proofs were derived from the same identity commitment. If the root age used to construct proofs
+     if older than the policy time to live (ttl), the root will be considered acceptable with an age of zero, provided
+     that the number of root successors is less than or equal to the policy acceptRoots (accept most recent n roots)._
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| attestor | address | The identityTree contract with a root that contains the user's identity commitment. Must be present      in the current attestor list for all policy disclosures in the authorization proof. |
+| attestor | address | The identityTree contract with a root that contains the user's identity commitment. Must be       present in the current attestor list for all policy disclosures in the authorization proof. |
 | membershipProof | struct IKeyringZkVerifier.IdentityMembershipProof | A zero-knowledge proof of identity commitment membership in the identity tree. Contains an      external nullifier and nullifier hash that must match the parameters of the authorization proof. |
 | authorizationProof | struct IKeyringZkVerifier.IdentityAuthorisationProof | A zero-knowledge proof of compliance with up to 24 policy disclosures. Contains an      external nullifier and nullifier hash that must match the parameters of the membershiip proof. |
 
@@ -331,6 +333,8 @@ function merkleRootSuccessors(bytes32 merkleRoot) external view returns (uint256
 
 Returns the count of roots recorded after the root to inspect.
 
+_Returns 2 ^ 256 - 1 if no merkle roots have been recorded._
+
 #### Parameters
 
 | Name | Type | Description |
@@ -345,45 +349,6 @@ Returns the count of roots recorded after the root to inspect.
 
 ## KeyringGuard
 
-Provides the core support for functions and modifiers that inspect trader compliance
- with admission policies using the credential cache.
-
-### Compliance
-
-```solidity
-error Compliance(address sender, address user, string module, string method, string reason)
-```
-
-### _isCompliant
-
-```solidity
-function _isCompliant(address user, address keyringCredentials, address policyManager, uint32 admissionPolicyId, bytes32 universeRule, bytes32 emptyRule) internal returns (bool isIndeed)
-```
-
-Checks if the given user has a stored, fresh credential for the admission policy in the
-     credential cache.
-
-_Use static call to inspect._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| user | address | The user address, normally a trading wallet, to check. |
-| keyringCredentials | address | The address for the deployed KeyringCredentials contract. |
-| policyManager | address | The address of the deployed PolicyManager contract to rely on. |
-| admissionPolicyId | uint32 | The unique identifier of a Policy. |
-| universeRule | bytes32 | The id of the universe (everyone) Rule. |
-| emptyRule | bytes32 | The id of the empty (noone) Rule. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| isIndeed | bool | True if a valid credential is found and its age is less than or equal to      the admission policy's TTL. |
-
-## KeyringGuardImmutable
-
 KeyringGuard implementation that uses immutable configuration parameters and presents 
  a simplified modifier for use in derived contracts.
 
@@ -393,125 +358,80 @@ KeyringGuard implementation that uses immutable configuration parameters and pre
 address NULL_ADDRESS
 ```
 
-### NULL_BYTES32
+### keyringCredentials
 
 ```solidity
-bytes32 NULL_BYTES32
+address keyringCredentials
 ```
 
-### keyringCompliance
+### policyManager
 
 ```solidity
-modifier keyringCompliance(address user)
+address policyManager
 ```
 
-_Use this modifier in derived contracts to enforce user compliance with the admission policy._
+### userPolicies
 
-#### Parameters
+```solidity
+address userPolicies
+```
 
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| user | address | User address to check. |
+### admissionPolicyId
+
+```solidity
+uint32 admissionPolicyId
+```
+
+### universeRule
+
+```solidity
+bytes32 universeRule
+```
+
+### emptyRule
+
+```solidity
+bytes32 emptyRule
+```
 
 ### constructor
 
 ```solidity
-constructor(address keyringCredentials, address policyManager, uint32 admissionPolicyId) internal
+constructor(address keyringCredentials_, address policyManager_, address userPolicies_, uint32 admissionPolicyId_) internal
 ```
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| keyringCredentials | address | The KeyringCredentials contract to rely on. |
-| policyManager | address | The address of the deployed PolicyManager to rely on. |
-| admissionPolicyId | uint32 | The unique identifier of a Policy against which user accounts will be compared. |
+| keyringCredentials_ | address | The KeyringCredentials contract to rely on.      @param policyManager_ The address of the deployed PolicyManager to rely on.      @param userPolicies_ The address of the deployed UserPolicies contract to rely on.       @param admissionPolicyId_ The unique identifier of a Policy against which user accounts will be compared. |
+| policyManager_ | address |  |
+| userPolicies_ | address |  |
+| admissionPolicyId_ | uint32 |  |
 
-### getKeyringCredentials
-
-```solidity
-function getKeyringCredentials() external view returns (address keyringCredentials)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| keyringCredentials | address | The KeyringCredentials contract to rely on. |
-
-### getKeyringPolicyManager
+### checkCache
 
 ```solidity
-function getKeyringPolicyManager() external view returns (address policyManager)
+function checkCache(address trader) public returns (bool isIndeed)
 ```
 
-#### Return Values
+Checks if the given user has a stored, fresh credential for the admission policy in the
+     credential cache.
+     @dev Use static call to inspect.
+     @param trader The user address, normally a trading wallet, to check.
 
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| policyManager | address | The PolicyManager contract to rely on. |
-
-### getKeyringAdmissionPolicyId
+### checkGuard
 
 ```solidity
-function getKeyringAdmissionPolicyId() external view returns (uint32 admissionPolicyId)
+function checkGuard(address from, address to) public returns (bool isAuthorised)
 ```
 
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| admissionPolicyId | uint32 | The unique identifier of the admission Policy. |
-
-### getKeyringGenesisRules
-
-```solidity
-function getKeyringGenesisRules() external view returns (bytes32 universeRuleId, bytes32 emptyRuleId)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| universeRuleId | bytes32 | The id of the universal set Rule (everyone), |
-| emptyRuleId | bytes32 | The id of the null set Rule (no one), |
-
-### checkKeyringCompliance
-
-```solidity
-function checkKeyringCompliance(address user) external returns (bool isCompliant)
-```
-
-Checks user compliance status.
-
-_Use static call to inspect._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| user | address | User to check. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| isCompliant | bool | True if the user would be permitted to proceed. |
-
-### _isPolicy
-
-```solidity
-function _isPolicy(address policyManager, uint32 policyId) internal view returns (bool isIndeed)
-```
-
-Checks the existence of a policy in the PolicyManager contract.
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| policyManager | address | The address of the deployed PolicyManager contract to query. |
-| policyId | uint32 | The unique identifier of a policy. |
+Check if parties are acceptable to each other, either through compliance with the active policy,
+     or because they are explicitly whitelisted by the trader. 
+     @param from The first of two parties to check. 
+     @param to The second of two parties to check. 
+     @return isAuthorised True if the parties have cached credentials signifying compliance attestations, or
+     if counterparties are explicitly whitelisted by the other.
 
 ## IAuthorizationProofVerifier
 
@@ -678,7 +598,7 @@ function setCredential(address trader, uint32 admissionPolicyId, uint256 timesta
 function getCredential(uint8 version, address trader, uint32 admissionPolicyId) external view returns (uint256)
 ```
 
-## IKeyringGuardImmutable
+## IKeyringGuard
 
 KeyringGuard implementation that uses immutables and presents a simplified modifier.
 
@@ -691,37 +611,19 @@ error Unacceptable(string reason)
 ### KeyringGuardConfigured
 
 ```solidity
-event KeyringGuardConfigured(address keyringCredentials, address policyManager, uint32 admissionPolicyId, bytes32 universeRule, bytes32 emptyRule)
+event KeyringGuardConfigured(address keyringCredentials, address policyManager, address userPolicies, uint32 admissionPolicyId, bytes32 universeRule, bytes32 emptyRule)
 ```
 
-### getKeyringCredentials
+### checkCache
 
 ```solidity
-function getKeyringCredentials() external view returns (address keyringCredentials)
+function checkCache(address trader) external returns (bool isIndeed)
 ```
 
-### getKeyringPolicyManager
+### checkGuard
 
 ```solidity
-function getKeyringPolicyManager() external view returns (address policyManager)
-```
-
-### getKeyringAdmissionPolicyId
-
-```solidity
-function getKeyringAdmissionPolicyId() external view returns (uint32 admissionPolicyId)
-```
-
-### getKeyringGenesisRules
-
-```solidity
-function getKeyringGenesisRules() external view returns (bytes32 universeRuleId, bytes32 emptyRuleId)
-```
-
-### checkKeyringCompliance
-
-```solidity
-function checkKeyringCompliance(address user) external returns (bool isCompliant)
+function checkGuard(address from, address to) external returns (bool isAuthorized)
 ```
 
 ## IKeyringZkCredentialUpdater
@@ -805,6 +707,18 @@ function unpack12x20(uint256 packed) external pure returns (uint32[12] unpacked)
 ```
 
 ## IKeyringZkVerifier
+
+### Unacceptable
+
+```solidity
+error Unacceptable(string reason)
+```
+
+### Deployed
+
+```solidity
+event Deployed(address deployer, address identityConstructionProofVerifier, address membershipProofVerifier, address authorisationProofVerifier)
+```
 
 ### IDENTITY_MEMBERSHIP_PROOF_VERIFIER
 
@@ -954,28 +868,40 @@ event UpdatePolicyDescription(address owner, uint32 policyId, string description
 event UpdatePolicyRuleId(address owner, uint32 policyId, bytes32 ruleId, uint256 deadline)
 ```
 
+### UpdatePolicyTtl
+
+```solidity
+event UpdatePolicyTtl(address owner, uint32 policyId, uint128 ttl, uint256 deadline)
+```
+
 ### UpdatePolicyGracePeriod
 
 ```solidity
 event UpdatePolicyGracePeriod(address owner, uint32 policyId, uint128 gracePeriod, uint256 deadline)
 ```
 
-### UpdatePolicyDeadline
+### UpdatePolicyAcceptRoots
 
 ```solidity
-event UpdatePolicyDeadline(address owner, uint32 policyId, uint256 deadline)
+event UpdatePolicyAcceptRoots(address owner, uint32 policyId, uint16 acceptRoots, uint256 deadline)
 ```
 
 ### UpdatePolicyLock
 
 ```solidity
-event UpdatePolicyLock(address owner, uint32 policyId, uint256 deadline)
+event UpdatePolicyLock(address owner, uint32 policyId, bool locked, uint256 deadline)
 ```
 
-### UpdatePolicyTtl
+### UpdatePolicyAllowWhitelists
 
 ```solidity
-event UpdatePolicyTtl(address owner, uint32 policyId, uint128 ttl, uint256 deadline)
+event UpdatePolicyAllowWhitelists(address owner, uint32 policyId, bool allowWhitelists, uint256 deadline)
+```
+
+### UpdatePolicyDeadline
+
+```solidity
+event UpdatePolicyDeadline(address owner, uint32 policyId, uint256 deadline)
 ```
 
 ### AddPolicyAttestors
@@ -1000,24 +926,6 @@ event AddPolicyWalletChecks(address owner, uint32 policyId, address[] walletChec
 
 ```solidity
 event RemovePolicyWalletChecks(address owner, uint32 policyId, address[] walletChecks, uint256 deadline)
-```
-
-### UpdatePolicyAcceptRoots
-
-```solidity
-event UpdatePolicyAcceptRoots(address owner, uint32 policyId, uint16 acceptRoots, uint256 deadline)
-```
-
-### PolicyLocked
-
-```solidity
-event PolicyLocked(address owner, uint32 policyId, uint256 deadline)
-```
-
-### PolicyLockCancelled
-
-```solidity
-event PolicyLockCancelled(address owner, uint32 policyId, uint256 deadline)
 ```
 
 ### AdmitAttestor
@@ -1048,18 +956,6 @@ event AdmitWalletCheck(address admin, address walletCheck)
 
 ```solidity
 event RemoveWalletCheck(address admin, address walletCheck)
-```
-
-### SetUserPolicy
-
-```solidity
-event SetUserPolicy(address user, uint32 policyId)
-```
-
-### SEED_POLICY_OWNER
-
-```solidity
-function SEED_POLICY_OWNER() external view returns (bytes32)
 ```
 
 ### ROLE_POLICY_CREATOR
@@ -1128,22 +1024,28 @@ function updatePolicyTtl(uint32 policyId, uint32 ttl, uint256 deadline) external
 function updatePolicyGracePeriod(uint32 policyId, uint32 gracePeriod, uint256 deadline) external
 ```
 
+### updatePolicyAcceptRoots
+
+```solidity
+function updatePolicyAcceptRoots(uint32 policyId, uint16 acceptRoots, uint256 deadline) external
+```
+
+### updatePolicyAllowWhitelists
+
+```solidity
+function updatePolicyAllowWhitelists(uint32 policyId, bool allowWhitelists, uint256 deadline) external
+```
+
+### updatePolicyLock
+
+```solidity
+function updatePolicyLock(uint32 policyId, bool locked, uint256 deadline) external
+```
+
 ### setDeadline
 
 ```solidity
 function setDeadline(uint32 policyId, uint256 deadline) external
-```
-
-### lockPolicy
-
-```solidity
-function lockPolicy(uint32 policyId, uint256 deadline) external
-```
-
-### cancelLockPolicy
-
-```solidity
-function cancelLockPolicy(uint32 policyId, uint256 deadline) external
 ```
 
 ### addPolicyAttestors
@@ -1168,12 +1070,6 @@ function addPolicyWalletChecks(uint32 policyId, address[] walletChecks, uint256 
 
 ```solidity
 function removePolicyWalletChecks(uint32 policyId, address[] walletChecks, uint256 deadline) external
-```
-
-### setUserPolicy
-
-```solidity
-function setUserPolicy(uint32 policyId) external
 ```
 
 ### admitAttestor
@@ -1206,12 +1102,6 @@ function admitWalletCheck(address walletCheck) external
 function removeWalletCheck(address walletCheck) external
 ```
 
-### userPolicy
-
-```solidity
-function userPolicy(address user) external view returns (uint32 policyId)
-```
-
 ### policy
 
 ```solidity
@@ -1222,6 +1112,12 @@ function policy(uint32 policyId) external returns (struct PolicyStorage.PolicySc
 
 ```solidity
 function policyRawData(uint32 policyId) external view returns (uint256 deadline, struct PolicyStorage.PolicyScalar scalarActive, struct PolicyStorage.PolicyScalar scalarPending, address[] attestorsActive, address[] attestorsPendingAdditions, address[] attestorsPendingRemovals, address[] walletChecksActive, address[] walletChecksPendingAdditions, address[] walletChecksPendingRemovals)
+```
+
+### policyDescription
+
+```solidity
+function policyDescription(uint32 policyId) external returns (string description)
 ```
 
 ### policyOwnerRole
@@ -1236,10 +1132,16 @@ function policyOwnerRole(uint32 policyId) external pure returns (bytes32 ownerRo
 function policyRuleId(uint32 policyId) external returns (bytes32 ruleId)
 ```
 
-### policyDescription
+### policyTtl
 
 ```solidity
-function policyDescription(uint32 policyId) external returns (string description)
+function policyTtl(uint32 policyId) external returns (uint128 ttl)
+```
+
+### policyGracePeriod
+
+```solidity
+function policyGracePeriod(uint32 policyId) external returns (uint128 gracePeriod)
 ```
 
 ### policyAcceptRoots
@@ -1248,10 +1150,10 @@ function policyDescription(uint32 policyId) external returns (string description
 function policyAcceptRoots(uint32 policyId) external returns (uint16 acceptRoots)
 ```
 
-### policyTtl
+### policyAllowWhitelists
 
 ```solidity
-function policyTtl(uint32 policyId) external returns (uint128 ttl)
+function policyAllowWhitelists(uint32 policyId) external returns (bool isAllowed)
 ```
 
 ### policyLocked
@@ -1260,10 +1162,10 @@ function policyTtl(uint32 policyId) external returns (uint128 ttl)
 function policyLocked(uint32 policyId) external returns (bool isLocked)
 ```
 
-### policyGracePeriod
+### policyDeadline
 
 ```solidity
-function policyGracePeriod(uint32 policyId) external returns (uint128 gracePeriod)
+function policyDeadline(uint32 policyId) external returns (uint256 deadline)
 ```
 
 ### policyAttestorCount
@@ -1523,6 +1425,80 @@ function ruleOperandAtIndex(bytes32 ruleId, uint256 index) external view returns
 
 ```solidity
 function generateRuleId(string description, enum IRuleRegistry.Operator operator, bytes32[] operands) external pure returns (bytes32 ruleId)
+```
+
+## IUserPolicies
+
+### Unacceptable
+
+```solidity
+error Unacceptable(string reason)
+```
+
+### Deployed
+
+```solidity
+event Deployed(address trustedForwarder, address policyManager)
+```
+
+### SetUserPolicy
+
+```solidity
+event SetUserPolicy(address trader, uint32 policyId)
+```
+
+### AddTraderWhitelisted
+
+```solidity
+event AddTraderWhitelisted(address, address whitelisted)
+```
+
+### RemoveTraderWhitelisted
+
+```solidity
+event RemoveTraderWhitelisted(address, address whitelisted)
+```
+
+### userPolicies
+
+```solidity
+function userPolicies(address trader) external view returns (uint32)
+```
+
+### setUserPolicy
+
+```solidity
+function setUserPolicy(uint32 policyId) external
+```
+
+### addWhitelistedTrader
+
+```solidity
+function addWhitelistedTrader(address whitelisted) external
+```
+
+### removeWhitelistedTrader
+
+```solidity
+function removeWhitelistedTrader(address whitelisted) external
+```
+
+### whitelistedTraderCount
+
+```solidity
+function whitelistedTraderCount(address trader) external view returns (uint256 count)
+```
+
+### whitelistedTraderAtIndex
+
+```solidity
+function whitelistedTraderAtIndex(address trader, uint256 index) external view returns (address whitelisted)
+```
+
+### isWhitelisted
+
+```solidity
+function isWhitelisted(address trader, address counterparty) external view returns (bool isIndeed)
 ```
 
 ## IWalletCheck
@@ -2023,7 +1999,6 @@ error Unacceptable(string reason)
 ```solidity
 struct App {
   struct PolicyStorage.Policy[] policies;
-  mapping(address => uint32) userPolicies;
   struct AddressSet.Set globalAttestorSet;
   mapping(address => string) attestorUris;
   struct AddressSet.Set globalWalletCheckSet;
@@ -2039,6 +2014,7 @@ struct PolicyScalar {
   uint32 ttl;
   uint32 gracePeriod;
   uint16 acceptRoots;
+  bool allowWhitelists;
   bool locked;
 }
 ```
@@ -2105,18 +2081,6 @@ function insertGlobalWalletCheck(struct PolicyStorage.App self, address walletCh
 function removeGlobalWalletCheck(struct PolicyStorage.App self, address walletCheck) public
 ```
 
-### setUserPolicy
-
-```solidity
-function setUserPolicy(struct PolicyStorage.App self, address user, uint32 userPolicyId) public
-```
-
-### userPolicy
-
-```solidity
-function userPolicy(struct PolicyStorage.App self, address user) public view returns (uint32 policyId)
-```
-
 ### newPolicy
 
 ```solidity
@@ -2132,13 +2096,7 @@ function policyRawData(struct PolicyStorage.App self, uint32 policyId) public vi
 ### processStaged
 
 ```solidity
-function processStaged(struct PolicyStorage.Policy policyIn) public returns (struct PolicyStorage.Policy policy)
-```
-
-### isPolicy
-
-```solidity
-function isPolicy(struct PolicyStorage.App self, uint32 policyId) public view returns (bool isIndeed)
+function processStaged(struct PolicyStorage.Policy self) public
 ```
 
 ### checkLock
@@ -2156,7 +2114,7 @@ function isLocked(struct PolicyStorage.Policy policy) public view returns (bool 
 ### setDeadline
 
 ```solidity
-function setDeadline(struct PolicyStorage.Policy policyIn, uint256 deadline) public returns (struct PolicyStorage.Policy policy)
+function setDeadline(struct PolicyStorage.Policy self, uint256 deadline) public
 ```
 
 ### writePolicyScalar
@@ -2187,6 +2145,12 @@ function writeTtl(struct PolicyStorage.Policy self, uint32 ttl) public
 
 ```solidity
 function writeGracePeriod(struct PolicyStorage.Policy self, uint32 gracePeriod) public
+```
+
+### writeAllowWhitelists
+
+```solidity
+function writeAllowWhitelists(struct PolicyStorage.Policy self, bool allowWhitelists) public
 ```
 
 ### writePolicyLock
@@ -2542,12 +2506,6 @@ PolicyManager holds the policies managed by DeFi Protocol Operators and users.
  When used by a user, policies describe the rules that compliant DeFi Protocol Operators 
  must enforce in order for their contracts to be compatible with the user policy.
 
-### SEED_POLICY_OWNER
-
-```solidity
-bytes32 SEED_POLICY_OWNER
-```
-
 ### ROLE_POLICY_CREATOR
 
 ```solidity
@@ -2690,24 +2648,6 @@ _Deadlines must always be >= the active policy grace period._
 | policyScalar | struct PolicyStorage.PolicyScalar | The policy definition scalar values. |
 | deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
 
-### updatePolicyRuleId
-
-```solidity
-function updatePolicyRuleId(uint32 policyId, bytes32 ruleId, uint256 deadline) external
-```
-
-Policy admins can update policy rules.
-
-_Deadlines must always be >= the active policy grace period._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| policyId | uint32 | The policy to update. |
-| ruleId | bytes32 | The new policy rule. |
-| deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
-
 ### updatePolicyDescription
 
 ```solidity
@@ -2724,6 +2664,24 @@ _Deadlines must always be >= the active policy grace period._
 | ---- | ---- | ----------- |
 | policyId | uint32 | The policy to update. |
 | descriptionUtf8 | string | The new policy description. |
+| deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
+
+### updatePolicyRuleId
+
+```solidity
+function updatePolicyRuleId(uint32 policyId, bytes32 ruleId, uint256 deadline) external
+```
+
+Policy admins can update policy rules.
+
+_Deadlines must always be >= the active policy grace period._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policy to update. |
+| ruleId | bytes32 | The new policy rule. |
 | deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
 
 ### updatePolicyTtl
@@ -2780,12 +2738,29 @@ _Deadlines must always be >= the active policy grace period._
 | ---- | ---- | ----------- |
 | policyId | uint32 | The policy to update. |
 | acceptRoots | uint16 | The depth of most recent roots to always accept. |
-| deadline | uint256 |  |
+| deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
 
-### lockPolicy
+### updatePolicyAllowWhitelists
 
 ```solidity
-function lockPolicy(uint32 policyId, uint256 deadline) external
+function updatePolicyAllowWhitelists(uint32 policyId, bool allowWhitelists, uint256 deadline) external
+```
+
+Policy owners can allow users to set whitelists of counterparties to exempt from
+     compliance checks.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policy to update. |
+| allowWhitelists | bool | True if whitelists are allowed, otherwise false. |
+| deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
+
+### updatePolicyLock
+
+```solidity
+function updatePolicyLock(uint32 policyId, bool locked, uint256 deadline) external
 ```
 
 Schedules policy locking if the policy is not already scheduled to be locked.
@@ -2797,24 +2772,8 @@ _Deadlines must always be >= the active policy grace period._
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | policyId | uint32 | The policy to lock. |
+| locked | bool | True if the policy is to be locked. False if the scheduled lock is to be cancelled. |
 | deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
-
-### cancelLockPolicy
-
-```solidity
-function cancelLockPolicy(uint32 policyId, uint256 deadline) external
-```
-
-Unschedules policy locking.
-
-_Deadlines must always be >= the active policy grace period._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| policyId | uint32 | The policy to abort locking. |
-| deadline | uint256 | Overrides previous deadline. |
 
 ### setDeadline
 
@@ -2909,21 +2868,6 @@ _Deadlines must always be >= the active policy grace period. The wallet checks m
 | walletChecks | address[] | The address of one or more Attestors to remove from the Policy. |
 | deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
 
-### setUserPolicy
-
-```solidity
-function setUserPolicy(uint32 policyId) external
-```
-
-Each user sets exactly one Policy that attestors are required to compare with admission 
-     policies.
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| policyId | uint32 | The unique identifier of a Policy. |
-
 ### admitAttestor
 
 ```solidity
@@ -3000,20 +2944,6 @@ _Does not automatically remove Wallet Checks from affected Policies._
 | ---- | ---- | ----------- |
 | walletCheck | address | The address of a Wallet Check contract in the global whitelist. |
 
-### userPolicy
-
-```solidity
-function userPolicy(address user) external view returns (uint32 policyId)
-```
-
-Each user has a user policy that is compared to admission policies.
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| user | address | The user to inspect. |
-
 ### policy
 
 ```solidity
@@ -3073,26 +3003,6 @@ Generate the corresponding admin/owner role for a policyId
 | ---- | ---- | ----------- |
 | ownerRole | bytes32 | The bytes32 owner role that corresponds to the policyId |
 
-### policyRuleId
-
-```solidity
-function policyRuleId(uint32 policyId) external returns (bytes32 ruleId)
-```
-
-_Use static calls to inspect current information._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| policyId | uint32 | The unique identifier of a Policy. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| ruleId | bytes32 | Rule to enforce, defined in the RuleRegistry. |
-
 ### policyDescription
 
 ```solidity
@@ -3112,6 +3022,26 @@ _Use static calls to inspect current information._
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | descriptionUtf8 | string | Not used for any on-chain logic. |
+
+### policyRuleId
+
+```solidity
+function policyRuleId(uint32 policyId) external returns (bytes32 ruleId)
+```
+
+_Use static calls to inspect current information._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The unique identifier of a Policy. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| ruleId | bytes32 | Rule to enforce, defined in the RuleRegistry. |
 
 ### policyTtl
 
@@ -3169,6 +3099,26 @@ Check the number of latest identity roots to accept, regardless of age.
 | ---- | ---- | ----------- |
 | acceptRoots | uint16 | The number of latest identity roots to accept unconditionally for the construction      of zero-knowledge proofs. |
 
+### policyAllowWhitelists
+
+```solidity
+function policyAllowWhitelists(uint32 policyId) external returns (bool isAllowed)
+```
+
+Check if the policy allows user whitelisting.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policy to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| isAllowed | bool | True if whitelists can be used to override compliance checks. |
+
 ### policyLocked
 
 ```solidity
@@ -3184,6 +3134,28 @@ _Use static calls to inspect current information._
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | isLocked | bool | True if the policy cannot be changed |
+
+### policyDeadline
+
+```solidity
+function policyDeadline(uint32 policyId) external returns (uint256 deadline)
+```
+
+Inspect the schedule to implementing staged policy updates.
+
+_Use static calls to inspect current information._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policy to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| deadline | uint256 | The scheduled time to active the pending policy update. |
 
 ### policyAttestorCount
 
@@ -3838,16 +3810,23 @@ This contract illustrates how an immutable KeyringGuard can be wrapped around co
  (e.g. DAI Token). Tokens can only be transferred to an address that maintains compliance with the configured 
  policy.
 
+### checkAuthorisations
+
+```solidity
+modifier checkAuthorisations(address from, address to)
+```
+
 ### constructor
 
 ```solidity
-constructor(address collateralToken, address keyringCredentials, address policyManager, uint32 policyId, string name_, string symbol_) public
+constructor(address collateralToken, address keyringCredentials, address policyManager, address userPolicies, uint32 policyId, string name_, string symbol_) public
 ```
 
 Specify the token to wrap and the new name/symbol of the wrapped token - then good to go!
      @param collateralToken The contract address of the token that is to be wrapped
      @param keyringCredentials The address for the deployed KeyringCredentials contract.
      @param policyManager The address for the deployed PolicyManager contract.
+     @param userPolicies The address for the deployed UserPolicies contract.
      @param policyId The unique identifier of a Policy.
      @param name_ The name of the new wrapped token. Passed to ERC20.constructor to set the ERC20.name
      @param symbol_ The symbol for the new wrapped token. Passed to ERC20.constructor to set the ERC20.symbol
@@ -3864,7 +3843,7 @@ Returns decimals based on the underlying token decimals
 ### depositFor
 
 ```solidity
-function depositFor(address account, uint256 amount) public returns (bool)
+function depositFor(address trader, uint256 amount) public returns (bool)
 ```
 
 Compliant users deposit underlying tokens and mint the same number of wrapped tokens.
@@ -3873,13 +3852,13 @@ Compliant users deposit underlying tokens and mint the same number of wrapped to
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| account | address | Recipient of the wrapped tokens |
+| trader | address | Recipient of the wrapped tokens |
 | amount | uint256 | Quantity of underlying tokens from _msgSender() to exchange for wrapped tokens (to account) at 1:1 |
 
 ### withdrawTo
 
 ```solidity
-function withdrawTo(address account, uint256 amount) public returns (bool)
+function withdrawTo(address trader, uint256 amount) public returns (bool)
 ```
 
 Compliant users burn a number of wrapped tokens and withdraw the same number of underlying tokens.
@@ -3888,7 +3867,7 @@ Compliant users burn a number of wrapped tokens and withdraw the same number of 
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| account | address | Recipient of the underlying tokens |
+| trader | address | Recipient of the underlying tokens |
 | amount | uint256 | Quantity of wrapped tokens from _msgSender() to exchange for underlying tokens (to account) at 1:1 |
 
 ### transfer
@@ -3913,6 +3892,129 @@ Wraps the inherited ERC20.transferFrom function with the keyringCompliance guard
      @param to The recipient of amount 
      @param amount The amount to be deducted from the to's allowance.
      @return bool True if successfully executed.
+
+## UserPolicies
+
+Users select one policy. Attestors are required to confirm compatibility of the user policy with
+ the admission policy to check before issuing attestations. Traders may also define whitelists which are
+ counterparties they will trade with even if compliance cannot be confirmed by an attestor. Whitelists
+ only apply where admission policy owners have set the admission policy allowWhitelists flag to true.
+
+### policyManager
+
+```solidity
+address policyManager
+```
+
+### userPolicies
+
+```solidity
+mapping(address => uint32) userPolicies
+```
+
+### constructor
+
+```solidity
+constructor(address trustedForwarder, address policyManager_) public
+```
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| trustedForwarder | address | Contract address that is allowed to relay message signers. |
+| policyManager_ | address |  |
+
+### setUserPolicy
+
+```solidity
+function setUserPolicy(uint32 policyId) external
+```
+
+Users, normally auth wallets, set a policy to be checked by attestors.
+     @param policyId The policy id to enable for the auth wallet.
+
+### addWhitelistedTrader
+
+```solidity
+function addWhitelistedTrader(address whitelisted) external
+```
+
+Trader wallets may appoint whitelisted addresses to trade with without the protection
+     of Keyring compliance checks. 
+     @param whitelisted A counterparty address to trade with unconditionally. Must not be whitelisted.
+
+### removeWhitelistedTrader
+
+```solidity
+function removeWhitelistedTrader(address whitelisted) external
+```
+
+Trader wallets may appoint whitelisted addresses to trade with without the protection
+     of Keyring compliance checks.
+     @param whitelisted A counterparty to re-enable compliance checks. Must be whitelisted..
+
+### whitelistedTraderCount
+
+```solidity
+function whitelistedTraderCount(address trader) external view returns (uint256 count)
+```
+
+Count the addresses on a trader whitelist.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| trader | address | The trader whitelist to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| count | uint256 | The number of addresses on a trader whitelist. |
+
+### whitelistedTraderAtIndex
+
+```solidity
+function whitelistedTraderAtIndex(address trader, uint256 index) external view returns (address whitelisted)
+```
+
+Iterate the addresses on a trader whitelist.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| trader | address | The trader whitelist to inspect. |
+| index | uint256 | The row to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| whitelisted | address | The address in the trader whitelist at the index row. |
+
+### isWhitelisted
+
+```solidity
+function isWhitelisted(address trader, address counterparty) external view returns (bool isIndeed)
+```
+
+check if a counterparty is whitelisted by a trader.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| trader | address | The trader whitelist to inspect. |
+| counterparty | address | The address to search for on the trader whitelist. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| isIndeed | bool | True if the counterparty is present on the trader whitelist. |
 
 ## WalletCheck
 
@@ -3960,152 +4062,6 @@ Set the flagged boolean for a specific trading wallet to true or false.
 | ---- | ---- | ----------- |
 | wallet | address | The subject wallet. |
 | flagged | bool | True if the wallet is to prevent from trading for policies that       observe this instance. |
-
-## Pairing
-
-### InvalidProof
-
-```solidity
-error InvalidProof()
-```
-
-### BASE_MODULUS
-
-```solidity
-uint256 BASE_MODULUS
-```
-
-### SCALAR_MODULUS
-
-```solidity
-uint256 SCALAR_MODULUS
-```
-
-### G1Point
-
-```solidity
-struct G1Point {
-  uint256 X;
-  uint256 Y;
-}
-```
-
-### G2Point
-
-```solidity
-struct G2Point {
-  uint256[2] X;
-  uint256[2] Y;
-}
-```
-
-### P1
-
-```solidity
-function P1() internal pure returns (struct Pairing.G1Point)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | struct Pairing.G1Point | the generator of G1 |
-
-### P2
-
-```solidity
-function P2() internal pure returns (struct Pairing.G2Point)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | struct Pairing.G2Point | the generator of G2 |
-
-### negate
-
-```solidity
-function negate(struct Pairing.G1Point p) internal pure returns (struct Pairing.G1Point r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | struct Pairing.G1Point | the negation of p, i.e. p.addition(p.negate()) should be zero. |
-
-### addition
-
-```solidity
-function addition(struct Pairing.G1Point p1, struct Pairing.G1Point p2) internal view returns (struct Pairing.G1Point r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | struct Pairing.G1Point | the sum of two points of G1 |
-
-### scalar_mul
-
-```solidity
-function scalar_mul(struct Pairing.G1Point p, uint256 s) internal view returns (struct Pairing.G1Point r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | struct Pairing.G1Point | the product of a point on G1 and a scalar, i.e. p == p.scalar_mul(1) and p.addition(p) == p.scalar_mul(2) for all points p. |
-
-### pairingCheck
-
-```solidity
-function pairingCheck(struct Pairing.G1Point[] p1, struct Pairing.G2Point[] p2) internal view
-```
-
-Asserts the pairing check
-e(p1[0], p2[0]) *  .... * e(p1[n], p2[n]) == 1
-For example pairing([P1(), P1().negate()], [P2(), P2()]) should succeed
-
-## Verifier20
-
-### VerifyingKey
-
-```solidity
-struct VerifyingKey {
-  struct Pairing.G1Point alfa1;
-  struct Pairing.G2Point beta2;
-  struct Pairing.G2Point gamma2;
-  struct Pairing.G2Point delta2;
-  struct Pairing.G1Point[] IC;
-}
-```
-
-### Proof
-
-```solidity
-struct Proof {
-  struct Pairing.G1Point A;
-  struct Pairing.G2Point B;
-  struct Pairing.G1Point C;
-}
-```
-
-### verifyingKey
-
-```solidity
-function verifyingKey() internal pure returns (struct Verifier20.VerifyingKey vk)
-```
-
-### verifyProof
-
-```solidity
-function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[4] input) public view
-```
-
-_Verifies a Semaphore proof. Reverts with InvalidProof if the proof is invalid._
 
 ## Pairing
 
@@ -4271,20 +4227,6 @@ function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[3] inp
 | ---- | ---- | ----------- |
 | r | bool | bool true if proof is valid |
 
-## IKeyringECRecoverTyped
-
-### getSignerFromSig
-
-```solidity
-function getSignerFromSig(address user, uint32 userPolicyId, uint32 admissionPolicyId, uint256 timestamp, bool isRequest, bytes signature) external view returns (address signer)
-```
-
-### getHashFromAttestation
-
-```solidity
-function getHashFromAttestation(address user, uint32 userPolicyId, uint32 admissionPolicyId, uint256 timestamp, bool isRequest) external view returns (bytes32 message)
-```
-
 ## NoImplementation
 
 This stub provides a hint for hardhat artifacts and typings. It is a non-functional
@@ -4328,6 +4270,166 @@ function verify(struct NoImplementation.ForwardRequest, bytes) public pure retur
 
 ```solidity
 function execute(struct NoImplementation.ForwardRequest, bytes) public payable returns (bool, bytes)
+```
+
+## Pairing
+
+### InvalidProof
+
+```solidity
+error InvalidProof()
+```
+
+### BASE_MODULUS
+
+```solidity
+uint256 BASE_MODULUS
+```
+
+### SCALAR_MODULUS
+
+```solidity
+uint256 SCALAR_MODULUS
+```
+
+### G1Point
+
+```solidity
+struct G1Point {
+  uint256 X;
+  uint256 Y;
+}
+```
+
+### G2Point
+
+```solidity
+struct G2Point {
+  uint256[2] X;
+  uint256[2] Y;
+}
+```
+
+### P1
+
+```solidity
+function P1() internal pure returns (struct Pairing.G1Point)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | struct Pairing.G1Point | the generator of G1 |
+
+### P2
+
+```solidity
+function P2() internal pure returns (struct Pairing.G2Point)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | struct Pairing.G2Point | the generator of G2 |
+
+### negate
+
+```solidity
+function negate(struct Pairing.G1Point p) internal pure returns (struct Pairing.G1Point r)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| r | struct Pairing.G1Point | the negation of p, i.e. p.addition(p.negate()) should be zero. |
+
+### addition
+
+```solidity
+function addition(struct Pairing.G1Point p1, struct Pairing.G1Point p2) internal view returns (struct Pairing.G1Point r)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| r | struct Pairing.G1Point | the sum of two points of G1 |
+
+### scalar_mul
+
+```solidity
+function scalar_mul(struct Pairing.G1Point p, uint256 s) internal view returns (struct Pairing.G1Point r)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| r | struct Pairing.G1Point | the product of a point on G1 and a scalar, i.e. p == p.scalar_mul(1) and p.addition(p) == p.scalar_mul(2) for all points p. |
+
+### pairingCheck
+
+```solidity
+function pairingCheck(struct Pairing.G1Point[] p1, struct Pairing.G2Point[] p2) internal view
+```
+
+Asserts the pairing check
+e(p1[0], p2[0]) *  .... * e(p1[n], p2[n]) == 1
+For example pairing([P1(), P1().negate()], [P2(), P2()]) should succeed
+
+## Verifier20
+
+### VerifyingKey
+
+```solidity
+struct VerifyingKey {
+  struct Pairing.G1Point alfa1;
+  struct Pairing.G2Point beta2;
+  struct Pairing.G2Point gamma2;
+  struct Pairing.G2Point delta2;
+  struct Pairing.G1Point[] IC;
+}
+```
+
+### Proof
+
+```solidity
+struct Proof {
+  struct Pairing.G1Point A;
+  struct Pairing.G2Point B;
+  struct Pairing.G1Point C;
+}
+```
+
+### verifyingKey
+
+```solidity
+function verifyingKey() internal pure returns (struct Verifier20.VerifyingKey vk)
+```
+
+### verifyProof
+
+```solidity
+function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[4] input) public view
+```
+
+_Verifies a Semaphore proof. Reverts with InvalidProof if the proof is invalid._
+
+## IKeyringECRecoverTyped
+
+### getSignerFromSig
+
+```solidity
+function getSignerFromSig(address user, uint32 userPolicyId, uint32 admissionPolicyId, uint256 timestamp, bool isRequest, bytes signature) external view returns (address signer)
+```
+
+### getHashFromAttestation
+
+```solidity
+function getHashFromAttestation(address user, uint32 userPolicyId, uint32 admissionPolicyId, uint256 timestamp, bool isRequest) external view returns (bytes32 message)
 ```
 
 ## Pairing

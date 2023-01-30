@@ -35,13 +35,25 @@ interface IPolicyManager {
     
     event UpdatePolicyRuleId(address indexed owner, uint32 indexed policyId, bytes32 indexed ruleId, uint256 deadline);
 
-    event UpdatePolicyGracePeriod(address indexed owner, uint32 policyId, uint128 gracePeriod, uint256 deadline);
+    event UpdatePolicyTtl(address indexed owner, uint32 indexed policyId, uint128 ttl, uint256 deadline);
+
+    event UpdatePolicyGracePeriod(
+        address indexed owner, 
+        uint32 indexed policyId, 
+        uint128 gracePeriod, 
+        uint256 deadline);
+
+    event UpdatePolicyAcceptRoots(address indexed owner, uint32 indexed policyId, uint16 acceptRoots, uint256 deadline);
+
+    event UpdatePolicyLock(address indexed owner, uint32 indexed policyId, bool locked, uint256 deadline);
+
+    event UpdatePolicyAllowWhitelists(
+        address indexed owner, 
+        uint32 indexed policyId, 
+        bool allowWhitelists, 
+        uint256 deadline);
 
     event UpdatePolicyDeadline(address indexed owner, uint32 indexed policyId, uint256 deadline);
-    
-    event UpdatePolicyLock(address indexed owner, uint32 policyId, uint256 deadline);
-    
-    event UpdatePolicyTtl(address indexed owner, uint32 indexed policyId, uint128 ttl, uint256 deadline);
 
     event AddPolicyAttestors(
         address indexed owner,
@@ -71,12 +83,6 @@ interface IPolicyManager {
         uint256 deadline
     );
 
-    event UpdatePolicyAcceptRoots(address owner, uint32 policyId, uint16 acceptRoots, uint256 deadline);
-
-    event PolicyLocked(address owner, uint32 policyId, uint256 deadline);
-
-    event PolicyLockCancelled(address indexed owner, uint32 policyId, uint256 deadline);
-
     event AdmitAttestor(address indexed admin, address indexed attestor, string uri);
     
     event UpdateAttestorUri(address indexed admin, address indexed attestor, string uri);
@@ -86,10 +92,6 @@ interface IPolicyManager {
     event AdmitWalletCheck(address indexed admin, address indexed walletCheck);
 
     event RemoveWalletCheck(address indexed admin, address indexed walletCheck);
-
-    event SetUserPolicy(address indexed user, uint32 indexed policyId);
-
-    function SEED_POLICY_OWNER() external view returns (bytes32);
 
     function ROLE_POLICY_CREATOR() external view returns (bytes32);
 
@@ -121,11 +123,13 @@ interface IPolicyManager {
 
     function updatePolicyGracePeriod(uint32 policyId, uint32 gracePeriod, uint256 deadline) external;
 
-    function setDeadline(uint32 policyId, uint256 deadline) external;
-    
-    function lockPolicy(uint32 policyId, uint256 deadline) external;
+    function updatePolicyAcceptRoots(uint32 policyId, uint16 acceptRoots, uint256 deadline) external;
 
-    function cancelLockPolicy(uint32 policyId, uint256 deadline) external;
+    function updatePolicyAllowWhitelists(uint32 policyId, bool allowWhitelists,uint256 deadline) external;
+    
+    function updatePolicyLock(uint32 policyId, bool locked, uint256 deadline) external;
+
+    function setDeadline(uint32 policyId, uint256 deadline) external;
 
     function addPolicyAttestors(uint32 policyId, address[] calldata attestors, uint256 deadline) external;
 
@@ -135,19 +139,15 @@ interface IPolicyManager {
 
     function removePolicyWalletChecks(uint32 policyId, address[] calldata walletChecks, uint256 deadline) external;
 
-    function setUserPolicy(uint32 policyId) external;
+    function admitAttestor(address attestor, string calldata uri) external;
 
-    function admitAttestor(address attestor, string memory uri) external;
-
-    function updateAttestorUri(address attestor, string memory uri) external;
+    function updateAttestorUri(address attestor, string calldata uri) external;
 
     function removeAttestor(address attestor) external;
 
     function admitWalletCheck(address walletCheck) external;
 
     function removeWalletCheck(address walletCheck) external;
-
-    function userPolicy(address user) external view returns (uint32 policyId);
 
     function policy(uint32 policyId)
         external
@@ -172,19 +172,23 @@ interface IPolicyManager {
             address[] memory walletChecksPendingAdditions,
             address[] memory walletChecksPendingRemovals);
 
+    function policyDescription(uint32 policyId) external returns (string memory description);
+
     function policyOwnerRole(uint32 policyId) external pure returns (bytes32 ownerRole);
 
     function policyRuleId(uint32 policyId) external returns (bytes32 ruleId);
-
-    function policyDescription(uint32 policyId) external returns (string memory description);
-
-    function policyAcceptRoots(uint32 policyId) external returns (uint16 acceptRoots);
     
     function policyTtl(uint32 policyId) external returns (uint128 ttl);
 
+    function policyGracePeriod(uint32 policyId) external returns(uint128 gracePeriod);
+
+    function policyAcceptRoots(uint32 policyId) external returns (uint16 acceptRoots);
+
+    function policyAllowWhitelists(uint32 policyId) external returns (bool isAllowed);
+
     function policyLocked(uint32 policyId) external returns (bool isLocked);
 
-    function policyGracePeriod(uint32 policyId) external returns(uint128 gracePeriod);
+    function policyDeadline(uint32 policyId) external returns (uint256 deadline);
 
     function policyAttestorCount(uint32 policyId) external returns (uint256 count);
 

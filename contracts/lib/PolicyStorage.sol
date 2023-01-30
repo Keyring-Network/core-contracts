@@ -15,7 +15,6 @@ library PolicyStorage {
 
     struct App {
         Policy[] policies;
-        mapping(address => uint32) userPolicies;
         AddressSet.Set globalAttestorSet;
         mapping(address => string) attestorUris;
         AddressSet.Set globalWalletCheckSet;
@@ -27,6 +26,7 @@ library PolicyStorage {
         uint32 ttl;
         uint32 gracePeriod;
         uint16 acceptRoots;
+        bool allowWhitelists;
         bool locked;
     }
 
@@ -113,18 +113,6 @@ library PolicyStorage {
         self.globalWalletCheckSet.remove(walletCheck, "PolicyStorage:removeGlobalWalletCheck");
     }
 
-    function setUserPolicy(App storage self, address user, uint32 userPolicyId) public {
-        if(!isPolicy(self, userPolicyId))
-            revert Unacceptable({
-                reason: "policy not found"
-            });
-        self.userPolicies[user] = userPolicyId;
-    }
-
-    function userPolicy(App storage self, address user) public view returns (uint32 policyId) {
-        policyId = self.userPolicies[user];
-    }
-
     function newPolicy(
         App storage self,
         PolicyScalar calldata policyScalar,
@@ -181,75 +169,66 @@ library PolicyStorage {
     }
 
     function processStaged(
-        Policy storage policyIn
-    ) public returns (Policy storage policy)
+        Policy storage self
+    ) public
     {
-        policy = policyIn;
-        uint256 deadline = policy.deadline;
+        uint256 deadline = self.deadline;
         if(deadline > 0 && deadline <= block.timestamp) {
-            policy.scalarActive = policy.scalarPending;
-            while(policy.attestors.pendingAdditionSet.count() > 0) {
-                address attestor = policy.attestors.pendingAdditionSet.keyAtIndex(
-                    policy.attestors.pendingAdditionSet.count() - 1
+            self.scalarActive = self.scalarPending;
+            while(self.attestors.pendingAdditionSet.count() > 0) {
+                address attestor = self.attestors.pendingAdditionSet.keyAtIndex(
+                    self.attestors.pendingAdditionSet.count() - 1
                 );
-                policy.attestors.activeSet.insert(
+                self.attestors.activeSet.insert(
                     attestor,
                     "policyStorage:processStaged"
                 );
-                policy.attestors.pendingAdditionSet.remove(
-                    attestor,
-                    "policyStorage:processStaged"
-                );
-            }
-            while(policy.attestors.pendingRemovalSet.count() > 0) {
-                address attestor = policy.attestors.pendingRemovalSet.keyAtIndex(
-                    policy.attestors.pendingRemovalSet.count() - 1
-                );
-                policy.attestors.activeSet.remove(
-                    attestor,
-                    "policyStorage:processStaged"
-                );
-                policy.attestors.pendingRemovalSet.remove(
+                self.attestors.pendingAdditionSet.remove(
                     attestor,
                     "policyStorage:processStaged"
                 );
             }
-            while(policy.walletChecks.pendingAdditionSet.count() > 0) {
-                address walletCheck = policy.walletChecks.pendingAdditionSet.keyAtIndex(
-                    policy.walletChecks.pendingAdditionSet.count() - 1
+            while(self.attestors.pendingRemovalSet.count() > 0) {
+                address attestor = self.attestors.pendingRemovalSet.keyAtIndex(
+                    self.attestors.pendingRemovalSet.count() - 1
                 );
-                policy.walletChecks.activeSet.insert(
+                self.attestors.activeSet.remove(
+                    attestor,
+                    "policyStorage:processStaged"
+                );
+                self.attestors.pendingRemovalSet.remove(
+                    attestor,
+                    "policyStorage:processStaged"
+                );
+            }
+            while(self.walletChecks.pendingAdditionSet.count() > 0) {
+                address walletCheck = self.walletChecks.pendingAdditionSet.keyAtIndex(
+                    self.walletChecks.pendingAdditionSet.count() - 1
+                );
+                self.walletChecks.activeSet.insert(
                     walletCheck,
                     "policyStorage:processStaged"
                 );
-                policy.walletChecks.pendingAdditionSet.remove(
+                self.walletChecks.pendingAdditionSet.remove(
                     walletCheck,
                     "policyStorage:processStaged"
                 );
             }
-            while(policy.walletChecks.pendingRemovalSet.count() > 0) {
-                address walletCheck = policy.walletChecks.pendingRemovalSet.keyAtIndex(
-                    policy.walletChecks.pendingRemovalSet.count() - 1
+            while(self.walletChecks.pendingRemovalSet.count() > 0) {
+                address walletCheck = self.walletChecks.pendingRemovalSet.keyAtIndex(
+                    self.walletChecks.pendingRemovalSet.count() - 1
                 );
-                policy.walletChecks.activeSet.remove(
+                self.walletChecks.activeSet.remove(
                     walletCheck,
                     "policyStorage:processStaged"
                 );
-                policy.walletChecks.pendingRemovalSet.remove(
+                self.walletChecks.pendingRemovalSet.remove(
                     walletCheck,
                     "policyStorage:processStaged"
                 );
             }
-            policy.deadline = 0;
+            self.deadline = 0;
         }
-    }
-
-    function isPolicy(
-        App storage self,
-        uint32 policyId
-    ) public view returns(bool isIndeed)
-    {
-        isIndeed = policyId > 0 && policyId < self.policies.length;
     }
 
     function checkLock(
@@ -267,23 +246,23 @@ library PolicyStorage {
     }
 
     function setDeadline(
-        Policy storage policyIn, 
+        Policy storage self, 
         uint256 deadline
-    ) public returns (Policy storage policy) 
+    ) public
     {
-        policy = processStaged(policyIn);
-        checkLock(policy);
+        processStaged(self);
+        checkLock(self);
 
         // Deadline of 0 allows staging of changes with no implementation schedule.
         // Positive deadlines must be at least graceTime seconds in the future.
      
         if(deadline != 0 && 
-            (deadline < block.timestamp + policy.scalarActive.gracePeriod)
+            (deadline < block.timestamp + self.scalarActive.gracePeriod)
         )
             revert Unacceptable({
-                reason: "deadline is in the past"
+                reason: "deadline in the past or too soon"
         });
-        policy.deadline = deadline;
+        self.deadline = deadline;
     }
 
     function writePolicyScalar(
@@ -343,6 +322,14 @@ library PolicyStorage {
     {
         // 0 is acceptable
         self.scalarPending.gracePeriod = gracePeriod;
+    }
+
+    function writeAllowWhitelists(
+        Policy storage self,
+        bool allowWhitelists
+    ) public
+    {
+        self.scalarPending.allowWhitelists = allowWhitelists;
     }
 
     function writePolicyLock(

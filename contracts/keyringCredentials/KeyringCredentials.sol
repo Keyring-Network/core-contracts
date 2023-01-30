@@ -17,7 +17,6 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 contract KeyringCredentials is IKeyringCredentials, KeyringAccessControl, Initializable {
 
-    string private constant MODULE = "KeyringCredentials";
     address private constant NULL_ADDRESS = address(0);
     bytes32 public constant ROLE_CREDENTIAL_UPDATER = keccak256("Credentials updater");
     address public immutable policyManager;
