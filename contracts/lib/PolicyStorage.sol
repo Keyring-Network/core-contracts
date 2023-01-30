@@ -4,6 +4,13 @@ pragma solidity 0.8.14;
 import "./AddressSet.sol";
 import "../interfaces/IRuleRegistry.sol";
 
+/**
+ @notice PolicyStorage attends to state management concerns for the PolicyManager. It establishes the
+ storage layout and is responsible for internal state integrity and managing state transitions. The 
+ PolicyManager is responsible for orchestration of the functions implemented here as well as access
+ control. 
+ */
+
 library PolicyStorage {
 
     using AddressSet for AddressSet.Set;
@@ -13,12 +20,16 @@ library PolicyStorage {
 
     error Unacceptable(string reason);
 
+    /// @dev The App struct contains the essential PolicyManager state including an array of Policies. 
+
     struct App {
         Policy[] policies;
         AddressSet.Set globalAttestorSet;
         mapping(address => string) attestorUris;
         AddressSet.Set globalWalletCheckSet;
     }
+
+    /// @dev PolicyScalar contains the non-indexed values in a policy configuration.
 
     struct PolicyScalar {
         bytes32 ruleId;
@@ -30,11 +41,15 @@ library PolicyStorage {
         bool locked;
     }
 
+    /// @dev PolicyAttestors contains the active policy attestors as well as scheduled changes. 
+
     struct PolicyAttestors {
         AddressSet.Set activeSet;
         AddressSet.Set pendingAdditionSet;
         AddressSet.Set pendingRemovalSet;
     }
+
+    /// @dev PolicyWalletChecks contains the active policy wallet checks as well as scheduled changes.
 
     struct PolicyWalletChecks {
         AddressSet.Set activeSet;
@@ -42,6 +57,11 @@ library PolicyStorage {
         AddressSet.Set pendingRemovalSet;
     }
 
+    /**
+     @dev Policy contains the active and scheduled changes and the deadline when the changes will
+    take effect.
+    */
+    
     struct Policy {
         uint256 deadline;
         PolicyScalar scalarActive;
