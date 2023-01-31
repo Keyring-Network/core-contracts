@@ -70,6 +70,12 @@ library PolicyStorage {
         PolicyWalletChecks walletChecks;
     }
 
+    /**
+     * @notice The attestor admin can admit attestors into the global attestor whitelist. 
+     * @param self PolicyManager App state.
+     * @param attestor Address of the attestor's identity tree contract.
+     * @param uri The URI refers to detailed information about the attestor.
+     */
     function insertGlobalAttestor(
         App storage self,
         address attestor,
@@ -88,6 +94,13 @@ library PolicyStorage {
         self.attestorUris[attestor] = uri;
     }
 
+    /**
+     * @notice The attestor admin can update the informational URIs for attestors on the whitelist.
+     * @dev No onchain logic relies on the URI.
+     * @param self PolicyManager App state.
+     * @param attestor Address of an attestor's identity tree contract on the whitelist. 
+     * @param uri The URI refers to detailed information about the attestor.
+     */
     function updateGlobalAttestorUri(
         App storage self, 
         address attestor,
@@ -105,6 +118,12 @@ library PolicyStorage {
         self.attestorUris[attestor] = uri;
     }
 
+    /**
+     * @notice The attestor admin can remove attestors from the whitelist.
+     * @dev Does not remove attestors from policies that recognise the attestor to remove. 
+     * @param self PolicyManager App state.
+     * @param attestor Address of an attestor identity tree to remove from the whitelist. 
+     */
     function removeGlobalAttestor(
         App storage self,
         address attestor
@@ -113,6 +132,12 @@ library PolicyStorage {
         self.globalAttestorSet.remove(attestor, "PolicyStorage:removeGlobalAttestor");
     }
 
+    /**
+     * @notice The wallet check admin can admit wallet check contracts into the system.
+     * @dev Wallet checks implement the IWalletCheck interface.
+     * @param self PolicyManager App state.
+     * @param walletCheck The address of a Wallet Check to admit into the global whitelist.
+     */
     function insertGlobalWalletCheck(
         App storage self,
         address walletCheck
@@ -125,6 +150,12 @@ library PolicyStorage {
         self.globalWalletCheckSet.insert(walletCheck, "PolicyStorage:insertGlobalWalletCheck");
     }
 
+    /**
+     * @notice The wallet check admin can remove a wallet check from the system.
+     * @dev Does not affect policies that utilize the wallet check. 
+     * @param self PolicyManager App state.
+     * @param walletCheck The address of a Wallet Check to admit into the global whitelist.
+     */
     function removeGlobalWalletCheck(
         App storage self,
         address walletCheck
@@ -133,6 +164,16 @@ library PolicyStorage {
         self.globalWalletCheckSet.remove(walletCheck, "PolicyStorage:removeGlobalWalletCheck");
     }
 
+    /**
+     * @notice Creates a new policy that is owned by the creator.
+     * @dev Maximum unique policies is 2 ^ 20.
+     * @param self PolicyManager App state.
+     * @param policyScalar The new policy's non-indexed values. 
+     * @param attestors A list of attestor identity tree contracts.
+     * @param walletChecks The address of one or more Wallet Checks to add to the Policy.
+     * @param ruleRegistry The address of the deployed RuleRegistry contract.
+     * @return policyId A PolicyStorage struct.Id The unique identifier of a Policy.
+     */
     function newPolicy(
         App storage self,
         PolicyScalar calldata policyScalar,
@@ -178,8 +219,15 @@ library PolicyStorage {
                 });
             policy.walletChecks.activeSet.insert(walletCheck, "PolicyStorage:newPolicy");
         }
-}
+    }
 
+    /**
+     * @notice Returns the internal policy state without processing staged changes. 
+     * @dev Staged changes with deadlines in the past are presented as pending. 
+     * @param self PolicyManager App state.
+     * @param policyId A PolicyStorage struct.Id The unique identifier of a Policy.
+     * @return policyInfo Policy info in the internal storage format without processing.
+     */
     function policyRawData(
         App storage self, 
         uint32 policyId
@@ -188,6 +236,11 @@ library PolicyStorage {
         policyInfo = self.policies[policyId];
     }
 
+    /**
+     * @notice Updates policy storage if the deadline is in the past.
+     * @dev Always call this before inspecting the the active policy state. .
+     * @param self A Policy object.
+     */
     function processStaged(
         Policy storage self
     ) public
@@ -251,6 +304,11 @@ library PolicyStorage {
         }
     }
 
+    /**
+     * @notice Enforces policy locks. 
+     * @dev Reverts if the active policy lock is set to true.
+     * @param policy A Policy object.
+     */
     function checkLock(
         Policy storage policy
     ) public view 
@@ -261,10 +319,22 @@ library PolicyStorage {
             });
     }
 
+    /**
+     * @notice Inspect the active policy lock.
+     * @param policy A Policy object.
+     * @return isIndeed True if the active policy locked parameter is set to true. True value if PolicyStorage
+     is locked, otherwise False.
+     */
     function isLocked(Policy storage policy) public view returns(bool isIndeed) {
         isIndeed = policy.scalarActive.locked;
     }
 
+    /**
+     * @notice Processes staged changes if the current deadline has passed and updates the deadline. 
+     * @dev The deadline must be at least as far in the future as the active policy gracePeriod. 
+     * @param self A Policy object.
+     * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
+     */
     function setDeadline(
         Policy storage self, 
         uint256 deadline
@@ -285,6 +355,14 @@ library PolicyStorage {
         self.deadline = deadline;
     }
 
+    /**
+     * @notice Non-indexed Policy values can be updated in one step. 
+     * @param self PolicyManager App state.
+     * @param policyId A PolicyStorage struct.Id The unique identifier of a Policy.
+     * @param policyScalar The new non-indexed properties. 
+     * @param ruleRegistry The address of the deployed RuleRegistry contract. 
+     * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
+     */
     function writePolicyScalar(
         App storage self,
         uint32 policyId,
@@ -302,6 +380,12 @@ library PolicyStorage {
         setDeadline(policyObj, deadline);
     }
 
+    /**
+     * @notice Writes a new RuleId to the pending Policy changes in a Policy.
+     * @param self A Policy object.
+     * @param ruleId The unique identifier of a Rule.
+     * @param ruleRegistry The address of the deployed RuleRegistry contract. 
+     */
     function writeRuleId(
         Policy storage self, 
         bytes32 ruleId, 
@@ -315,6 +399,11 @@ library PolicyStorage {
         self.scalarPending.ruleId = ruleId;
     }
 
+    /**
+     * @notice Writes a new descriptionUtf8 to the pending Policy changes in a Policy.
+     * @param self A Policy object.
+     * @param descriptionUtf8 Policy description in UTF-8 format. 
+     */
     function writeDescription(
         Policy storage self, 
         string memory descriptionUtf8
@@ -327,6 +416,11 @@ library PolicyStorage {
         self.scalarPending.descriptionUtf8 = descriptionUtf8;
     }
 
+    /**
+     * @notice Writes a new ttl to the pending Policy changes in a Policy.
+     * @param self A Policy object.
+     * @param ttl The maximum acceptable credential age in seconds.
+     */
     function writeTtl(
         Policy storage self,
         uint32 ttl
@@ -335,6 +429,12 @@ library PolicyStorage {
         self.scalarPending.ttl = ttl;
     }
 
+    /**
+     * @notice Writes a new gracePeriod to the pending Policy changes in a Policy. 
+     * @dev Deadlines must always be >= the active policy grace period. 
+     * @param self A Policy object.
+     * @param gracePeriod The minimum acceptable deadline.
+     */
     function writeGracePeriod(
         Policy storage self,
         uint32 gracePeriod
@@ -344,6 +444,11 @@ library PolicyStorage {
         self.scalarPending.gracePeriod = gracePeriod;
     }
 
+    /**
+     * @notice Writes a new allowWhitelists state in the pending Policy changes in a Policy. 
+     * @param self A Policy object.
+     * @param allowWhitelists True if whitelists are allowed, otherwise false.
+     */
     function writeAllowWhitelists(
         Policy storage self,
         bool allowWhitelists
@@ -352,6 +457,11 @@ library PolicyStorage {
         self.scalarPending.allowWhitelists = allowWhitelists;
     }
 
+    /**
+     * @notice Writes a new locked state in the pending Policy changes in a Policy.
+     * @param self A Policy object.
+     * @param setPolicyLocked True if the policy is to be locked, otherwise false.
+     */
     function writePolicyLock(
         Policy storage self,
         bool setPolicyLocked
@@ -360,7 +470,12 @@ library PolicyStorage {
         self.scalarPending.locked = setPolicyLocked;
     }
 
-
+    /**
+     * @notice Writes a new value for acceptRoots in the pending Policy changes of a Policy. 
+     * @dev The KeyringZkUpdater will accept the n most recent roots, where n is specified here. 
+     * @param self A Policy object.
+     * @param acceptRoots The depth of most recent roots to always accept.
+     */
     function writeAcceptRoots(
         Policy storage self,
         uint16 acceptRoots
@@ -369,6 +484,12 @@ library PolicyStorage {
         self.scalarPending.acceptRoots = acceptRoots;
     }
 
+    /**
+     * @notice Writes attestors to pending Policy attestor additions. 
+     * @param self PolicyManager App state.
+     * @param policy A Policy object.
+     * @param attestors The address of one or more Attestors to add to the Policy.
+     */
     function writeAttestorAdditions(
         App storage self,
         Policy storage policy,
@@ -380,6 +501,13 @@ library PolicyStorage {
         }        
     }
 
+    /**
+     * @notice Writes an attestor to pending Policy attestor additions. 
+     * @dev If the attestor is scheduled to be remove, unschedules the removal. 
+     * @param self PolicyManager App state.
+     * @param policy A Policy object. 
+     * @param attestor The address of an Attestor to add to the Policy.
+     */
     function _writeAttestorAddition(
         App storage self,
         Policy storage policy,
@@ -402,6 +530,11 @@ library PolicyStorage {
         }
     }
 
+    /**
+     * @notice Writes attestors to pending Policy attestor removals. 
+     * @param self A Policy object.
+     * @param attestors The address of one or more Attestors to remove from the Policy.
+     */
     function writeAttestorRemovals(
         Policy storage self,
         address[] memory attestors
@@ -412,6 +545,12 @@ library PolicyStorage {
         }
     }
 
+    /**
+     * @notice Writes an attestor to a Policy's pending attestor removals. 
+     * @dev Cancels the addition if the attestor is scheduled to be added. 
+     * @param self PolicyManager App state.
+     * @param attestor The address of a Attestor to remove from the Policy.
+     */
     function _writeAttestorRemoval(
         Policy storage self,
         address attestor
@@ -429,6 +568,12 @@ library PolicyStorage {
         }
     }
 
+    /**
+     * @notice Writes wallet checks to a Policy's pending wallet check additions.
+     * @param self PolicyManager App state.
+     * @param policy A PolicyStorage object.
+     * @param walletChecks The address of one or more Wallet Checks to add to the Policy.
+     */
     function writeWalletCheckAdditions(
         App storage self,
         Policy storage policy,
@@ -440,6 +585,13 @@ library PolicyStorage {
         }
     }
 
+    /**
+     * @notice Writes a wallet check to a Policy's pending wallet check additions. 
+     * @dev Cancels removal if the wallet check is scheduled for removal. 
+     * @param self PolicyManager App state.
+     * @param policy A Policy object. 
+     * @param walletCheck The address of a Wallet Check to admit into the global whitelist.
+     */
     function _writeWalletCheckAddition(
         App storage self,
         Policy storage policy,
@@ -467,6 +619,11 @@ library PolicyStorage {
         policy.walletChecks.pendingAdditionSet.insert(walletCheck, "PolicyStorage:_writeWalletCheckAddition");
     }
 
+    /**
+     * @notice Writes wallet checks to a Policy's pending wallet check removals. 
+     * @param self A Policy object.
+     * @param walletChecks The address of one or more Wallet Checks to add to the Policy.
+     */
     function writeWalletCheckRemovals(
         Policy storage self,
         address[] memory walletChecks
@@ -477,6 +634,12 @@ library PolicyStorage {
         }
     }
 
+    /**
+     * @notice Writes a wallet check to a Policy's pending wallet check removals. 
+     * @dev Unschedules addition if the wallet check is present in the Policy's pending wallet check additions. 
+     * @param self A Policy object.
+     * @param walletCheck The address of a Wallet Check to remove from the Policy. 
+     */
     function _writeWalletCheckRemoval(
         Policy storage self,
         address walletCheck

@@ -1764,8 +1764,8 @@ _Duplicate keys are not permitted._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| self | struct AddressSet.Set | An Set struct - similar syntax to python classes. |
-| key | address | An key to insert cast as an address. |
+| self | struct AddressSet.Set | A Set struct |
+| key | address | A key to insert cast as an address. |
 | context | string | A message string about interpretation of the issue. Normally the calling function. |
 
 ### remove
@@ -1782,7 +1782,7 @@ _The key to remove must exist._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| self | struct AddressSet.Set | A Set struct - similar syntax to python classes. |
+| self | struct AddressSet.Set | A Set struct |
 | key | address | An address to remove from the Set. |
 | context | string | A message string about interpretation of the issue. Normally the calling function. |
 
@@ -1798,7 +1798,7 @@ Count the keys.
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| self | struct AddressSet.Set | A Set struct - similar syntax to python classes. |
+| self | struct AddressSet.Set | A Set struct |
 
 #### Return Values
 
@@ -1818,7 +1818,7 @@ Check if a key exists in the Set.
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| self | struct AddressSet.Set | A Set struct - similar syntax to python classes |
+| self | struct AddressSet.Set | A Set struct |
 | key | address | An address to look for in the Set. |
 
 #### Return Values
@@ -1839,7 +1839,7 @@ Retrieve an address by its position in the set. Use for enumeration.
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| self | struct AddressSet.Set | A Set struct - similar syntax to python classes. |
+| self | struct AddressSet.Set | A Set struct |
 | index | uint256 | The internal index to inspect. |
 
 #### Return Values
@@ -1885,7 +1885,7 @@ _Duplicate keys are not permitted._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| self | struct Bytes32Set.Set | A Set struct - similar syntax to python classes. |
+| self | struct Bytes32Set.Set | A Set struct |
 | key | bytes32 | A value in the Set. |
 | context | string | A message string about interpretation of the issue. Normally the calling function. |
 
@@ -1901,7 +1901,7 @@ Count the keys.
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| self | struct Bytes32Set.Set | A Set struct - similar syntax to python classes. |
+| self | struct Bytes32Set.Set | A Set struct |
 
 #### Return Values
 
@@ -1921,7 +1921,7 @@ Check if a key exists in the Set.
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| self | struct Bytes32Set.Set | A Set struct - similar syntax to python classes. |
+| self | struct Bytes32Set.Set | A Set struct |
 | key | bytes32 | A key to look for. |
 
 #### Return Values
@@ -1942,7 +1942,7 @@ Retrieve an bytes32 by its position in the Set. Use for enumeration.
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| self | struct Bytes32Set.Set | A Set struct - similar syntax to python classes. |
+| self | struct Bytes32Set.Set | A Set struct |
 | index | uint256 | The position in the Set to inspect. |
 
 #### Return Values
@@ -1987,6 +1987,11 @@ Unpack 12 20-bit integers from 240-bit input
      @return output 12 20-bit integers cast as an array of 32-bit integers.
 
 ## PolicyStorage
+
+PolicyStorage attends to state management concerns for the PolicyManager. It establishes the
+ storage layout and is responsible for internal state integrity and managing state transitions. The 
+ PolicyManager is responsible for orchestration of the functions implemented here as well as access
+ control.
 
 ### Unacceptable
 
@@ -2057,11 +2062,33 @@ struct Policy {
 function insertGlobalAttestor(struct PolicyStorage.App self, address attestor, string uri) public
 ```
 
+The attestor admin can admit attestors into the global attestor whitelist.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.App | PolicyManager App state. |
+| attestor | address | Address of the attestor's identity tree contract. |
+| uri | string | The URI refers to detailed information about the attestor. |
+
 ### updateGlobalAttestorUri
 
 ```solidity
 function updateGlobalAttestorUri(struct PolicyStorage.App self, address attestor, string uri) public
 ```
+
+The attestor admin can update the informational URIs for attestors on the whitelist.
+
+_No onchain logic relies on the URI._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.App | PolicyManager App state. |
+| attestor | address | Address of an attestor's identity tree contract on the whitelist. |
+| uri | string | The URI refers to detailed information about the attestor. |
 
 ### removeGlobalAttestor
 
@@ -2069,11 +2096,33 @@ function updateGlobalAttestorUri(struct PolicyStorage.App self, address attestor
 function removeGlobalAttestor(struct PolicyStorage.App self, address attestor) public
 ```
 
+The attestor admin can remove attestors from the whitelist.
+
+_Does not remove attestors from policies that recognise the attestor to remove._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.App | PolicyManager App state. |
+| attestor | address | Address of an attestor identity tree to remove from the whitelist. |
+
 ### insertGlobalWalletCheck
 
 ```solidity
 function insertGlobalWalletCheck(struct PolicyStorage.App self, address walletCheck) public
 ```
+
+The wallet check admin can admit wallet check contracts into the system.
+
+_Wallet checks implement the IWalletCheck interface._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.App | PolicyManager App state. |
+| walletCheck | address | The address of a Wallet Check to admit into the global whitelist. |
 
 ### removeGlobalWalletCheck
 
@@ -2081,11 +2130,42 @@ function insertGlobalWalletCheck(struct PolicyStorage.App self, address walletCh
 function removeGlobalWalletCheck(struct PolicyStorage.App self, address walletCheck) public
 ```
 
+The wallet check admin can remove a wallet check from the system.
+
+_Does not affect policies that utilize the wallet check._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.App | PolicyManager App state. |
+| walletCheck | address | The address of a Wallet Check to admit into the global whitelist. |
+
 ### newPolicy
 
 ```solidity
 function newPolicy(struct PolicyStorage.App self, struct PolicyStorage.PolicyScalar policyScalar, address[] attestors, address[] walletChecks, address ruleRegistry) public returns (uint32 policyId)
 ```
+
+Creates a new policy that is owned by the creator.
+
+_Maximum unique policies is 2 ^ 20._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.App | PolicyManager App state. |
+| policyScalar | struct PolicyStorage.PolicyScalar | The new policy's non-indexed values. |
+| attestors | address[] | A list of attestor identity tree contracts. |
+| walletChecks | address[] | The address of one or more Wallet Checks to add to the Policy. |
+| ruleRegistry | address | The address of the deployed RuleRegistry contract. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | A PolicyStorage struct.Id The unique identifier of a Policy. |
 
 ### policyRawData
 
@@ -2093,11 +2173,38 @@ function newPolicy(struct PolicyStorage.App self, struct PolicyStorage.PolicySca
 function policyRawData(struct PolicyStorage.App self, uint32 policyId) public view returns (struct PolicyStorage.Policy policyInfo)
 ```
 
+Returns the internal policy state without processing staged changes.
+
+_Staged changes with deadlines in the past are presented as pending._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.App | PolicyManager App state. |
+| policyId | uint32 | A PolicyStorage struct.Id The unique identifier of a Policy. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyInfo | struct PolicyStorage.Policy | Policy info in the internal storage format without processing. |
+
 ### processStaged
 
 ```solidity
 function processStaged(struct PolicyStorage.Policy self) public
 ```
+
+Updates policy storage if the deadline is in the past.
+
+_Always call this before inspecting the the active policy state. ._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.Policy | A Policy object. |
 
 ### checkLock
 
@@ -2105,11 +2212,35 @@ function processStaged(struct PolicyStorage.Policy self) public
 function checkLock(struct PolicyStorage.Policy policy) public view
 ```
 
+Enforces policy locks.
+
+_Reverts if the active policy lock is set to true._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policy | struct PolicyStorage.Policy | A Policy object. |
+
 ### isLocked
 
 ```solidity
 function isLocked(struct PolicyStorage.Policy policy) public view returns (bool isIndeed)
 ```
+
+Inspect the active policy lock.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policy | struct PolicyStorage.Policy | A Policy object. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| isIndeed | bool | True if the active policy locked parameter is set to true. True value if PolicyStorage      is locked, otherwise False. |
 
 ### setDeadline
 
@@ -2117,11 +2248,34 @@ function isLocked(struct PolicyStorage.Policy policy) public view returns (bool 
 function setDeadline(struct PolicyStorage.Policy self, uint256 deadline) public
 ```
 
+Processes staged changes if the current deadline has passed and updates the deadline.
+
+_The deadline must be at least as far in the future as the active policy gracePeriod._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.Policy | A Policy object. |
+| deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
+
 ### writePolicyScalar
 
 ```solidity
 function writePolicyScalar(struct PolicyStorage.App self, uint32 policyId, struct PolicyStorage.PolicyScalar policyScalar, address ruleRegistry, uint256 deadline) public
 ```
+
+Non-indexed Policy values can be updated in one step.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.App | PolicyManager App state. |
+| policyId | uint32 | A PolicyStorage struct.Id The unique identifier of a Policy. |
+| policyScalar | struct PolicyStorage.PolicyScalar | The new non-indexed properties. |
+| ruleRegistry | address | The address of the deployed RuleRegistry contract. |
+| deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
 
 ### writeRuleId
 
@@ -2129,11 +2283,30 @@ function writePolicyScalar(struct PolicyStorage.App self, uint32 policyId, struc
 function writeRuleId(struct PolicyStorage.Policy self, bytes32 ruleId, address ruleRegistry) public
 ```
 
+Writes a new RuleId to the pending Policy changes in a Policy.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.Policy | A Policy object. |
+| ruleId | bytes32 | The unique identifier of a Rule. |
+| ruleRegistry | address | The address of the deployed RuleRegistry contract. |
+
 ### writeDescription
 
 ```solidity
 function writeDescription(struct PolicyStorage.Policy self, string descriptionUtf8) public
 ```
+
+Writes a new descriptionUtf8 to the pending Policy changes in a Policy.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.Policy | A Policy object. |
+| descriptionUtf8 | string | Policy description in UTF-8 format. |
 
 ### writeTtl
 
@@ -2141,11 +2314,31 @@ function writeDescription(struct PolicyStorage.Policy self, string descriptionUt
 function writeTtl(struct PolicyStorage.Policy self, uint32 ttl) public
 ```
 
+Writes a new ttl to the pending Policy changes in a Policy.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.Policy | A Policy object. |
+| ttl | uint32 | The maximum acceptable credential age in seconds. |
+
 ### writeGracePeriod
 
 ```solidity
 function writeGracePeriod(struct PolicyStorage.Policy self, uint32 gracePeriod) public
 ```
+
+Writes a new gracePeriod to the pending Policy changes in a Policy.
+
+_Deadlines must always be >= the active policy grace period._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.Policy | A Policy object. |
+| gracePeriod | uint32 | The minimum acceptable deadline. |
 
 ### writeAllowWhitelists
 
@@ -2153,11 +2346,29 @@ function writeGracePeriod(struct PolicyStorage.Policy self, uint32 gracePeriod) 
 function writeAllowWhitelists(struct PolicyStorage.Policy self, bool allowWhitelists) public
 ```
 
+Writes a new allowWhitelists state in the pending Policy changes in a Policy.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.Policy | A Policy object. |
+| allowWhitelists | bool | True if whitelists are allowed, otherwise false. |
+
 ### writePolicyLock
 
 ```solidity
 function writePolicyLock(struct PolicyStorage.Policy self, bool setPolicyLocked) public
 ```
+
+Writes a new locked state in the pending Policy changes in a Policy.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.Policy | A Policy object. |
+| setPolicyLocked | bool | True if the policy is to be locked, otherwise false. |
 
 ### writeAcceptRoots
 
@@ -2165,11 +2376,32 @@ function writePolicyLock(struct PolicyStorage.Policy self, bool setPolicyLocked)
 function writeAcceptRoots(struct PolicyStorage.Policy self, uint16 acceptRoots) public
 ```
 
+Writes a new value for acceptRoots in the pending Policy changes of a Policy.
+
+_The KeyringZkUpdater will accept the n most recent roots, where n is specified here._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.Policy | A Policy object. |
+| acceptRoots | uint16 | The depth of most recent roots to always accept. |
+
 ### writeAttestorAdditions
 
 ```solidity
 function writeAttestorAdditions(struct PolicyStorage.App self, struct PolicyStorage.Policy policy, address[] attestors) public
 ```
+
+Writes attestors to pending Policy attestor additions.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.App | PolicyManager App state. |
+| policy | struct PolicyStorage.Policy | A Policy object. |
+| attestors | address[] | The address of one or more Attestors to add to the Policy. |
 
 ### writeAttestorRemovals
 
@@ -2177,17 +2409,45 @@ function writeAttestorAdditions(struct PolicyStorage.App self, struct PolicyStor
 function writeAttestorRemovals(struct PolicyStorage.Policy self, address[] attestors) public
 ```
 
+Writes attestors to pending Policy attestor removals.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.Policy | A Policy object. |
+| attestors | address[] | The address of one or more Attestors to remove from the Policy. |
+
 ### writeWalletCheckAdditions
 
 ```solidity
 function writeWalletCheckAdditions(struct PolicyStorage.App self, struct PolicyStorage.Policy policy, address[] walletChecks) public
 ```
 
+Writes wallet checks to a Policy's pending wallet check additions.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.App | PolicyManager App state. |
+| policy | struct PolicyStorage.Policy | A PolicyStorage object. |
+| walletChecks | address[] | The address of one or more Wallet Checks to add to the Policy. |
+
 ### writeWalletCheckRemovals
 
 ```solidity
 function writeWalletCheckRemovals(struct PolicyStorage.Policy self, address[] walletChecks) public
 ```
+
+Writes wallet checks to a Policy's pending wallet check removals.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.Policy | A Policy object. |
+| walletChecks | address[] | The address of one or more Wallet Checks to add to the Policy. |
 
 ## MockERC20
 
@@ -2618,7 +2878,7 @@ A policy creater can create a policy and is granted the admin and user admin rol
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| policyScalar | struct PolicyStorage.PolicyScalar | The policy object scalar values as defined in PolicyStorage. |
+| policyScalar | struct PolicyStorage.PolicyScalar | The non-indexed values in a policy configuration as defined in PolicyStorage. |
 | attestors | address[] | Acceptable attestors correspond to identity trees that will be used in      zero-knowledge proofs. Proofs cannot be generated, and therefore credentials cannot be      generated using roots that do not originate in an identity tree that is not explicitly      acceptable. |
 | walletChecks | address[] | Trader wallets are optionally checked againt on-chain wallet checks on      a just-in-time basis. |
 
@@ -2645,7 +2905,7 @@ _Deadlines must always be >= the active policy grace period._
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | policyId | uint32 | The unique identifier of a Policy. |
-| policyScalar | struct PolicyStorage.PolicyScalar | The policy definition scalar values. |
+| policyScalar | struct PolicyStorage.PolicyScalar | The non-indexed values in a policy configuration as defined in PolicyStorage. |
 | deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
 
 ### updatePolicyDescription

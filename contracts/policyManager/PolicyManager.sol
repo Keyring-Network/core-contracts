@@ -121,7 +121,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
 
     /**
      * @notice A policy creater can create a policy and is granted the admin and user admin roles.
-     * @param policyScalar The policy object scalar values as defined in PolicyStorage.
+     * @param policyScalar The non-indexed values in a policy configuration as defined in PolicyStorage.
      * @param attestors Acceptable attestors correspond to identity trees that will be used in
      zero-knowledge proofs. Proofs cannot be generated, and therefore credentials cannot be
      generated using roots that do not originate in an identity tree that is not explicitly
@@ -179,7 +179,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      * @notice The Policy admin role can update a policy's scalar values one step.
      * @dev Deadlines must always be >= the active policy grace period. 
      * @param policyId The unique identifier of a Policy.
-     * @param policyScalar The policy definition scalar values.
+     * @param policyScalar The non-indexed values in a policy configuration as defined in PolicyStorage.
      * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
      */
     function updatePolicyScalar(
