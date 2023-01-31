@@ -3,7 +3,7 @@
 pragma solidity 0.8.14;
 
 import "../interfaces/IKycERC20.sol";
-import "../integration/KeyringGuardImmutable.sol";
+import "../integration/KeyringGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Wrapper.sol";
@@ -15,16 +15,26 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  policy.
  */
 
-contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuardImmutable {
-    
-    string private constant MODULE = "KycERC20";
+contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuard {
+        
     using SafeERC20 for IERC20;
 
+    string private constant MODULE = "KycERC20";
+
+    modifier checkAuthorisations(address from, address to) {
+        if (!checkGuard(from, to)) 
+            revert Unacceptable({
+                reason: "trader not authorized and not whitelisted"
+            });
+        _;
+    }
+
     /**
-     @notice Specify the token to wrap and the new name / symbol of the wrapped token - then good to go!
+     @notice Specify the token to wrap and the new name/symbol of the wrapped token - then good to go!
      @param collateralToken The contract address of the token that is to be wrapped
      @param keyringCredentials The address for the deployed KeyringCredentials contract.
      @param policyManager The address for the deployed PolicyManager contract.
+     @param userPolicies The address for the deployed UserPolicies contract.
      @param policyId The unique identifier of a Policy.
      @param name_ The name of the new wrapped token. Passed to ERC20.constructor to set the ERC20.name
      @param symbol_ The symbol for the new wrapped token. Passed to ERC20.constructor to set the ERC20.symbol
@@ -33,6 +43,7 @@ contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuardImmutable
         address collateralToken,
         address keyringCredentials,
         address policyManager,
+        address userPolicies,
         uint32 policyId,
         string memory name_,
         string memory symbol_
@@ -40,7 +51,7 @@ contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuardImmutable
         ERC20(name_, symbol_)
         ERC20Permit(name_)
         ERC20Wrapper(IERC20(collateralToken))
-        KeyringGuardImmutable(keyringCredentials, policyManager, policyId)
+        KeyringGuard(keyringCredentials, policyManager, userPolicies, policyId)
     {
         if (collateralToken == NULL_ADDRESS)
             revert Unacceptable({
@@ -66,45 +77,42 @@ contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuardImmutable
 
     /**
      * @notice Compliant users deposit underlying tokens and mint the same number of wrapped tokens.
-     * @param account Recipient of the wrapped tokens
+     * @param trader Recipient of the wrapped tokens
      * @param amount Quantity of underlying tokens from _msgSender() to exchange for wrapped tokens (to account) at 1:1
      */
-    function depositFor(address account, uint256 amount)
+    function depositFor(address trader, uint256 amount)
         public
         override(IKycERC20, ERC20Wrapper)
-        keyringCompliance(account)
-        keyringCompliance(_msgSender())
+        checkAuthorisations(_msgSender(), trader)
         returns (bool)
     {
-        return ERC20Wrapper.depositFor(account, amount);
+        return ERC20Wrapper.depositFor(trader, amount);
     }
 
     /**
      * @notice Compliant users burn a number of wrapped tokens and withdraw the same number of underlying tokens.
-     * @param account Recipient of the underlying tokens
+     * @param trader Recipient of the underlying tokens
      * @param amount Quantity of wrapped tokens from _msgSender() to exchange for underlying tokens (to account) at 1:1
      */
-    function withdrawTo(address account, uint256 amount)
+    function withdrawTo(address trader, uint256 amount)
         public
         override(IKycERC20, ERC20Wrapper)
-        keyringCompliance(account)
-        keyringCompliance(_msgSender())
+        checkAuthorisations(_msgSender(), trader)
         returns (bool)
     {
-        return ERC20Wrapper.withdrawTo(account, amount);
+        return ERC20Wrapper.withdrawTo(trader, amount);
     }
 
     /**
      @notice Wraps the inherited ERC20.transfer function with the keyringCompliance guard.
      @param to The recipient of amount 
-     @param amount The amount to be deducted from the to's allowance.
+     @param amount The amount to transfer.
      @return bool True if successfully executed.
      */
     function transfer(address to, uint256 amount)
         public
         override(IERC20, ERC20)
-        keyringCompliance(to)
-        keyringCompliance(_msgSender())
+        checkAuthorisations(_msgSender(), to)
         returns (bool)
     {
         return ERC20.transfer(to, amount);
@@ -120,8 +128,7 @@ contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuardImmutable
     function transferFrom(address from, address to, uint256 amount) 
         public 
         override(IERC20, ERC20)
-        keyringCompliance(to)
-        keyringCompliance(from)
+        checkAuthorisations(_msgSender(), to)
         returns (bool)
     {
         return ERC20.transferFrom(from, to, amount);

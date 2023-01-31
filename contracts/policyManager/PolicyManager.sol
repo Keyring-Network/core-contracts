@@ -20,11 +20,10 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     using PolicyStorage for PolicyStorage.Policy;
     using AddressSet for AddressSet.Set;
 
-    uint256 private constant MAX_POLICIES = 2 ** 20;
     uint32 private constant DEFAULT_TTL = 1440 * 60; 
     address private constant NULL_ADDRESS = address(0);
+    bytes32 private constant SEED_POLICY_OWNER = keccak256("spo");
 
-    bytes32 public constant override SEED_POLICY_OWNER = keccak256("spo");
     bytes32 public constant override ROLE_POLICY_CREATOR = keccak256("rpc");
     bytes32 public constant override ROLE_GLOBAL_ATTESTOR_ADMIN = keccak256("rgaa");
     bytes32 public constant override ROLE_GLOBAL_WALLETCHECK_ADMIN = keccak256("rgwca");
@@ -82,11 +81,11 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     {
         if (trustedForwarder == NULL_ADDRESS)
             revert Unacceptable({
-                reason: "forwarder"
+                reason: "trustedForwarder cannot be empty"
             });
         if (ruleRegistryAddr == NULL_ADDRESS)
             revert Unacceptable({
-                reason: "ruleRegistry"
+                reason: "ruleRegistry cannot be empty"
             });
         ruleRegistry = ruleRegistryAddr;
         emit PolicyManagerDeployed(_msgSender(), trustedForwarder, ruleRegistryAddr);
@@ -108,6 +107,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
             ttl: DEFAULT_TTL,
             gracePeriod: 0,
             acceptRoots: 0,
+            allowWhitelists: true,
             locked: true
         });
         policyStorage.newPolicy(
@@ -121,7 +121,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
 
     /**
      * @notice A policy creater can create a policy and is granted the admin and user admin roles.
-     * @param policyScalar The policy object scalar values as defined in PolicyStorage.
+     * @param policyScalar The non-indexed values in a policy configuration as defined in PolicyStorage.
      * @param attestors Acceptable attestors correspond to identity trees that will be used in
      zero-knowledge proofs. Proofs cannot be generated, and therefore credentials cannot be
      generated using roots that do not originate in an identity tree that is not explicitly
@@ -131,7 +131,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      * @return policyId The unique identifier of a new Policy.
      */
     function createPolicy(
-        PolicyStorage.PolicyScalar memory policyScalar,
+        PolicyStorage.PolicyScalar calldata policyScalar,
         address[] calldata attestors,
         address[] calldata walletChecks
     ) 
@@ -179,7 +179,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      * @notice The Policy admin role can update a policy's scalar values one step.
      * @dev Deadlines must always be >= the active policy grace period. 
      * @param policyId The unique identifier of a Policy.
-     * @param policyScalar The policy definition scalar values.
+     * @param policyScalar The non-indexed values in a policy configuration as defined in PolicyStorage.
      * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
      */
     function updatePolicyScalar(
@@ -194,6 +194,28 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
             deadline
         );
         emit UpdatePolicyScalar(_msgSender(), policyId, policyScalar, deadline);
+    }
+
+    /**
+     * @notice Policy admins can update policy descriptions.
+     * @dev Deadlines must always be >= the active policy grace period. 
+     * @param policyId The policy to update.
+     * @param descriptionUtf8 The new policy description.
+     * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
+     */
+    function updatePolicyDescription(
+        uint32 policyId, 
+        string calldata descriptionUtf8, 
+        uint256 deadline
+    )
+        external
+        override
+        onlyPolicyAdmin(policyId)
+    {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        policyObj.writeDescription(descriptionUtf8);
+        policyObj.setDeadline(deadline);
     }
 
     /**
@@ -213,28 +235,6 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         policyObj.writeRuleId(ruleId, ruleRegistry);
         policyObj.setDeadline(deadline);
         emit UpdatePolicyRuleId(_msgSender(), policyId, ruleId, deadline);
-    }
-
-    /**
-     * @notice Policy admins can update policy descriptions.
-     * @dev Deadlines must always be >= the active policy grace period. 
-     * @param policyId The policy to update.
-     * @param descriptionUtf8 The new policy description.
-     * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
-     */
-    function updatePolicyDescription(
-        uint32 policyId, 
-        string memory descriptionUtf8, 
-        uint256 deadline
-    )
-        external
-        override
-        onlyPolicyAdmin(policyId)
-    {
-        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
-        policyObj.writeDescription(descriptionUtf8);
-        policyObj.setDeadline(deadline);
     }
 
     /**
@@ -282,12 +282,13 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      * @dev Deadlines must always be >= the active policy grace period. 
      * @param policyId The policy to update.
      * @param acceptRoots The depth of most recent roots to always accept.
+     * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
      */
-    function updatePolicyAcceptRoots(
-        uint32 policyId, 
-        uint16 acceptRoots, 
-        uint256 deadline
-    ) external onlyPolicyAdmin(policyId) {
+    function updatePolicyAcceptRoots(uint32 policyId, uint16 acceptRoots, uint256 deadline) 
+        external
+        override 
+        onlyPolicyAdmin(policyId) 
+    {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
         policyObj.processStaged();
         policyObj.writeAcceptRoots(acceptRoots);
@@ -296,42 +297,42 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     }
 
     /**
-     * @notice Schedules policy locking if the policy is not already scheduled to be locked.
-     * @dev Deadlines must always be >= the active policy grace period. 
-     * @param policyId The policy to lock.
+     * @notice Policy owners can allow users to set whitelists of counterparties to exempt from
+     compliance checks.
+     * @param policyId The policy to update.
+     * @param allowWhitelists True if whitelists are allowed, otherwise false.
      * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
      */
-    function lockPolicy(uint32 policyId, uint256 deadline) 
-        external
-        override
-        onlyPolicyAdmin(policyId)
+    function updatePolicyAllowWhitelists(uint32 policyId, bool allowWhitelists,uint256 deadline) 
+        external 
+        override 
+        onlyPolicyAdmin(policyId) 
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
         policyObj.processStaged();
-        if(!policyObj.scalarPending.locked) {
-            policyObj.writePolicyLock(true);
-            policyObj.setDeadline(deadline);
-            emit UpdatePolicyLock(_msgSender(), policyId, deadline);
-        }
+        policyObj.writeAllowWhitelists(allowWhitelists);
+        policyObj.setDeadline(deadline);
+        emit UpdatePolicyAllowWhitelists(_msgSender(), policyId, allowWhitelists, deadline);
     }
 
     /**
-     * @notice Unschedules policy locking.
+     * @notice Schedules policy locking if the policy is not already scheduled to be locked.
      * @dev Deadlines must always be >= the active policy grace period. 
-     * @param policyId The policy to abort locking.
-     * @param deadline Overrides previous deadline.
+     * @param policyId The policy to lock.
+     * @param locked True if the policy is to be locked. False if the scheduled lock is to be cancelled.
+     * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
      */
-    function cancelLockPolicy(uint32 policyId, uint256 deadline) 
+    function updatePolicyLock(uint32 policyId, bool locked, uint256 deadline) 
         external
         override
         onlyPolicyAdmin(policyId)
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
         policyObj.processStaged();
-        if(policyObj.scalarPending.locked) {
-            policyObj.writePolicyLock(false);
+        if(policyObj.scalarPending.locked != locked) {
+            policyObj.writePolicyLock(locked);
             policyObj.setDeadline(deadline);
-            emit PolicyLockCancelled(_msgSender(), policyId, deadline);
+            emit UpdatePolicyLock(_msgSender(), policyId, locked, deadline);
         }
     }
 
@@ -432,16 +433,6 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         emit RemovePolicyWalletChecks(_msgSender(), policyId, walletChecks, deadline);
     }
 
-    /**
-     * @notice Each user sets exactly one Policy that attestors are required to compare with admission 
-     policies.
-     * @param policyId The unique identifier of a Policy.
-     */
-    function setUserPolicy(uint32 policyId) external override {
-        policyStorage.setUserPolicy(_msgSender(), policyId);
-        emit SetUserPolicy(_msgSender(), policyId);
-    }
-
     /***************************************************
      Global Governance
      ***************************************************/
@@ -521,19 +512,6 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      **********************************************************/
 
     /**
-     * @notice Each user has a user policy that is compared to admission policies.
-     * @param user The user to inspect.
-     * @param policyId The user's current user policy. The default policy 0 is permissive policy. Attestors are 
-     required to defer to admission policy details when the user does not explicitly select a non-default policy. 
-     For example, the general rule that admission policies must be at least as restrictive as user policies does
-     not apply to parameters such as TTL, gracetime, attestors and wallet checks when the user relies on the default
-     policy which uses zero values and empty lists to represent agreement with admission policy details.
-     */
-    function userPolicy(address user) external view override returns (uint32 policyId) {
-        policyId = policyStorage.userPolicy(user);
-    }     
-
-    /**
      * @param policyId The unique identifier of a Policy.
      * @dev Use static calls to inspect current information.
      * @return config The scalar values that form part of the policy definition.
@@ -609,17 +587,6 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     /**
      * @param policyId The unique identifier of a Policy.
      * @dev Use static calls to inspect current information.
-     * @return ruleId Rule to enforce, defined in the RuleRegistry.
-     */
-    function policyRuleId(uint32 policyId) external override returns (bytes32 ruleId) {
-        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
-        ruleId = policyObj.scalarActive.ruleId;
-    }
-
-    /**
-     * @param policyId The unique identifier of a Policy.
-     * @dev Use static calls to inspect current information.
      * @return descriptionUtf8 Not used for any on-chain logic.
      */
     function policyDescription(uint32 policyId)
@@ -630,6 +597,17 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
         policyObj.processStaged();
         descriptionUtf8 = policyObj.scalarActive.descriptionUtf8;
+    }
+
+    /**
+     * @param policyId The unique identifier of a Policy.
+     * @dev Use static calls to inspect current information.
+     * @return ruleId Rule to enforce, defined in the RuleRegistry.
+     */
+    function policyRuleId(uint32 policyId) external override returns (bytes32 ruleId) {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        ruleId = policyObj.scalarActive.ruleId;
     }
 
     /**
@@ -671,6 +649,17 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     }
 
     /**
+     * @notice Check if the policy allows user whitelisting.
+     * @param policyId The policy to inspect. 
+     * @return isAllowed True if whitelists can be used to override compliance checks. 
+     */
+    function policyAllowWhitelists(uint32 policyId) external returns (bool isAllowed){
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        isAllowed = policyObj.scalarActive.allowWhitelists;
+    }
+
+    /**
      * @notice Check if the policy is locked.
      * @dev Use static calls to inspect current information.
      * @return isLocked True if the policy cannot be changed
@@ -679,6 +668,18 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
         policyObj.processStaged();
         isLocked = policyObj.scalarActive.locked;
+    }
+
+    /**
+     * @notice Inspect the schedule to implementing staged policy updates. 
+     * @dev Use static calls to inspect current information.
+     * @param policyId The policy to inspect.
+     * @return deadline The scheduled time to active the pending policy update. 
+     */
+    function policyDeadline(uint32 policyId) external override returns (uint256 deadline) {
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.processStaged();
+        deadline = policyObj.deadline;
     }
 
     /**

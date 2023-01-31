@@ -9,6 +9,7 @@ import {
   KeyringZkVerifier,
   WalletCheck,
   IdentityTree,
+  UserPolicies,
 } from "../../src/types";
 import { PolicyStorage } from "../../src/types/PolicyManager";
 import {
@@ -28,6 +29,7 @@ interface KeyringFixture {
   contracts: {
     credentials: KeyringCredentials;
     ruleRegistry: RuleRegistry;
+    userPolicies: UserPolicies;
     policyManager: PolicyManager;
     credentialsUpdater: KeyringZkCredentialUpdater;
     forwarder: NoImplementation;
@@ -134,6 +136,15 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
   })) as PolicyManager;
   await policyManager.deployed();
   await policyManager.init();
+
+  /* ------------------------------ UserPolicies ------------------------------ */
+
+  const UserPoliciesFactory = await ethers.getContractFactory("UserPolicies");
+  const userPolicies = (await upgrades.deployProxy(UserPoliciesFactory, {
+    constructorArgs: [forwarder.address, policyManager.address],
+    unsafeAllow: ["constructor"],
+  })) as UserPolicies;
+  await userPolicies.deployed();
 
   /* --------------------------- KeyringCredentials --------------------------- */
   /**
@@ -255,6 +266,7 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
     gracePeriod: THIRTY_DAYS_IN_SECONDS,
     acceptRoots: 1,
     locked: false,
+    allowWhitelists: false,
   };
   await policyManager.createPolicy(policyScalar, [attestor1, attestor2, identityTree.address], [walletCheck.address]);
 
@@ -284,6 +296,7 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
     contracts: {
       credentials,
       ruleRegistry,
+      userPolicies,
       policyManager,
       credentialsUpdater,
       forwarder,

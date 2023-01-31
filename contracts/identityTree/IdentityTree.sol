@@ -17,7 +17,7 @@ contract IdentityTree is IIdentityTree, KeyringAccessControl {
     
     using Bytes32Set for Bytes32Set.Set;
 
-    string private constant MODULE = "IdentityTree";
+    uint256 private constant INFINITY = ~uint256(0);
     bytes32 private constant NULL_BYTES32 = bytes32(0);
     bytes32 public constant override ROLE_AGGREGATOR = keccak256("aggregator role");
     uint256 public constant override MAX_SUCCESSORS = 5000;
@@ -83,10 +83,13 @@ contract IdentityTree is IIdentityTree, KeyringAccessControl {
 
     /**
      * @notice Returns the count of roots recorded after the root to inspect.
+     * @dev Returns 2 ^ 256 - 1 if no merkle roots have been recorded.
      * @param merkleRoot The root to inspect.
      * @return successors The count of roots recorded after the root to inspect.
      */
     function merkleRootSuccessors(bytes32 merkleRoot) external view override returns (uint256 successors) {
-        successors = merkleRootSet.count() - merkleRootSet.keyPointers[merkleRoot] - 1;
+        successors = (merkleRootSet.count() > 0) ?
+            merkleRootSet.count() - merkleRootSet.keyPointers[merkleRoot] - 1 :
+            INFINITY;
     }
 }

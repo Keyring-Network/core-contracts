@@ -23,7 +23,7 @@ library Bytes32Set {
     /**
      * @notice Insert a key to store.
      * @dev Duplicate keys are not permitted.
-     * @param self A Set struct - similar syntax to python classes.
+     * @param self A Set struct
      * @param key A value in the Set.
      * @param context A message string about interpretation of the issue. Normally the calling function.
      */
@@ -45,7 +45,7 @@ library Bytes32Set {
 
     /**
      * @notice Count the keys.
-     * @param self A Set struct - similar syntax to python classes.
+     * @param self A Set struct
      * @return uint256 Length of the `keyList` which is the count of keys contained in the Set.
      */
     function count(Set storage self) internal view returns (uint256) {
@@ -54,7 +54,7 @@ library Bytes32Set {
 
     /**
      * @notice Check if a key exists in the Set.
-     * @param self A Set struct - similar syntax to python classes.
+     * @param self A Set struct
      * @param key A key to look for.
      * @return bool True if the key exists in the Set, otherwise false.
      */
@@ -65,7 +65,7 @@ library Bytes32Set {
 
     /**
      * @notice Retrieve an bytes32 by its position in the Set. Use for enumeration.
-     * @param self A Set struct - similar syntax to python classes.
+     * @param self A Set struct
      * @param index The position in the Set to inspect.
      * @return bytes32 The key stored in the Set at the index position.
      */

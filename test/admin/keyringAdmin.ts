@@ -12,6 +12,7 @@ import type {
   KeyringZkVerifier,
   WalletCheck,
   IdentityTree,
+  UserPolicies,
 } from "../../src/types";
 import { PolicyStorage } from "../../src/types/PolicyManager";
 import {
@@ -39,6 +40,7 @@ describe("Admin", function () {
   // prepare contracts with interfaces
   let credentials: KeyringCredentials;
   let ruleRegistry: RuleRegistry;
+  let userPolicies: UserPolicies;
   let policyManager: PolicyManager;
   let forwarder: NoImplementation;
   let keyringZkVerifier: KeyringZkVerifier;
@@ -84,6 +86,7 @@ describe("Admin", function () {
       const fixture = await loadFixture(keyringTestFixture);
       credentials = fixture.contracts.credentials;
       ruleRegistry = fixture.contracts.ruleRegistry;
+      userPolicies = fixture.contracts.userPolicies;
       policyManager = fixture.contracts.policyManager;
       forwarder = fixture.contracts.forwarder;
       keyringZkVerifier = fixture.contracts.keyringZkVerifier;
@@ -149,15 +152,35 @@ describe("Admin", function () {
         },
       });
       await expect(PolicyManagerFactory.deploy(NULL_ADDRESS, ruleRegistry.address)).to.be.revertedWith(
-        unacceptable("forwarder"),
+        unacceptable("trustedForwarder cannot be empty"),
       );
       await expect(PolicyManagerFactory.deploy(forwarder.address, NULL_ADDRESS)).to.be.revertedWith(
-        unacceptable("ruleRegistry"),
+        unacceptable("ruleRegistry cannot be empty"),
       );
 
       const RuleRegistryFactory = await ethers.getContractFactory("RuleRegistry");
       await expect(RuleRegistryFactory.deploy(NULL_ADDRESS)).to.be.revertedWith(
         unacceptable("trustedForwarder cannot be empty"),
+      );
+
+      const UserPoliciesFactory = await ethers.getContractFactory("UserPolicies");
+      await expect(UserPoliciesFactory.deploy(NULL_ADDRESS, policyManager.address)).to.be.revertedWith(
+        unacceptable("trustedForwarder cannot be empty"),
+      );
+      await expect(UserPoliciesFactory.deploy(forwarder.address, NULL_ADDRESS)).to.be.revertedWith(
+        unacceptable("policyManager cannot be empty"),
+      );
+
+      const KeyringZkVerifierFactory = await ethers.getContractFactory("KeyringZkVerifier");
+      const verifier = "0x0000000000000000000000000000000000000001";
+      await expect(KeyringZkVerifierFactory.deploy(NULL_ADDRESS, verifier, verifier)).to.be.revertedWith(
+        unacceptable("identityConstructionProofVerifier cannot be empty"),
+      );
+      await expect(KeyringZkVerifierFactory.deploy(verifier, NULL_ADDRESS, verifier)).to.be.revertedWith(
+        unacceptable("membershipProofVerifier cannot be empty"),
+      );
+      await expect(KeyringZkVerifierFactory.deploy(verifier, verifier, NULL_ADDRESS)).to.be.revertedWith(
+        unacceptable("authorisationProofVerifier cannot be empty"),
       );
     });
 
@@ -219,7 +242,8 @@ describe("Admin", function () {
       expect(policy.attestorsActive.includes(attestor2)).to.equal(true);
 
       // move the time forward to the deadline and process the staged changes
-      await helpers.time.increaseTo(deadline);
+      const policyDeadline = await policyManager.callStatic.policyDeadline(policyId);
+      await helpers.time.increaseTo(policyDeadline);
       await policyManager.policy(policyId);
 
       // check if the staged changes are committed
@@ -324,7 +348,7 @@ describe("Admin", function () {
       const invalidDeadline = now + THIRTY_DAYS_IN_SECONDS - 1;
 
       await expect(policyManager.setDeadline(validPolicyId, invalidDeadline)).to.be.revertedWith(
-        unacceptable("deadline is in the past"),
+        unacceptable("deadline in the past or too soon"),
       );
 
       // attestor is not whitelisted
@@ -409,12 +433,12 @@ describe("Admin", function () {
         policyManager.connect(attackerAsSigner).updatePolicyAcceptRoots(policyId, policyScalar.acceptRoots, deadline),
       ).to.be.revertedWith("Unauthorized");
 
-      await expect(policyManager.connect(attackerAsSigner).lockPolicy(policyId, deadline)).to.be.revertedWith(
-        "Unauthorized",
-      );
-      await expect(policyManager.connect(attackerAsSigner).cancelLockPolicy(policyId, deadline)).to.be.revertedWith(
-        "Unauthorized",
-      );
+      await expect(
+        policyManager.connect(attackerAsSigner).updatePolicyLock(policyId, true, deadline),
+      ).to.be.revertedWith("Unauthorized");
+      await expect(
+        policyManager.connect(attackerAsSigner).updatePolicyLock(policyId, false, deadline),
+      ).to.be.revertedWith("Unauthorized");
       await expect(policyManager.connect(attackerAsSigner).setDeadline(policyId, deadline)).to.be.revertedWith(
         "Unauthorized",
       );
@@ -476,13 +500,13 @@ describe("Admin", function () {
 
     it("should not allow users to set an invalid policy", async function () {
       const bogusId = await policyManager.policyCount();
-      await expect(policyManager.setUserPolicy(bogusId)).to.be.revertedWith(unacceptable("policy not found"));
+      await expect(userPolicies.setUserPolicy(bogusId)).to.be.revertedWith(unacceptable("policyId not found"));
     });
 
     it("should allow users to set their policy", async function () {
       const policyId = 1;
-      await policyManager.setUserPolicy(policyId);
-      const userPolicyId = await policyManager.userPolicy(admin);
+      await userPolicies.setUserPolicy(policyId);
+      const userPolicyId = await userPolicies.userPolicies(admin);
       expect(userPolicyId).to.equal(policyId);
     });
 
@@ -655,11 +679,11 @@ describe("Admin", function () {
       await policyManager.updatePolicyDescription(policy, policyScalarUpdated.descriptionUtf8, deadline);
       await policyManager.updatePolicyTtl(policy, policyScalarUpdated.ttl, deadline);
       await policyManager.updatePolicyAcceptRoots(policy, policyScalarUpdated.acceptRoots, deadline);
-      await policyManager.lockPolicy(policy, deadline);
-      await policyManager.lockPolicy(policy, deadline); // to reach the empty else path
-      await policyManager.cancelLockPolicy(policy, deadline);
-      await policyManager.cancelLockPolicy(policy, deadline); // to reach the empty else path
-      await policyManager.lockPolicy(policy, deadline);
+      await policyManager.updatePolicyLock(policy, true, deadline);
+      await policyManager.updatePolicyLock(policy, true, deadline); // to reach the empty else path
+      await policyManager.updatePolicyLock(policy, false, deadline);
+      await policyManager.updatePolicyLock(policy, false, deadline); // to reach the empty else path
+      await policyManager.updatePolicyLock(policy, true, deadline);
 
       const now = await helpers.time.latest();
       deadline = now + THIRTY_DAYS_IN_SECONDS + 1;
@@ -683,7 +707,7 @@ describe("Admin", function () {
       const now = await helpers.time.latest();
       let deadline = now + THIRTY_DAYS_IN_SECONDS + 10;
 
-      await policyManager.lockPolicy(policy, deadline);
+      await policyManager.updatePolicyLock(policy, true, deadline);
 
       await helpers.time.increaseTo(deadline);
       await policyManager.policy(policy);
@@ -707,7 +731,7 @@ describe("Admin", function () {
       await expect(
         policyManager.updatePolicyAcceptRoots(policy, policyScalar.acceptRoots, deadline),
       ).to.be.revertedWith(unacceptable("policy is locked"));
-      await expect(policyManager.cancelLockPolicy(policy, deadline)).to.be.revertedWith(
+      await expect(policyManager.updatePolicyLock(policy, false, deadline)).to.be.revertedWith(
         unacceptable("policy is locked"),
       );
 

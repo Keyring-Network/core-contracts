@@ -22,8 +22,8 @@ library AddressSet {
     /**
      * @notice Insert a key to store.
      * @dev Duplicate keys are not permitted.
-     * @param self An Set struct - similar syntax to python classes.
-     * @param key An key to insert cast as an address.
+     * @param self A Set struct
+     * @param key A key to insert cast as an address.
      * @param context A message string about interpretation of the issue. Normally the calling function.
      */
     function insert(
@@ -45,7 +45,7 @@ library AddressSet {
     /**
      * @notice Remove a key from the store.
      * @dev The key to remove must exist.
-     * @param self A Set struct - similar syntax to python classes.
+     * @param self A Set struct
      * @param key An address to remove from the Set.
      * @param context A message string about interpretation of the issue. Normally the calling function.
      */
@@ -71,7 +71,7 @@ library AddressSet {
 
     /**
      * @notice Count the keys.
-     * @param self A Set struct - similar syntax to python classes.
+     * @param self A Set struct
      * @return uint256 Length of the `keyList`, which correspond to the number of elements
      * stored in the `keyPointers` mapping.
      */
@@ -81,7 +81,7 @@ library AddressSet {
 
     /**
      * @notice Check if a key exists in the Set.
-     * @param self A Set struct - similar syntax to python classes
+     * @param self A Set struct
      * @param key An address to look for in the Set.
      * @return bool True if the key exists in the Set, otherwise false.
      */
@@ -92,7 +92,7 @@ library AddressSet {
 
     /**
      * @notice Retrieve an address by its position in the set. Use for enumeration.
-     * @param self A Set struct - similar syntax to python classes.
+     * @param self A Set struct
      * @param index The internal index to inspect.
      * @return address Address value stored at the index position in the Set.
      */

@@ -1,6 +1,11 @@
 # ZK Verifiers
 
-Solidity assets in this folder are generated from the Circom circuits. IdentityMembershipProofVerifier is a exact copy of https://github.com/semaphore-protocol/semaphore/blob/main/packages/contracts/contracts/verifiers/Verifier20.sol
+Solidity assets in this folder are generated from Circom circuits. IdentityMembershipProofVerifier is an exact copy of https://github.com/semaphore-protocol/semaphore/blob/main/packages/contracts/contracts/verifiers/Verifier20.sol
+
+The 20-bit limitation constrains this implementation of the verifiers to 2 ^ 20 unique policies - a
+constraint that is enforced by PolicyManager. This constraint can be easily increased by deploying
+a revised implementation of the KeyringZkCredentialUpdater that uses verifiers, disclosures and policy
+ids with more bits. 
 
 ## Exact circuit output
 
@@ -9,7 +14,7 @@ Where flexible pragmas are declared, Keyring uses the lowest acceptable compiler
 - 0.6.11
 - 0.8.4
 
-These are left unchanged so that these assets are exact outputs of the Circom system. 
+These contracts are left unchanged so that the assets Keyring uses are exact outputs of the Circom system. 
 
 ## Depoyment ceremony
 

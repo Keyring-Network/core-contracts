@@ -26,7 +26,6 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
     using Bytes32Set for Bytes32Set.Set;
 
-    string private constant MODULE = "RuleRegistry";
     address private constant NULL_ADDRESS = address(0);
     bytes32 private _universeRule;
     bytes32 private _emptyRule;

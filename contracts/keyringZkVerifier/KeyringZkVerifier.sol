@@ -18,6 +18,7 @@ import "../interfaces/IKeyringZkVerifier.sol";
 
 contract KeyringZkVerifier is IKeyringZkVerifier {
 
+    address private constant NULL_ADDRESS = address(0);
     address public immutable override IDENTITY_MEMBERSHIP_PROOF_VERIFIER;
     address public immutable override IDENTITY_CONSTRUCTION_PROOF_VERIFIER;
     address public immutable override AUTHORIZATION_PROOF_VERIFIER;
@@ -27,9 +28,26 @@ contract KeyringZkVerifier is IKeyringZkVerifier {
         address membershipProofVerifier,
         address authorisationProofVerifier
     ) {
+        if (identityConstructionProofVerifier == NULL_ADDRESS)
+            revert Unacceptable({
+                reason: "identityConstructionProofVerifier cannot be empty"
+            });
+        if (membershipProofVerifier == NULL_ADDRESS)
+            revert Unacceptable({
+                reason: "membershipProofVerifier cannot be empty"
+            });
+        if (authorisationProofVerifier == NULL_ADDRESS)
+            revert Unacceptable({
+                reason: "authorisationProofVerifier cannot be empty"
+            });
         IDENTITY_CONSTRUCTION_PROOF_VERIFIER = identityConstructionProofVerifier;
         IDENTITY_MEMBERSHIP_PROOF_VERIFIER = membershipProofVerifier;
         AUTHORIZATION_PROOF_VERIFIER = authorisationProofVerifier;
+        emit Deployed(
+            msg.sender, 
+            identityConstructionProofVerifier, 
+            membershipProofVerifier, 
+            authorisationProofVerifier);
     }
 
     /**

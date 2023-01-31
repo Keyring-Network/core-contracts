@@ -26,7 +26,6 @@ contract KeyringZkCredentialUpdater is
     using PackLib for uint32[12];
     using PackLib for uint256;
 
-    string private constant MODULE = "KeyringV1CredentialUpdater";
     bytes32 public constant override  ROLE_IDENTITY_TREE_ADMIN = keccak256("identity tree master");
     address private constant NULL_ADDRESS = address(0);
     address public immutable override POLICY_MANAGER;
@@ -79,10 +78,12 @@ contract KeyringZkCredentialUpdater is
     /**
      * @notice Updates the credential cache if the request is acceptable.
      * @dev The attestor must be valid for all policy disclosures. For this to be possible, it must have been admitted
-     to the system globally before it was selected for a policy. The two zero-knowledge proof share parameters that ensure
-     that both proofs were derived from the same identity commitment. 
-     * @param attestor The identityTree contract with a root that contains the user's identity commitment. Must be present
-     in the current attestor list for all policy disclosures in the authorization proof. 
+     to the system globally before it was selected for a policy. The two zero-knowledge proof share parameters that 
+     ensure that both proofs were derived from the same identity commitment. If the root age used to construct proofs
+     if older than the policy time to live (ttl), the root will be considered acceptable with an age of zero, provided
+     that the number of root successors is less than or equal to the policy acceptRoots (accept most recent n roots).
+     * @param attestor The identityTree contract with a root that contains the user's identity commitment. Must be 
+     present in the current attestor list for all policy disclosures in the authorization proof. 
      * @param membershipProof A zero-knowledge proof of identity commitment membership in the identity tree. Contains an
      external nullifier and nullifier hash that must match the parameters of the authorization proof. 
      * @param authorizationProof A zero-knowledge proof of compliance with up to 24 policy disclosures. Contains an
@@ -123,10 +124,21 @@ contract KeyringZkCredentialUpdater is
                     reason: "policy, wallet or identity tree is unacceptable"
                 });
             
+            uint credentialTime = rootTime;
+
+            if(rootTime + IPolicyManager(POLICY_MANAGER).policyTtl(policyId) < block.timestamp) {
+                if(IIdentityTree(attestor).merkleRootSuccessors(bytes32(membershipProof.root)) <= 
+                    IPolicyManager(POLICY_MANAGER).policyAcceptRoots(policyId) && 
+                    IPolicyManager(POLICY_MANAGER).policyAcceptRoots(policyId) > 0) 
+                {
+                    credentialTime = block.timestamp;
+                }
+            }
+            
             IKeyringCredentials(KEYRING_CREDENTIALS).setCredential(
                 trader, 
-                policyId, 
-                rootTime);
+                policyId,                
+                credentialTime);
         }
         emit AcceptCredentialUpdate(
             sender, 
@@ -149,12 +161,12 @@ contract KeyringZkCredentialUpdater is
         address trader, 
         uint32 policyId, 
         address attestor
-    ) public override returns (bool acceptable) 
+    ) public override returns (bool acceptable)
     {
         IPolicyManager p = IPolicyManager(POLICY_MANAGER);
         if(!p.isPolicy(policyId)) return false;
         address[] memory walletChecks = p.policyWalletChecks(policyId);
-  
+
         acceptable = !(IRuleRegistry(p.ruleRegistry()).ruleIsToxic(p.policyRuleId(policyId))) &&
             p.isPolicyAttestor(policyId, attestor);
         
