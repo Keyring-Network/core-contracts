@@ -21,9 +21,9 @@ import {
   KeyringZkCredentialUpdater__factory,
   KeyringZkVerifier__factory,
   PolicyStorage__factory,
+  UserPolicies__factory,
 } from "../src/types";
 import { genesis } from "../constants";
-import { Contract } from "ethers";
 
 export interface Signers {
   admin: SignerWithAddress;
@@ -88,6 +88,11 @@ task("deploy").setAction(async function (taskArguments: TaskArguments, { ethers 
   const policyManager = await PolicyManagerFactory.deploy(forwarder.address, ruleRegistry.address);
   console.log("PolicyManager:                 ", policyManager.address);
 
+    /* ------------------------------ UserPolicies ------------------------------ */
+    const UserPoliciesFactory = await ethers.getContractFactory("UserPolicies");
+    const userPolicies = await UserPoliciesFactory.deploy(forwarder.address, policyManager.address);
+    console.log("UserPolicies:                 ", userPolicies.address);
+
   /* --------------------------- KeyringCredentials --------------------------- */
   const CredentialFactory = await ethers.getContractFactory("KeyringCredentials");
   const credentials = await CredentialFactory.deploy(forwarder.address, policyManager.address);
@@ -128,6 +133,7 @@ task("deploy").setAction(async function (taskArguments: TaskArguments, { ethers 
   await ruleRegistry.deployed();
   await packLib.deployed();
   await policyManager.deployed();
+  await userPolicies.deployed();
   await credentialUpdater.deployed();
   await PolicyStorage.deployed();
   await walletCheck.deployed();
@@ -217,6 +223,10 @@ task("deploy").setAction(async function (taskArguments: TaskArguments, { ethers 
       PolicyManager: {
         address: policyManager.address,
         abi: PolicyManager__factory.abi,
+      },
+      UserPolicies: {
+        address: userPolicies.address,
+        abi: UserPolicies__factory.abi,
       },
       PolicyStorage: {
         address: PolicyStorage.address,
