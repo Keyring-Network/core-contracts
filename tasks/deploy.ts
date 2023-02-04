@@ -259,8 +259,8 @@ task("deploy").setAction(async function (taskArguments: TaskArguments, { ethers 
     },
   };
 
-  if (!fs.existsSync(contractsDir)) {
-    fs.mkdirSync(contractsDir);
+  if (!fs.existsSync(contractsDir)){
+    fs.mkdirSync(contractsDir, { recursive: true });
   }
   fs.writeFileSync(`${contractsDir}/deployment.json`, JSON.stringify(deploymentInfo, undefined, 2));
 
