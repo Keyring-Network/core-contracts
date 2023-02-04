@@ -48,6 +48,18 @@ task("deploy").setAction(async function (taskArguments: TaskArguments, { ethers 
   const AuthorizationProofVerifier = await import("../artifacts/contracts/zkVerifiers/authorizationProof/contracts/AuthorizationProofVerifier.sol/Verifier.json");
   const IdentityMembershipProofVerifier = await import("../artifacts/contracts/zkVerifiers/membershipProof/contracts/IdentityMembershipProofVerifier.sol/Verifier20.json");
 
+  const IdentityTree__factory = await import("../artifacts/contracts/identityTree/IdentityTree.sol/IdentityTree.json");
+  const PackLib__factory = await import("../artifacts/contracts/lib/Pack12x20.sol/PackLib.json");
+  const WalletCheck__factory = await import("../artifacts/contracts/walletCheck/WalletCheck.sol/WalletCheck.json");
+  const NoImplementation__factory = await import("../artifacts/contracts/forwarder/NoImplementation.sol/NoImplementation.json");
+  const KeyringCredentials__factory = await import("../artifacts/contracts/keyringCredentials/KeyringCredentials.sol/KeyringCredentials.json");
+  const RuleRegistry__factory = await import("../artifacts/contracts/ruleRegistry/RuleRegistry.sol/RuleRegistry.json");
+  const PolicyManager__factory = await import("../artifacts/contracts/policyManager/PolicyManager.sol/PolicyManager.json");
+  const KeyringZkCredentialUpdater__factory = await import("../artifacts/contracts/credentialUpdater/KeyringZkCredentialUpdater.sol/KeyringZkCredentialUpdater.json");
+  const KeyringZkVerifier__factory = await import("../artifacts/contracts/keyringZkVerifier/KeyringZkVerifier.sol/KeyringZkVerifier.json");
+  const PolicyStorage__factory = await import("../artifacts/contracts/lib/PolicyStorage.sol/PolicyStorage.json");
+  const UserPolicies__factory = await import("../artifacts/contracts/userPolicies/UserPolicies.sol/UserPolicies.json");
+
   let verifierFactory = new ethers.ContractFactory(
     IdentityConstructionProofVerifier.abi,
     IdentityConstructionProofVerifier.bytecode,
@@ -199,29 +211,29 @@ task("deploy").setAction(async function (taskArguments: TaskArguments, { ethers 
 
   /* ------------------------------ Deployer Info ------------------------------ */
 
-  let IdentityTree__factory: any;
-  let PackLib__factory: any;
-  let WalletCheck__factory: any;
-  let NoImplementation__factory: any;
-  let KeyringCredentials__factory: any;
-  let RuleRegistry__factory: any;
-  let PolicyManager__factory: any;
-  let KeyringZkCredentialUpdater__factory: any;
-  let KeyringZkVerifier__factory: any;
-  let PolicyStorage__factory: any;
-  let UserPolicies__factory: any;
+  // let IdentityTree__factory: any;
+  // let PackLib__factory: any;
+  // let WalletCheck__factory: any;
+  // let NoImplementation__factory: any;
+  // let KeyringCredentials__factory: any;
+  // let RuleRegistry__factory: any;
+  // let PolicyManager__factory: any;
+  // let KeyringZkCredentialUpdater__factory: any;
+  // let KeyringZkVerifier__factory: any;
+  // let PolicyStorage__factory: any;
+  // let UserPolicies__factory: any;
 
-  IdentityTree__factory = await import("../artifacts/contracts/identityTree/IdentityTree.sol/IdentityTree.json");
-  PackLib__factory = await import("../artifacts/contracts/lib/Pack12x20.sol/PackLib.json");
-  WalletCheck__factory = await import("../artifacts/contracts/walletCheck/WalletCheck.sol/WalletCheck.json");
-  NoImplementation__factory = await import("../artifacts/contracts/forwarder/NoImplementation.sol/NoImplementation.json");
-  KeyringCredentials__factory = await import("../artifacts/contracts/keyringCredentials/KeyringCredentials.sol/KeyringCredentials.json");
-  RuleRegistry__factory = await import("../artifacts/contracts/ruleRegistry/RuleRegistry.sol/RuleRegistry.json");
-  PolicyManager__factory = await import("../artifacts/contracts/policyManager/PolicyManager.sol/PolicyManager.json");
-  KeyringZkCredentialUpdater__factory = await import("../artifacts/contracts/credentialUpdater/KeyringZkCredentialUpdater.sol/KeyringZkCredentialUpdater.json");
-  KeyringZkVerifier__factory = await import("../artifacts/contracts/keyringZkVerifier/KeyringZkVerifier.sol/KeyringZkVerifier.json");
-  PolicyStorage__factory = await import("../artifacts/contracts/lib/PolicyStorage.sol/PolicyStorage.json");
-  UserPolicies__factory = await import("../artifacts/contracts/userPolicies/UserPolicies.sol/UserPolicies.json");
+  // const IdentityTree__factory = (await import("../src/types/factories/IdentityTree__factory"));
+  // const PackLib__factory = (await import("../src/types/factories/PackLib__factory"));
+  // const WalletCheck__factory = (await import("../src/types/factories/WalletCheck__factory"));
+  // const NoImplementation__factory = (await import("../src/types/factories/NoImplementation__factory"));
+  // const KeyringCredentials__factory = (await import("../src/types/factories/KeyringCredentials__factory"));
+  // const RuleRegistry__factory = (await import("../src/types/factories/RuleRegistry__factory"));
+  // const PolicyManager__factory = (await import("../src/types/factories/PolicyManager__factory"));
+  // const KeyringZkCredentialUpdater__factory = (await import("../src/types/factories/KeyringZkCredentialUpdater__factory"));
+  // const KeyringZkVerifier__factory = (await import("../src/types/factories/KeyringZkVerifier__factory"));
+  // const PolicyStorage__factory = (await import("../src/types/factories/PolicyStorage__factory"));
+  // const UserPolicies__factory = (await import("../src/types/factories/UserPolicies__factory"));
 
   const deploymentInfo = {
     roles: {
