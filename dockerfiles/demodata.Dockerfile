@@ -22,6 +22,7 @@ INFURA_API_KEY=blank\n\
 WORKDIR ${APP_ROOT}
 
 RUN yarn install
+RUN yarn typechain
 
 RUN npx hardhat compile
 
