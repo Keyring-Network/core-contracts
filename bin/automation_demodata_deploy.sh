@@ -1,5 +1,9 @@
 # runs node in background
+npx hardhat compile
 npx hardhat node --network hardhat &
+
+# publishing contracts to s3
+aws s3 cp --recursive /app/artifacts/contracts/ s3://$CONTRACT_BUCKET/$GIT_SHA
 
 # ensures node is up and then deploys
 start=$SECONDS
