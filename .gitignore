@@ -18,6 +18,7 @@
 **/artifacts
 **/bin
 **/.openzeppelin
+**/deploymentInfo
 
 # files
 .DS_Store
