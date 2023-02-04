@@ -112,7 +112,9 @@ task("demodata").setAction(async function (taskArguments: TaskArguments, { ether
 
 // NOTE instead of `1675276993802` set timestamp of latest deployment
 async function getDeploymentInfo() {
-  const deploymentInfo = await fsp.readFile(contractsDir + "/1675276993802/deployment.json");
+  var result = fs.readdirSync(contractsDir).sort().reverse();
+  var subdir = result[0];
+  const deploymentInfo = await fsp.readFile(contractsDir + "/" + subdir + "/deployment.json");
   return JSON.parse(deploymentInfo);
 }
 
