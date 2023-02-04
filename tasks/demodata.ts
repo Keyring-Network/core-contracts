@@ -114,6 +114,7 @@ task("demodata").setAction(async function (taskArguments: TaskArguments, { ether
 async function getDeploymentInfo() {
   var result = fs.readdirSync(contractsDir).sort().reverse();
   var subdir = result[0];
+  console.log("Reading DeploymentInfo from: " + contractsDir + "/" + subdir + "/deployment.json");
   const deploymentInfo = await fsp.readFile(contractsDir + "/" + subdir + "/deployment.json");
   return JSON.parse(deploymentInfo);
 }
