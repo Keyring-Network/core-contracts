@@ -88,10 +88,10 @@ task("deploy").setAction(async function (taskArguments: TaskArguments, { ethers 
   const policyManager = await PolicyManagerFactory.deploy(forwarder.address, ruleRegistry.address);
   console.log("PolicyManager:                 ", policyManager.address);
 
-    /* ------------------------------ UserPolicies ------------------------------ */
-    const UserPoliciesFactory = await ethers.getContractFactory("UserPolicies");
-    const userPolicies = await UserPoliciesFactory.deploy(forwarder.address, policyManager.address);
-    console.log("UserPolicies:                 ", userPolicies.address);
+  /* ------------------------------ UserPolicies ------------------------------ */
+  const UserPoliciesFactory = await ethers.getContractFactory("UserPolicies");
+  const userPolicies = await UserPoliciesFactory.deploy(forwarder.address, policyManager.address);
+  console.log("UserPolicies:                 ", userPolicies.address);
 
   /* --------------------------- KeyringCredentials --------------------------- */
   const CredentialFactory = await ethers.getContractFactory("KeyringCredentials");
@@ -173,8 +173,6 @@ task("deploy").setAction(async function (taskArguments: TaskArguments, { ethers 
   const tx9 = await identityTree.grantRole(roleAggregator, admin);
   const tx10 = await credentialUpdater.grantRole(roleIdentityTreeAdmin, admin);
 
-  console.log("contract internal roles configuration confirmed");
-
   await tx4.wait();
   await tx5.wait();
   await tx6.wait();
@@ -182,6 +180,20 @@ task("deploy").setAction(async function (taskArguments: TaskArguments, { ethers 
   await tx8.wait();
   await tx9.wait();
   await tx10.wait();
+
+  console.log("contract internal roles configuration confirmed");
+
+  /* --------------------- Admit Attestor and WalletCheck --------------------- */
+  const attestorAddress = "0xbF76cca6D678949E207D7fB66136bbFdd4E317aF";
+  const tx11 = await policyManager.admitAttestor(attestorAddress, "bulut");
+  const tx12 = await policyManager.admitWalletCheck(walletCheck.address);
+  // NOTE granting an aggregator with the `ROLE_AGGREGATOR` on the IdentityTree contract is missing
+  await tx11.wait();
+  await tx12.wait();
+
+  console.log("contract Attestor and Walletcheck configuration confirmed");
+
+  /* ------------------------------ Deployer Info ------------------------------ */
 
   const deploymentInfo = {
     roles: {

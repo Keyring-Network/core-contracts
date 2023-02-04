@@ -18,6 +18,7 @@ import "./tasks/accounts";
 import { chainIds, namedAccounts } from "./constants";
 
 import "./tasks/deploy";
+import "./tasks/demodata";
 
 dotenvConfig({ path: resolve(__dirname, "./.env") });
 
