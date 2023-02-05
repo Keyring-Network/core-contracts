@@ -3,7 +3,11 @@ on:
   # Triggers the workflow on push to matching branches
   push:
     branches:
-      - feature/duplo-devops-not-exists
+      - v2-staging-backend-checks
+      - staging
+      - master
+      - V2
+      - V2-staging
 env:
   duplo_host: https://keyring.duplocloud.net
   duplo_token: "${{ secrets.DUPLO_SECRET }}"
