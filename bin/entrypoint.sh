@@ -1,9 +1,8 @@
 #!/bin/bash
 
-if [[ "$MODULE" == "hardhat-node" ]]; then
+npx hardhat compile
+
+if [[ "$MODULE" != "contract-generation" ]]; then
     # runs hardhat node in foreground
     npx hardhat node --network hardhat
-else
-    # complies contracts
-    npx hardhat compile
 fi
