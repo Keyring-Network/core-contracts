@@ -17,7 +17,13 @@ import { config as dotenvConfig } from "dotenv";
 import "./tasks/accounts";
 import { chainIds, namedAccounts } from "./constants";
 
+import "./tasks/deploy";
+import "./tasks/demodata";
+
 dotenvConfig({ path: resolve(__dirname, "./.env") });
+
+const INFURA_API_KEY: string | undefined = process.env.INFURA_API_KEY;
+const GOERLI_PRIVATE_KEY: string | undefined = process.env.GOERLI_PRIVATE_KEY;
 
 const config: HardhatUserConfig = {
   abiExporter: {
@@ -32,6 +38,15 @@ const config: HardhatUserConfig = {
       chainId: chainIds.hardhat,
       allowUnlimitedContractSize: false,
     },
+    ...( // only adds if the key is defined
+      INFURA_API_KEY && GOERLI_PRIVATE_KEY && {
+        goerli: {
+          chainId: chainIds.goerli,
+          url: "https://goerli.infura.io/v3/" + INFURA_API_KEY,
+          accounts: [`${GOERLI_PRIVATE_KEY}`],
+        }
+      }
+    )
   },
   namedAccounts: {
     ...namedAccounts,

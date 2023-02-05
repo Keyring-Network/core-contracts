@@ -1,4 +1,5 @@
 # runs node in background
+npx hardhat compile
 npx hardhat node --network hardhat &
 
 # ensures node is up and then deploys

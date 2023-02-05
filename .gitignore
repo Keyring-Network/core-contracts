@@ -18,6 +18,7 @@
 **/artifacts
 **/bin
 **/.openzeppelin
+**/deploymentInfo
 
 # files
 .DS_Store
@@ -28,6 +29,3 @@ coverage.json
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# config
-deploymentInfo/
