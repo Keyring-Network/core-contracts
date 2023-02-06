@@ -148,7 +148,7 @@ _The attestor must be valid for all policy disclosures. For this to be possible,
 function checkPolicyAndWallet(address trader, uint32 policyId, address attestor) public returns (bool acceptable)
 ```
 
-The identity tree must be a policy attestor, the wallet must not be flagged by any policy wallet
+The identity tree must be a policy attestor, the wallet must be whitelisted by all policy wallet
 check and the policy rule cannot be toxic.
 
 #### Parameters
@@ -163,7 +163,7 @@ check and the policy rule cannot be toxic.
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| acceptable | bool | True if the policy rule is not toxic, the identity tree is authoritative for the poliy       and the wallet is not flagged in any wallet check contract that is authoritative for the policy. |
+| acceptable | bool | True if the policy rule is not toxic, the identity tree is authoritative for the policy       and the wallet is listed in all wallet check contracts that are authoritative for the policy. |
 
 ### pack12x20
 
@@ -1503,16 +1503,10 @@ function isWhitelisted(address trader, address counterparty) external view retur
 
 ## IWalletCheck
 
-### Unacceptable
+### SetWalletWhitelist
 
 ```solidity
-error Unacceptable(string reason)
-```
-
-### SetWalletFlag
-
-```solidity
-event SetWalletFlag(address admin, address wallet, bool isFlagged)
+event SetWalletWhitelist(address admin, address wallet, bool isWhitelisted)
 ```
 
 ### ROLE_WALLET_CHECK_ADMIN
@@ -1521,16 +1515,16 @@ event SetWalletFlag(address admin, address wallet, bool isFlagged)
 function ROLE_WALLET_CHECK_ADMIN() external view returns (bytes32)
 ```
 
-### isFlagged
+### isWhitelisted
 
 ```solidity
-function isFlagged(address wallet) external view returns (bool isFlagged)
+function isWhitelisted(address wallet) external view returns (bool isWhitelisted)
 ```
 
-### setWalletFlag
+### setWalletWhitelist
 
 ```solidity
-function setWalletFlag(address wallet, bool flagged) external
+function setWalletWhitelist(address wallet, bool flagged) external
 ```
 
 ## KeyringCredentials
@@ -4284,16 +4278,16 @@ check if a counterparty is whitelisted by a trader.
 bytes32 ROLE_WALLET_CHECK_ADMIN
 ```
 
-Wallet checks are on-chain blacklists that can contain information gathered by
-     off-chain processes. Policies can specify which wallet checks must be check on a just-in-time
-     basis when trading wallet credentials are refreshed. This contract establishes the interface
-     that all wallet check contracts must implement. Future wallet check instances may employ
-     additional logic. There is a distinct instance of a wallet check for each case.
+Wallet checks are on-chain whitelists that can contain information gathered by
+     off-chain processes. Policies can specify which wallet checks must be checked on a just-in-time
+     basis. This contract establishes the interface that all wallet check contracts must implement. 
+     Future wallet check instances may employ additional logic. There is a distinct instance of a 
+     wallet check for each on-chain check.
 
-### isFlagged
+### isWhitelisted
 
 ```solidity
-mapping(address => bool) isFlagged
+mapping(address => bool) isWhitelisted
 ```
 
 ### onlyWalletCheckAdmin
@@ -4308,184 +4302,20 @@ modifier onlyWalletCheckAdmin()
 constructor(address trustedForwarder) public
 ```
 
-### setWalletFlag
+### setWalletWhitelist
 
 ```solidity
-function setWalletFlag(address wallet, bool flagged) external
+function setWalletWhitelist(address wallet, bool whitelisted) external
 ```
 
-Set the flagged boolean for a specific trading wallet to true or false.
+Set the whitelisted boolean for a specific trading wallet to true or false.
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | wallet | address | The subject wallet. |
-| flagged | bool | True if the wallet is to prevent from trading for policies that       observe this instance. |
-
-## Pairing
-
-### G1Point
-
-```solidity
-struct G1Point {
-  uint256 X;
-  uint256 Y;
-}
-```
-
-### G2Point
-
-```solidity
-struct G2Point {
-  uint256[2] X;
-  uint256[2] Y;
-}
-```
-
-### P1
-
-```solidity
-function P1() internal pure returns (struct Pairing.G1Point)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | struct Pairing.G1Point | the generator of G1 |
-
-### P2
-
-```solidity
-function P2() internal pure returns (struct Pairing.G2Point)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | struct Pairing.G2Point | the generator of G2 |
-
-### negate
-
-```solidity
-function negate(struct Pairing.G1Point p) internal pure returns (struct Pairing.G1Point r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | struct Pairing.G1Point | the negation of p, i.e. p.addition(p.negate()) should be zero. |
-
-### addition
-
-```solidity
-function addition(struct Pairing.G1Point p1, struct Pairing.G1Point p2) internal view returns (struct Pairing.G1Point r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | struct Pairing.G1Point | the sum of two points of G1 |
-
-### scalar_mul
-
-```solidity
-function scalar_mul(struct Pairing.G1Point p, uint256 s) internal view returns (struct Pairing.G1Point r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | struct Pairing.G1Point | the product of a point on G1 and a scalar, i.e. p == p.scalar_mul(1) and p.addition(p) == p.scalar_mul(2) for all points p. |
-
-### pairing
-
-```solidity
-function pairing(struct Pairing.G1Point[] p1, struct Pairing.G2Point[] p2) internal view returns (bool)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | bool | the result of computing the pairing check e(p1[0], p2[0]) *  .... * e(p1[n], p2[n]) == 1 For example pairing([P1(), P1().negate()], [P2(), P2()]) should return true. |
-
-### pairingProd2
-
-```solidity
-function pairingProd2(struct Pairing.G1Point a1, struct Pairing.G2Point a2, struct Pairing.G1Point b1, struct Pairing.G2Point b2) internal view returns (bool)
-```
-
-Convenience method for a pairing check for two pairs.
-
-### pairingProd3
-
-```solidity
-function pairingProd3(struct Pairing.G1Point a1, struct Pairing.G2Point a2, struct Pairing.G1Point b1, struct Pairing.G2Point b2, struct Pairing.G1Point c1, struct Pairing.G2Point c2) internal view returns (bool)
-```
-
-Convenience method for a pairing check for three pairs.
-
-### pairingProd4
-
-```solidity
-function pairingProd4(struct Pairing.G1Point a1, struct Pairing.G2Point a2, struct Pairing.G1Point b1, struct Pairing.G2Point b2, struct Pairing.G1Point c1, struct Pairing.G2Point c2, struct Pairing.G1Point d1, struct Pairing.G2Point d2) internal view returns (bool)
-```
-
-Convenience method for a pairing check for four pairs.
-
-## Verifier
-
-### VerifyingKey
-
-```solidity
-struct VerifyingKey {
-  struct Pairing.G1Point alfa1;
-  struct Pairing.G2Point beta2;
-  struct Pairing.G2Point gamma2;
-  struct Pairing.G2Point delta2;
-  struct Pairing.G1Point[] IC;
-}
-```
-
-### Proof
-
-```solidity
-struct Proof {
-  struct Pairing.G1Point A;
-  struct Pairing.G2Point B;
-  struct Pairing.G1Point C;
-}
-```
-
-### verifyingKey
-
-```solidity
-function verifyingKey() internal pure returns (struct Verifier.VerifyingKey vk)
-```
-
-### verify
-
-```solidity
-function verify(uint256[] input, struct Verifier.Proof proof) internal view returns (uint256)
-```
-
-### verifyProof
-
-```solidity
-function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[3] input) public view returns (bool r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | bool | bool true if proof is valid |
+| whitelisted | bool | True if the wallet has passed the checks represented by this contract. |
 
 ## NoImplementation
 
@@ -4678,19 +4508,169 @@ function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[4] inp
 
 _Verifies a Semaphore proof. Reverts with InvalidProof if the proof is invalid._
 
-## IKeyringECRecoverTyped
+## Pairing
 
-### getSignerFromSig
-
-```solidity
-function getSignerFromSig(address user, uint32 userPolicyId, uint32 admissionPolicyId, uint256 timestamp, bool isRequest, bytes signature) external view returns (address signer)
-```
-
-### getHashFromAttestation
+### G1Point
 
 ```solidity
-function getHashFromAttestation(address user, uint32 userPolicyId, uint32 admissionPolicyId, uint256 timestamp, bool isRequest) external view returns (bytes32 message)
+struct G1Point {
+  uint256 X;
+  uint256 Y;
+}
 ```
+
+### G2Point
+
+```solidity
+struct G2Point {
+  uint256[2] X;
+  uint256[2] Y;
+}
+```
+
+### P1
+
+```solidity
+function P1() internal pure returns (struct Pairing.G1Point)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | struct Pairing.G1Point | the generator of G1 |
+
+### P2
+
+```solidity
+function P2() internal pure returns (struct Pairing.G2Point)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | struct Pairing.G2Point | the generator of G2 |
+
+### negate
+
+```solidity
+function negate(struct Pairing.G1Point p) internal pure returns (struct Pairing.G1Point r)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| r | struct Pairing.G1Point | the negation of p, i.e. p.addition(p.negate()) should be zero. |
+
+### addition
+
+```solidity
+function addition(struct Pairing.G1Point p1, struct Pairing.G1Point p2) internal view returns (struct Pairing.G1Point r)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| r | struct Pairing.G1Point | the sum of two points of G1 |
+
+### scalar_mul
+
+```solidity
+function scalar_mul(struct Pairing.G1Point p, uint256 s) internal view returns (struct Pairing.G1Point r)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| r | struct Pairing.G1Point | the product of a point on G1 and a scalar, i.e. p == p.scalar_mul(1) and p.addition(p) == p.scalar_mul(2) for all points p. |
+
+### pairing
+
+```solidity
+function pairing(struct Pairing.G1Point[] p1, struct Pairing.G2Point[] p2) internal view returns (bool)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | bool | the result of computing the pairing check e(p1[0], p2[0]) *  .... * e(p1[n], p2[n]) == 1 For example pairing([P1(), P1().negate()], [P2(), P2()]) should return true. |
+
+### pairingProd2
+
+```solidity
+function pairingProd2(struct Pairing.G1Point a1, struct Pairing.G2Point a2, struct Pairing.G1Point b1, struct Pairing.G2Point b2) internal view returns (bool)
+```
+
+Convenience method for a pairing check for two pairs.
+
+### pairingProd3
+
+```solidity
+function pairingProd3(struct Pairing.G1Point a1, struct Pairing.G2Point a2, struct Pairing.G1Point b1, struct Pairing.G2Point b2, struct Pairing.G1Point c1, struct Pairing.G2Point c2) internal view returns (bool)
+```
+
+Convenience method for a pairing check for three pairs.
+
+### pairingProd4
+
+```solidity
+function pairingProd4(struct Pairing.G1Point a1, struct Pairing.G2Point a2, struct Pairing.G1Point b1, struct Pairing.G2Point b2, struct Pairing.G1Point c1, struct Pairing.G2Point c2, struct Pairing.G1Point d1, struct Pairing.G2Point d2) internal view returns (bool)
+```
+
+Convenience method for a pairing check for four pairs.
+
+## Verifier
+
+### VerifyingKey
+
+```solidity
+struct VerifyingKey {
+  struct Pairing.G1Point alfa1;
+  struct Pairing.G2Point beta2;
+  struct Pairing.G2Point gamma2;
+  struct Pairing.G2Point delta2;
+  struct Pairing.G1Point[] IC;
+}
+```
+
+### Proof
+
+```solidity
+struct Proof {
+  struct Pairing.G1Point A;
+  struct Pairing.G2Point B;
+  struct Pairing.G1Point C;
+}
+```
+
+### verifyingKey
+
+```solidity
+function verifyingKey() internal pure returns (struct Verifier.VerifyingKey vk)
+```
+
+### verify
+
+```solidity
+function verify(uint256[] input, struct Verifier.Proof proof) internal view returns (uint256)
+```
+
+### verifyProof
+
+```solidity
+function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[3] input) public view returns (bool r)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| r | bool | bool true if proof is valid |
 
 ## Pairing
 

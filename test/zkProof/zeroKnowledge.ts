@@ -265,6 +265,9 @@ describe("Zero-knowledge", function () {
         await policyManager.createPolicy(policyScalar, [identityTree.address], [walletCheck.address]);
       }
 
+      // whitelist trader
+      await walletCheck.setWalletWhitelist(trader2.address, true);
+
       await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
 
       // check if credentials are set properly
@@ -288,6 +291,9 @@ describe("Zero-knowledge", function () {
       for (let i = 0; i < numberOfPolices; i++) {
         await policyManager.createPolicy(policyScalar, [identityTree.address], [walletCheck.address]);
       }
+
+      // whitelist trader
+      await walletCheck.setWalletWhitelist(trader2.address, true);
 
       await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
       const version = 1;
@@ -315,7 +321,7 @@ describe("Zero-knowledge", function () {
       ).to.revertedWith(unacceptable("Proof unacceptable"));
     });
 
-    it("should not allow invalid policies, flagged users or invalid trees", async function () {
+    it("should not allow invalid policies, not whitelisted users or invalid trees", async function () {
       await expect(
         credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2),
       ).to.revertedWith(unacceptable("policy, wallet or identity tree is unacceptable"));
@@ -330,8 +336,9 @@ describe("Zero-knowledge", function () {
         await policyManager.createPolicy(policyScalar, [identityTree.address], [walletCheck.address]);
       }
 
-      // flag trader
-      await walletCheck.setWalletFlag(trader2.address, true);
+      // not whitelisted trader
+      expect(await walletCheck.isWhitelisted(trader2.address)).to.equal(false);
+      // await walletCheck.setWalletFlag(trader2.address, true);
 
       await expect(
         credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2),
@@ -368,6 +375,9 @@ describe("Zero-knowledge", function () {
           await policyManager.createPolicy(policyScalar, [identityTree.address], [walletCheck.address]);
         }
       }
+
+      // whitelist trader
+      await walletCheck.setWalletWhitelist(trader2.address, true);
 
       await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
 

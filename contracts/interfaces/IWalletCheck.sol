@@ -4,13 +4,11 @@ pragma solidity 0.8.14;
 
 interface IWalletCheck {
 
-    error Unacceptable(string reason);
-
-    event SetWalletFlag(address admin, address wallet, bool isFlagged);
+    event SetWalletWhitelist(address admin, address wallet, bool isWhitelisted);
 
     function ROLE_WALLET_CHECK_ADMIN() external view returns (bytes32);
 
-    function isFlagged(address wallet) external view returns(bool isFlagged);
+    function isWhitelisted(address wallet) external view returns(bool isWhitelisted);
 
-    function setWalletFlag(address wallet, bool flagged) external;
+    function setWalletWhitelist(address wallet, bool flagged) external;
 }

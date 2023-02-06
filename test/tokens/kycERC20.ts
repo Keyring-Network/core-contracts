@@ -110,6 +110,10 @@ describe("Compliant Token", function () {
       await identityTree.setMerkleRootBirthday(proofMerkleRoot2, now);
       await identityTree.setMerkleRootBirthday(proofMerkleRoot3, now);
 
+      // whitelist trader
+      await walletCheck.setWalletWhitelist(trader2.address, true);
+      await walletCheck.setWalletWhitelist(trader3.address, true);
+
       // update credentials
       await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
       await credentialsUpdater.updateCredentials(identityTree.address, membershipProof3, authorisationProof3);

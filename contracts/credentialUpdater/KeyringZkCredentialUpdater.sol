@@ -148,16 +148,16 @@ contract KeyringZkCredentialUpdater is
             rootTime);
     }
 
-    /**
-     * @notice The identity tree must be a policy attestor, the wallet must not be flagged by any policy wallet
+  /**
+     * @notice The identity tree must be a policy attestor, the wallet must be whitelisted by all policy wallet
      * check and the policy rule cannot be toxic.
      * @param trader The trader wallet to inspect.
      * @param policyId The policy to inspect.
      * @param attestor The identity tree contract address to compare to the policy attestors.
-     * @return acceptable True if the policy rule is not toxic, the identity tree is authoritative for the poliy 
-     and the wallet is not flagged in any wallet check contract that is authoritative for the policy. 
+     * @return acceptable True if the policy rule is not toxic, the identity tree is authoritative for the policy 
+     and the wallet is listed in all wallet check contracts that are authoritative for the policy. 
      */
-    function checkPolicyAndWallet(
+function checkPolicyAndWallet(
         address trader, 
         uint32 policyId, 
         address attestor
@@ -171,7 +171,7 @@ contract KeyringZkCredentialUpdater is
             p.isPolicyAttestor(policyId, attestor);
         
         for(uint256 i = 0; i < walletChecks.length; i++) {
-            if(IWalletCheck(walletChecks[i]).isFlagged(trader)) acceptable = false;
+            if(!IWalletCheck(walletChecks[i]).isWhitelisted(trader)) acceptable = false;
         }
     }
 

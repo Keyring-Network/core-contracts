@@ -988,20 +988,20 @@ describe("Admin", function () {
     });
 
     /* ------------------------------- WalletCheck ------------------------------ */
-    it("should only let admin flag wallet addresses", async function () {
-      expect(await walletCheck.isFlagged(bob)).to.equal(false);
-      await expect(walletCheck.connect(attackerAsSigner).setWalletFlag(bob, true)).to.be.revertedWith(
+    it("should only let wallet check admin whitelist wallet addresses", async function () {
+      expect(await walletCheck.isWhitelisted(bob)).to.equal(false);
+      await expect(walletCheck.connect(attackerAsSigner).setWalletWhitelist(bob, true)).to.be.revertedWith(
         unauthorized(
           attacker,
           "KeyringAccessControl",
           "_checkRole",
           ROLE_WALLET_CHECK_ADMIN,
           "sender does not have the required role",
-          "WalletCheck::onlyAggregator",
+          "WalletCheck::onlyWalletCheckAdmin",
         ),
       );
-      await walletCheck.setWalletFlag(bob, true);
-      expect(await walletCheck.isFlagged(bob)).to.equal(true);
+      await walletCheck.setWalletWhitelist(bob, true);
+      expect(await walletCheck.isWhitelisted(bob)).to.equal(true);
     });
   });
 });
