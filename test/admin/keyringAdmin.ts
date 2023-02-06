@@ -22,7 +22,7 @@ import {
   ONE_DAY_IN_SECONDS,
   ROLE_GLOBAL_ATTESTOR_ADMIN,
   ROLE_RULE_ADMIN,
-  ROLE_WALLET_CHECK_ADMIN,
+  ROLE_WALLETCHECK_ADMIN,
   THIRTY_DAYS_IN_SECONDS,
   NULL_ADDRESS,
 } from "../../constants";
@@ -995,7 +995,7 @@ describe("Admin", function () {
           attacker,
           "KeyringAccessControl",
           "_checkRole",
-          ROLE_WALLET_CHECK_ADMIN,
+          ROLE_WALLETCHECK_ADMIN,
           "sender does not have the required role",
           "WalletCheck::onlyWalletCheckAdmin",
         ),

@@ -6,7 +6,7 @@ interface IWalletCheck {
 
     event SetWalletWhitelist(address admin, address wallet, bool isWhitelisted);
 
-    function ROLE_WALLET_CHECK_ADMIN() external view returns (bytes32);
+    function ROLE_WALLETCHECK_ADMIN() external view returns (bytes32);
 
     function isWhitelisted(address wallet) external view returns(bool isWhitelisted);
 

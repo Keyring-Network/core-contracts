@@ -46,7 +46,7 @@ export const baseRules: Rule = {
 
 export const ROLE_GLOBAL_ATTESTOR_ADMIN = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("rgaa"));
 export const ROLE_RULE_ADMIN = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("role rule admin"));
-export const ROLE_WALLET_CHECK_ADMIN = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("wallet check admin role"));
+export const ROLE_WALLETCHECK_ADMIN = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("wallet check admin role"));
 export const ROLE_AGGREGATOR = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("aggregator role"));
 
 export const THIRTY_DAYS_IN_SECONDS = 24 * 60 * 60 * 30;

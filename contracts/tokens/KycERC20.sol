@@ -24,7 +24,7 @@ contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuard {
     modifier checkAuthorisations(address from, address to) {
         if (!checkGuard(from, to)) 
             revert Unacceptable({
-                reason: "trader not authorized and not whitelisted"
+                reason: "trader not authorized"
             });
         _;
     }

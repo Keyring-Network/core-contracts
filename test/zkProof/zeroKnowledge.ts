@@ -265,9 +265,6 @@ describe("Zero-knowledge", function () {
         await policyManager.createPolicy(policyScalar, [identityTree.address], [walletCheck.address]);
       }
 
-      // whitelist trader
-      await walletCheck.setWalletWhitelist(trader2.address, true);
-
       await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
 
       // check if credentials are set properly
@@ -291,9 +288,6 @@ describe("Zero-knowledge", function () {
       for (let i = 0; i < numberOfPolices; i++) {
         await policyManager.createPolicy(policyScalar, [identityTree.address], [walletCheck.address]);
       }
-
-      // whitelist trader
-      await walletCheck.setWalletWhitelist(trader2.address, true);
 
       await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
       const version = 1;
@@ -321,10 +315,10 @@ describe("Zero-knowledge", function () {
       ).to.revertedWith(unacceptable("Proof unacceptable"));
     });
 
-    it("should not allow invalid policies, not whitelisted users or invalid trees", async function () {
+    it("should not allow invalid policies or invalid trees (policy attestors)", async function () {
       await expect(
         credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2),
-      ).to.revertedWith(unacceptable("policy, wallet or identity tree is unacceptable"));
+      ).to.revertedWith(unacceptable("policy or attestor unacceptable"));
 
       // add merkle root
       const now = await helpers.time.latest();
@@ -336,13 +330,17 @@ describe("Zero-knowledge", function () {
         await policyManager.createPolicy(policyScalar, [identityTree.address], [walletCheck.address]);
       }
 
-      // not whitelisted trader
-      expect(await walletCheck.isWhitelisted(trader2.address)).to.equal(false);
-      // await walletCheck.setWalletFlag(trader2.address, true);
+      // deploy another identity tree which is not allowed to be used by the policy
+      const identityTreeFactory = await ethers.getContractFactory("IdentityTree");
+      const forwarder =  "0x0000000000000000000000000000000000000001"
+      const identityTree2 = await identityTreeFactory.deploy(forwarder);
+      await policyManager.admitAttestor(identityTree2.address, "attestor2");
 
       await expect(
-        credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2),
-      ).to.revertedWith(unacceptable("policy, wallet or identity tree is unacceptable"));
+        credentialsUpdater.updateCredentials(identityTree2.address, membershipProof2, authorisationProof2),
+      ).to.revertedWith(unacceptable("policy or attestor unacceptable"));
+
+      await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
     });
 
     it("should only allow policy admin to tear down credentials", async function () {
@@ -375,9 +373,6 @@ describe("Zero-knowledge", function () {
           await policyManager.createPolicy(policyScalar, [identityTree.address], [walletCheck.address]);
         }
       }
-
-      // whitelist trader
-      await walletCheck.setWalletWhitelist(trader2.address, true);
 
       await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
 
@@ -415,7 +410,7 @@ describe("Zero-knowledge", function () {
       // update credentials with old merkle root
       await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
 
-      console.log("check for updated credentials without new merkle root");
+     // check for updated credentials without new merkle root
       for (let i = 0; i < policies.length; i++) {
         if (policies[i] === 0 || policies[i] === 1) continue;
         // set the merkleRootSuccessors to 1, after 10 policies

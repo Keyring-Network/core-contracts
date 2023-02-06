@@ -201,7 +201,7 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
   const issuerAdminRole = await policyManager.ROLE_GLOBAL_ATTESTOR_ADMIN();
   const globalWalletCheckAdminRole = await policyManager.ROLE_GLOBAL_WALLETCHECK_ADMIN();
   const policyCreatorRole = await policyManager.ROLE_POLICY_CREATOR();
-  const walletCheckAdminRole = await walletCheck.ROLE_WALLET_CHECK_ADMIN();
+  const walletCheckAdminRole = await walletCheck.ROLE_WALLETCHECK_ADMIN();
   const roleAggregator = await identityTree.ROLE_AGGREGATOR();
   const roleIdentityTreeAdmin = await credentialsUpdater.ROLE_IDENTITY_TREE_ADMIN();
 
@@ -210,6 +210,7 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
   await policyManager.grantRole(globalWalletCheckAdminRole, admin);
   await policyManager.grantRole(policyCreatorRole, admin);
   await walletCheck.grantRole(walletCheckAdminRole, admin);
+  await walletCheck.grantRole(walletCheckAdminRole, credentialsUpdater.address);
   await identityTree.grantRole(roleAggregator, admin);
   await credentialsUpdater.grantRole(roleIdentityTreeAdmin, admin);
 

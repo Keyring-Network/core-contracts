@@ -501,7 +501,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     function removeWalletCheck(address walletCheck) 
         external 
         override 
-        onlyAttestorAdmin 
+        onlyWalletCheckAdmin 
     {
         policyStorage.removeGlobalWalletCheck(walletCheck);
         emit RemoveWalletCheck(_msgSender(), walletCheck);

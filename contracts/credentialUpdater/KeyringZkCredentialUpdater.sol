@@ -82,6 +82,7 @@ contract KeyringZkCredentialUpdater is
      ensure that both proofs were derived from the same identity commitment. If the root age used to construct proofs
      if older than the policy time to live (ttl), the root will be considered acceptable with an age of zero, provided
      that the number of root successors is less than or equal to the policy acceptRoots (accept most recent n roots).
+     Credential updates clear on-chain wallet checks and thus force an off-chain check and update.
      * @param attestor The identityTree contract with a root that contains the user's identity commitment. Must be 
      present in the current attestor list for all policy disclosures in the authorization proof. 
      * @param membershipProof A zero-knowledge proof of identity commitment membership in the identity tree. Contains an
@@ -119,12 +120,14 @@ contract KeyringZkCredentialUpdater is
             policyId = (disclosureGroup == 0) ? policyList0[index] : policyList1[index];
             if(policyId == 0) break;
             
-            if(!checkPolicyAndWallet(trader, policyId, attestor))
+            if(!checkPolicy(policyId, attestor))
                 revert Unacceptable({
-                    reason: "policy, wallet or identity tree is unacceptable"
+                    reason: "policy or attestor unacceptable"
                 });
             
-            uint credentialTime = rootTime;
+            resetWalletChecks(policyId, trader);
+
+            uint256 credentialTime = rootTime;
 
             if(rootTime + IPolicyManager(POLICY_MANAGER).policyTtl(policyId) < block.timestamp) {
                 if(IIdentityTree(attestor).merkleRootSuccessors(bytes32(membershipProof.root)) <= 
@@ -149,29 +152,38 @@ contract KeyringZkCredentialUpdater is
     }
 
   /**
-     * @notice The identity tree must be a policy attestor, the wallet must be whitelisted by all policy wallet
-     * check and the policy rule cannot be toxic.
-     * @param trader The trader wallet to inspect.
+     * @notice The identity tree must be a policy attestor and the policy rule cannot be toxic.
+     * @dev Use static call to inspect response.
      * @param policyId The policy to inspect.
      * @param attestor The identity tree contract address to compare to the policy attestors.
-     * @return acceptable True if the policy rule is not toxic, the identity tree is authoritative for the policy 
-     and the wallet is listed in all wallet check contracts that are authoritative for the policy. 
-     */
-function checkPolicyAndWallet(
-        address trader, 
+     * @return acceptable True if the policy rule is not toxic and the identity tree is authoritative for the policy.
+     */    
+    function checkPolicy(
         uint32 policyId, 
         address attestor
     ) public override returns (bool acceptable)
     {
         IPolicyManager p = IPolicyManager(POLICY_MANAGER);
         if(!p.isPolicy(policyId)) return false;
-        address[] memory walletChecks = p.policyWalletChecks(policyId);
 
         acceptable = !(IRuleRegistry(p.ruleRegistry()).ruleIsToxic(p.policyRuleId(policyId))) &&
             p.isPolicyAttestor(policyId, attestor);
-        
+    }
+
+    /**
+     * @notice Removes the active trader wallet from applicable wallet check whitelists. 
+     * @dev Requires walletCheck admin role in the walletCheck contract.
+     * @param policyId Policy to inspect. 
+     * @param trader Trading wallet to reset wallet checks.
+     */
+    function resetWalletChecks(
+        uint32 policyId,
+        address trader 
+    ) private {
+        address[] memory walletChecks = IPolicyManager(POLICY_MANAGER).policyWalletChecks(policyId);
         for(uint256 i = 0; i < walletChecks.length; i++) {
-            if(!IWalletCheck(walletChecks[i]).isWhitelisted(trader)) acceptable = false;
+            if(IWalletCheck(walletChecks[i]).isWhitelisted(trader)) 
+                IWalletCheck(walletChecks[i]).setWalletWhitelist(trader, false);
         }
     }
 

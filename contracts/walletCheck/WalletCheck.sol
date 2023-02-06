@@ -15,12 +15,12 @@ contract WalletCheck is IWalletCheck, KeyringAccessControl {
      wallet check for each on-chain check. 
      */
 
-    bytes32 public constant override ROLE_WALLET_CHECK_ADMIN = keccak256("wallet check admin role");
+    bytes32 public constant override ROLE_WALLETCHECK_ADMIN = keccak256("wallet check admin role");
 
     mapping(address => bool) public override isWhitelisted;
 
     modifier onlyWalletCheckAdmin() {
-        _checkRole(ROLE_WALLET_CHECK_ADMIN, _msgSender(), "WalletCheck::onlyWalletCheckAdmin");
+        _checkRole(ROLE_WALLETCHECK_ADMIN, _msgSender(), "WalletCheck::onlyWalletCheckAdmin");
         _;
     }
 

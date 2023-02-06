@@ -38,8 +38,7 @@ interface IKeyringZkCredentialUpdater {
         IKeyringZkVerifier.IdentityAuthorisationProof calldata authorizationProof
     ) external;
 
-    function checkPolicyAndWallet(
-        address trader, 
+    function checkPolicy( 
         uint32 policyId, 
         address attestor
     ) external returns (bool acceptable);

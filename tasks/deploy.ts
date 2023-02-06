@@ -16,11 +16,16 @@ export interface Signers {
 // TODO: THIS IS DEPLOYING NON-UPGRADABLE CONTRACTS. REFACTOR FOR PROXY DEPLOYMENT.
 
 task("deploy").setAction(async function (taskArguments: TaskArguments, { ethers }) {
-
   /* ------------------------- Contract Data ----------------------------- */
-  const IdentityConstructionProofVerifier = await import("../artifacts/contracts/zkVerifiers/identityContructionProof/contracts/IdentityConstructionProofVerifier.sol/Verifier.json");
-  const AuthorizationProofVerifier = await import("../artifacts/contracts/zkVerifiers/authorizationProof/contracts/AuthorizationProofVerifier.sol/Verifier.json");
-  const IdentityMembershipProofVerifier = await import("../artifacts/contracts/zkVerifiers/membershipProof/contracts/IdentityMembershipProofVerifier.sol/Verifier20.json");
+  const IdentityConstructionProofVerifier = await import(
+    "../artifacts/contracts/zkVerifiers/identityContructionProof/contracts/IdentityConstructionProofVerifier.sol/Verifier.json"
+  );
+  const AuthorizationProofVerifier = await import(
+    "../artifacts/contracts/zkVerifiers/authorizationProof/contracts/AuthorizationProofVerifier.sol/Verifier.json"
+  );
+  const IdentityMembershipProofVerifier = await import(
+    "../artifacts/contracts/zkVerifiers/membershipProof/contracts/IdentityMembershipProofVerifier.sol/Verifier20.json"
+  );
 
   // don't need to import these as we create a factory for them
   // const IdentityTree = await import("../artifacts/contracts/identityTree/IdentityTree.sol/IdentityTree.json");
@@ -28,11 +33,17 @@ task("deploy").setAction(async function (taskArguments: TaskArguments, { ethers 
   // const WalletCheck = await import("../artifacts/contracts/walletCheck/WalletCheck.sol/WalletCheck.json");
   // const PolicyStorage = await import("../artifacts/contracts/lib/PolicyStorage.sol/PolicyStorage.json");
   const NoImplementation = await import("../artifacts/contracts/forwarder/NoImplementation.sol/NoImplementation.json");
-  const KeyringCredentials = await import("../artifacts/contracts/keyringCredentials/KeyringCredentials.sol/KeyringCredentials.json");
+  const KeyringCredentials = await import(
+    "../artifacts/contracts/keyringCredentials/KeyringCredentials.sol/KeyringCredentials.json"
+  );
   const RuleRegistry = await import("../artifacts/contracts/ruleRegistry/RuleRegistry.sol/RuleRegistry.json");
   const PolicyManager = await import("../artifacts/contracts/policyManager/PolicyManager.sol/PolicyManager.json");
-  const KeyringZkCredentialUpdater = await import("../artifacts/contracts/credentialUpdater/KeyringZkCredentialUpdater.sol/KeyringZkCredentialUpdater.json");
-  const KeyringZkVerifier = await import("../artifacts/contracts/keyringZkVerifier/KeyringZkVerifier.sol/KeyringZkVerifier.json");
+  const KeyringZkCredentialUpdater = await import(
+    "../artifacts/contracts/credentialUpdater/KeyringZkCredentialUpdater.sol/KeyringZkCredentialUpdater.json"
+  );
+  const KeyringZkVerifier = await import(
+    "../artifacts/contracts/keyringZkVerifier/KeyringZkVerifier.sol/KeyringZkVerifier.json"
+  );
   const UserPolicies = await import("../artifacts/contracts/userPolicies/UserPolicies.sol/UserPolicies.json");
   /* ------------------------------ Forwarder ------------------------------ */
 
@@ -164,7 +175,7 @@ task("deploy").setAction(async function (taskArguments: TaskArguments, { ethers 
   const issuerAdminRole = await policyManager.ROLE_GLOBAL_ATTESTOR_ADMIN();
   const globalWalletCheckAdminRole = await policyManager.ROLE_GLOBAL_WALLETCHECK_ADMIN();
   const policyCreatorRole = await policyManager.ROLE_POLICY_CREATOR();
-  const walletCheckAdminRole = await walletCheck.ROLE_WALLET_CHECK_ADMIN();
+  const walletCheckAdminRole = await walletCheck.ROLE_WALLETCHECK_ADMIN();
   const roleAggregator = await identityTree.ROLE_AGGREGATOR();
   const roleIdentityTreeAdmin = await credentialUpdater.ROLE_IDENTITY_TREE_ADMIN();
 
@@ -263,7 +274,7 @@ task("deploy").setAction(async function (taskArguments: TaskArguments, { ethers 
     },
   };
 
-  if (!fs.existsSync(contractsDir)){
+  if (!fs.existsSync(contractsDir)) {
     fs.mkdirSync(contractsDir, { recursive: true });
   }
   fs.writeFileSync(`${contractsDir}/deployment.json`, JSON.stringify(deploymentInfo, undefined, 2));

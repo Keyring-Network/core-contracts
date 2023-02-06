@@ -6,6 +6,7 @@ import "../interfaces/IKeyringGuard.sol";
 import "../interfaces/IRuleRegistry.sol";
 import "../interfaces/IPolicyManager.sol";
 import "../interfaces/IUserPolicies.sol";
+import "../interfaces/IWalletCheck.sol";
 import "../interfaces/IKeyringCredentials.sol";
 
 /**
@@ -79,8 +80,8 @@ abstract contract KeyringGuard is IKeyringGuard {
     }
 
     /**
-     @notice Checks if the given user has a stored, fresh credential for the admission policy in the
-     credential cache.
+     @notice Checks if the given trader has a stored, fresh credential for the admission policy in the
+     credential cache and the trader wallet is present on all policy wallet check lists. 
      @dev Use static call to inspect.
      @param trader The user address, normally a trading wallet, to check.
      */
@@ -88,6 +89,12 @@ abstract contract KeyringGuard is IKeyringGuard {
         uint32 userPolicyId = IUserPolicies(userPolicies).userPolicies(trader);
         bytes32 userRuleId = IPolicyManager(policyManager).policyRuleId(userPolicyId);
         bytes32 admissionPolicyRuleId = IPolicyManager(policyManager).policyRuleId(admissionPolicyId);
+        address[] memory walletChecks = IPolicyManager(policyManager).policyWalletChecks(admissionPolicyId);
+
+        for(uint256 i = 0; i < walletChecks.length; i++) {
+            if(!IWalletCheck(walletChecks[i]).isWhitelisted(trader)) return false;
+        }
+
         if (admissionPolicyRuleId == universeRule && userRuleId == universeRule) {
             isIndeed = true;
         } else if (admissionPolicyRuleId == emptyRule || userRuleId == emptyRule) {

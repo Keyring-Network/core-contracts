@@ -110,13 +110,13 @@ describe("Compliant Token", function () {
       await identityTree.setMerkleRootBirthday(proofMerkleRoot2, now);
       await identityTree.setMerkleRootBirthday(proofMerkleRoot3, now);
 
-      // whitelist trader
-      await walletCheck.setWalletWhitelist(trader2.address, true);
-      await walletCheck.setWalletWhitelist(trader3.address, true);
-
       // update credentials
       await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
       await credentialsUpdater.updateCredentials(identityTree.address, membershipProof3, authorisationProof3);
+
+      // whitelist trader
+      await walletCheck.setWalletWhitelist(trader2.address, true);
+      await walletCheck.setWalletWhitelist(trader3.address, true);
 
       // check if credentials are set properly
       const version = 1;
@@ -158,9 +158,7 @@ describe("Compliant Token", function () {
         TOKEN_SYMBOL,
       );
       await mockERC20.approve(kycERC20.address, 100);
-      await expect(kycERC20.depositFor(admin, 100)).to.be.revertedWith(
-        unacceptable("trader not authorized and not whitelisted"),
-      );
+      await expect(kycERC20.depositFor(admin, 100)).to.be.revertedWith(unacceptable("trader not authorized"));
 
       // if policy is allowing whitelisting, it should allow the transfer
       // BUT only when parties are whitelisted
@@ -174,14 +172,11 @@ describe("Compliant Token", function () {
       await policyManager.policy(admissionPolicyId);
       expect(await policyManager.callStatic.policyAllowWhitelists(admissionPolicyId)).to.be.true;
 
-      await expect(kycERC20.transfer(bob, 50)).to.be.revertedWith(
-        unacceptable("trader not authorized and not whitelisted"),
-      );
+      await expect(kycERC20.transfer(bob, 50)).to.be.revertedWith(unacceptable("trader not authorized"));
+
 
       // NOTE trader needs to whitelist themself for depositFor
-      await expect(kycERC20.depositFor(admin, 100)).to.be.revertedWith(
-        unacceptable("trader not authorized and not whitelisted"),
-      );
+      await expect(kycERC20.depositFor(admin, 100)).to.be.revertedWith(unacceptable("trader not authorized"));
       await userPolicies.addWhitelistedTrader(admin);
       await kycERC20.depositFor(admin, 100);
 
@@ -193,12 +188,14 @@ describe("Compliant Token", function () {
       expect(adminKycBalance.toString()).to.equal("60");
       expect(bobKycBalance.toString()).to.equal("40");
 
+      // missing whitelisting in WalletCheck should not affect the transfer
+      expect(await walletCheck.isWhitelisted(admin)).to.equal(false);
+      expect(await walletCheck.isWhitelisted(bob)).to.equal(false);
+
       // remove trader from whitelist
       await userPolicies.removeWhitelistedTrader(bob);
       expect(await userPolicies.isWhitelisted(admin, bob)).to.be.false;
-      await expect(kycERC20.transfer(bob, 50)).to.be.revertedWith(
-        unacceptable("trader not authorized and not whitelisted"),
-      );
+      await expect(kycERC20.transfer(bob, 50)).to.be.revertedWith(unacceptable("trader not authorized"));
     });
 
     it("should not permit deployment of an invalid configuration", async function () {
@@ -380,7 +377,7 @@ describe("Compliant Token", function () {
       await kycERC20.depositFor(trader2.address, 100);
 
       await expect(kycERC20.transfer(aliceWallet.address, 50)).to.be.revertedWith(
-        unacceptable("trader not authorized and not whitelisted"),
+        unacceptable("trader not authorized"),
       );
     });
 
@@ -442,6 +439,15 @@ describe("Compliant Token", function () {
         TOKEN_SYMBOL,
       );
 
+      // whitelisting in WalletCheck is still required for the universeRule
+      await expect(kycERC20.depositFor(admin, 100)).to.be.revertedWith(unacceptable("trader not authorized"));
+      await expect(kycERC20.transfer(aliceWallet.address, 40)).to.be.revertedWith(
+        unacceptable("trader not authorized"),
+      );
+
+      await walletCheck.setWalletWhitelist(admin, true);
+      await walletCheck.setWalletWhitelist(aliceWallet.address, true);
+
       await mockERC20.approve(kycERC20.address, 100);
       await kycERC20.depositFor(admin, 100);
       await kycERC20.transfer(aliceWallet.address, 40);
@@ -480,9 +486,50 @@ describe("Compliant Token", function () {
       await userPolicies.connect(traderAsSigner2).setUserPolicy(emptyRulePolicy);
 
       await mockERC20.approve(kycERC20.address, 100);
-      await expect(kycERC20.depositFor(trader2.address, 100)).to.be.revertedWith(
-        unacceptable("trader not authorized and not whitelisted"),
+      await expect(kycERC20.depositFor(trader2.address, 100)).to.be.revertedWith(unacceptable("trader not authorized"));
+    });
+
+    it("should reject Policy B by wallet check whitelist check after Policy A credential is refreshed", async function () {
+      // check that user has valid credential for Policy B and wallet is whitelisted in WalletCheck
+      const policyA = 3;
+      const policyB = 4;
+
+      const mockERC20 = await deployMockERC20(traderAsSigner2);
+
+      const admissionPolicyId = policyB;
+
+      const kycERC20 = await deployKycERC20(
+        mockERC20,
+        credentials,
+        userPolicies,
+        policyManager,
+        admissionPolicyId,
+        TOKEN_NAME,
+        TOKEN_SYMBOL,
+        traderAsSigner2,
       );
+
+      expect(await walletCheck.isWhitelisted(trader2.address)).to.equal(true);
+      await mockERC20.approve(kycERC20.address, 1000);
+      await kycERC20.depositFor(trader2.address, 100);
+
+      let kycBalanceTrader2 = await kycERC20.balanceOf(trader2.address);
+      expect(kycBalanceTrader2).to.equal("100");
+
+      // user updates credential for Policy A
+      // NOTE proof incluceds Policy B as well as Policy A
+      await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
+      expect(await walletCheck.isWhitelisted(trader2.address)).to.equal(false);
+
+      // user should not be able to trade under Policy B or Policy A until wallet is whitelisted in WalletCheck again
+      await expect(kycERC20.depositFor(trader2.address, 100)).to.be.revertedWith(unacceptable("trader not authorized"));
+
+      // whitelist trader
+      await walletCheck.setWalletWhitelist(trader2.address, true);
+
+      await kycERC20.depositFor(trader2.address, 100);
+      kycBalanceTrader2 = await kycERC20.balanceOf(trader2.address);
+      expect(kycBalanceTrader2).to.equal("200");
     });
   });
 });
