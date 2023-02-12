@@ -1,6 +1,6 @@
 name: Build and Deploy
 on:
-  # Triggers the workflow on push to matching branches
+  # Triggers the workflow on push to matching branches 
   push:
     branches:
       - v2-staging-backend-checks
