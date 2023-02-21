@@ -5,6 +5,7 @@ library Pack12x20 {
 
     uint8 constant FIELD_SIZE = 20;
     uint256 constant MASK = 2 ** FIELD_SIZE - 1;
+    uint256 constant MAX = 2 ** 240 - 1;
 
     /**
      @notice Pack 12 20-bit integers into a 240-bit object.
@@ -48,6 +49,10 @@ library Pack12x20 {
     function unpack(uint256 packed) 
         internal pure returns(uint32[12] memory output)
     {
+        require(
+            packed <= MAX,
+            "input out of range"
+        );
         output[11] = uint32(packed & MASK);
         packed = packed >> FIELD_SIZE;
         output[10] = uint32(packed & MASK);
