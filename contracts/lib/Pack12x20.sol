@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.14;
 
-library PackLib {
+library Pack12x20 {
 
     uint8 constant FIELD_SIZE = 20;
     uint256 constant MASK = 2 ** FIELD_SIZE - 1;
@@ -46,8 +46,7 @@ library PackLib {
      @return output 12 20-bit integers cast as an array of 32-bit integers.
      **/
     function unpack(uint256 packed) 
-        public pure 
-        returns(uint32[12] memory output)
+        internal pure returns(uint32[12] memory output)
     {
         output[11] = uint32(packed & MASK);
         packed = packed >> FIELD_SIZE;

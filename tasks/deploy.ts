@@ -29,7 +29,7 @@ task("deploy").setAction(async function (taskArguments: TaskArguments, { ethers 
 
   // don't need to import these as we create a factory for them
   // const IdentityTree = await import("../artifacts/contracts/identityTree/IdentityTree.sol/IdentityTree.json");
-  // const PackLib = await import("../artifacts/contracts/lib/Pack12x20.sol/PackLib.json");
+  // const Pack12x20 = await import("../artifacts/contracts/lib/Pack12x20.sol/Pack12x20.json");
   // const WalletCheck = await import("../artifacts/contracts/walletCheck/WalletCheck.sol/WalletCheck.json");
   // const PolicyStorage = await import("../artifacts/contracts/lib/PolicyStorage.sol/PolicyStorage.json");
   const NoImplementation = await import("../artifacts/contracts/forwarder/NoImplementation.sol/NoImplementation.json");
@@ -114,13 +114,7 @@ task("deploy").setAction(async function (taskArguments: TaskArguments, { ethers 
   console.log("KeyringCredentials:            ", credentials.address);
 
   /* ---------------------- KeyringZkCredentialUpdater ----------------------- */
-  const PackLibFactory = await ethers.getContractFactory("PackLib");
-  const packLib = await PackLibFactory.deploy();
-  const CredentialUpdaterFactory = await ethers.getContractFactory("KeyringZkCredentialUpdater", {
-    libraries: {
-      PackLib: packLib.address,
-    },
-  });
+  const CredentialUpdaterFactory = await ethers.getContractFactory("KeyringZkCredentialUpdater");
   const credentialUpdater = await CredentialUpdaterFactory.deploy(
     forwarder.address,
     credentials.address,
@@ -146,7 +140,6 @@ task("deploy").setAction(async function (taskArguments: TaskArguments, { ethers 
   await keyringZkVerifier.deployed();
   await credentials.deployed();
   await ruleRegistry.deployed();
-  await packLib.deployed();
   await policyManager.deployed();
   await userPolicies.deployed();
   await credentialUpdater.deployed();
@@ -242,10 +235,6 @@ task("deploy").setAction(async function (taskArguments: TaskArguments, { ethers 
       RuleRegistry: {
         address: ruleRegistry.address,
         abi: RuleRegistry.abi,
-      },
-      PackLib: {
-        address: packLib.address,
-        abi: packLib.abi,
       },
       PolicyManager: {
         address: policyManager.address,

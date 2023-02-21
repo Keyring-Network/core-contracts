@@ -106,14 +106,8 @@ describe("Admin", function () {
       await expect(CredentialsFactory.deploy(forwarder.address, NULL_ADDRESS)).to.be.revertedWith(
         unacceptable("policyManager_ cannot be empty"),
       );
-
-      const PackLib = await ethers.getContractFactory("PackLib");
-      const packLib = await PackLib.deploy();
-      const CredentialsUpdaterFactory = await ethers.getContractFactory("KeyringZkCredentialUpdater", {
-        libraries: {
-          PackLib: packLib.address,
-        },
-      });
+    
+      const CredentialsUpdaterFactory = await ethers.getContractFactory("KeyringZkCredentialUpdater");
 
       await expect(
         CredentialsUpdaterFactory.deploy(

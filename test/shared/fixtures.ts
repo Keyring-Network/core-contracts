@@ -171,15 +171,7 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
    *  - redirecting UI submissions to a replacement credential updater with write permission.
    */
 
-  // NOTE deploy PackLib library and link to KeyringZkCredentialUpdater contract
-  const PackLib = await ethers.getContractFactory("PackLib");
-  const packLib = await PackLib.deploy();
-  await packLib.deployed();
-  const CredentialsUpdaterFactory = await ethers.getContractFactory("KeyringZkCredentialUpdater", {
-    libraries: {
-      PackLib: packLib.address,
-    },
-  });
+  const CredentialsUpdaterFactory = await ethers.getContractFactory("KeyringZkCredentialUpdater");
   const credentialsUpdater = (await CredentialsUpdaterFactory.deploy(
     forwarder.address,
     credentials.address,
@@ -203,7 +195,6 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
   const policyCreatorRole = await policyManager.ROLE_POLICY_CREATOR();
   const walletCheckAdminRole = await walletCheck.ROLE_WALLETCHECK_ADMIN();
   const roleAggregator = await identityTree.ROLE_AGGREGATOR();
-  const roleIdentityTreeAdmin = await credentialsUpdater.ROLE_IDENTITY_TREE_ADMIN();
 
   await credentials.grantRole(credentialUpdaterRole, credentialsUpdater.address);
   await policyManager.grantRole(issuerAdminRole, admin);
@@ -212,7 +203,7 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
   await walletCheck.grantRole(walletCheckAdminRole, admin);
   await walletCheck.grantRole(walletCheckAdminRole, credentialsUpdater.address);
   await identityTree.grantRole(roleAggregator, admin);
-  await credentialsUpdater.grantRole(roleIdentityTreeAdmin, admin);
+  await credentialsUpdater.grantRole(roleAggregator, admin);
 
   /* ------------------------------ Create Rules ------------------------------ */
 

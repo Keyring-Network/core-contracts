@@ -23,8 +23,8 @@ contract KeyringZkCredentialUpdater is
     IKeyringZkCredentialUpdater,
     KeyringAccessControl
 {
-    using PackLib for uint32[12];
-    using PackLib for uint256;
+    using Pack12x20 for uint32[12];
+    using Pack12x20 for uint256;
 
     address private constant NULL_ADDRESS = address(0);
     address public immutable override POLICY_MANAGER;
