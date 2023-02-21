@@ -18,6 +18,7 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 contract KeyringCredentials is IKeyringCredentials, KeyringAccessControl, Initializable {
 
     address private constant NULL_ADDRESS = address(0);
+    uint8 private constant VERSION = 1;
     bytes32 public constant ROLE_CREDENTIAL_UPDATER = keccak256("Credentials updater");
     address public immutable policyManager;
 
@@ -111,7 +112,7 @@ contract KeyringCredentials is IKeyringCredentials, KeyringAccessControl, Initia
                 reason: "timestamp must be in the past"
             });
         uint256 admissionPolicyEpoch = policyEpochs[admissionPolicyId];
-        cache[1][trader][admissionPolicyId][admissionPolicyEpoch] = timestamp;
+        cache[VERSION][trader][admissionPolicyId][admissionPolicyEpoch] = timestamp;
         emit UpdateCredential(1, _msgSender(), trader, admissionPolicyId, admissionPolicyEpoch);
     }
 
