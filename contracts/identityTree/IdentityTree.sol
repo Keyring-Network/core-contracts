@@ -13,14 +13,13 @@ import "../lib/Bytes32Set.sol";
  rely on for validity. 
  */
 
-contract IdentityTree is IIdentityTree, KeyringAccessControl {
-    
+contract IdentityTree is IIdentityTree, KeyringAccessControl { 
+
     using Bytes32Set for Bytes32Set.Set;
 
     uint256 private constant INFINITY = ~uint256(0);
     bytes32 private constant NULL_BYTES32 = bytes32(0);
     bytes32 public constant override ROLE_AGGREGATOR = keccak256("aggregator role");
-    uint256 public constant override MAX_SUCCESSORS = 5000;
 
     mapping(bytes32 => uint256) public override merkleRootBirthday;
     Bytes32Set.Set merkleRootSet;

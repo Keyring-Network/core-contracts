@@ -14,8 +14,6 @@ interface IIdentityTree {
     event SetMerkleRootBirthday(bytes32 merkleRoot, uint256 birthday);
 
     function ROLE_AGGREGATOR() external view returns (bytes32);
-    
-    function MAX_SUCCESSORS() external view returns (uint256);
 
     function merkleRootBirthday(bytes32 root) external view returns (uint);
     

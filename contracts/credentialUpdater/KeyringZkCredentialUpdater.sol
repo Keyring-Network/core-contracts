@@ -26,7 +26,6 @@ contract KeyringZkCredentialUpdater is
     using PackLib for uint32[12];
     using PackLib for uint256;
 
-    bytes32 public constant override  ROLE_IDENTITY_TREE_ADMIN = keccak256("identity tree master");
     address private constant NULL_ADDRESS = address(0);
     address public immutable override POLICY_MANAGER;
     address public immutable override KEYRING_CREDENTIALS;

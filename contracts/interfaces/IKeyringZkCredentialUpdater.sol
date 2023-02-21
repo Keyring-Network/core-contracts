@@ -27,7 +27,6 @@ interface IKeyringZkCredentialUpdater {
         IKeyringZkVerifier.IdentityAuthorisationProof authorizationProof, 
         uint256 rootTime);
 
-    function ROLE_IDENTITY_TREE_ADMIN() external view returns (bytes32);
     function POLICY_MANAGER() external view returns (address);
     function KEYRING_CREDENTIALS() external view returns (address);
     function KEYRING_ZK_VERIFIER() external view returns (address);
