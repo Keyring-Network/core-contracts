@@ -68,6 +68,10 @@ contract IdentityTree is IIdentityTree, KeyringAccessControl {
      * @return merkleRoot The root stored at the row.
      */
     function merkleRootAtIndex(uint256 index) external view override returns (bytes32 merkleRoot) {
+        if (index >= merkleRootSet.count())
+            revert Unacceptable({
+                reason: "index"
+            });
         merkleRoot = merkleRootSet.keyAtIndex(index);
     }
 

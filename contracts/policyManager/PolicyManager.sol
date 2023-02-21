@@ -853,6 +853,10 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      * @return walletCheck A wallet check contract address from the global whitelist. 
      */
     function globalWalletCheckAtIndex(uint256 index) external view override returns (address walletCheck) {
+        if (index >= policyStorage.globalWalletCheckSet.count())
+            revert Unacceptable({
+                reason: "index"
+            });
         walletCheck = policyStorage.globalWalletCheckSet.keyAtIndex(index);
     }
 
