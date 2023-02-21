@@ -335,7 +335,7 @@ contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
 
     /**
      * @notice Generate a deterministic ruleId
-     * @dev Warning: This does not validate the inputs
+     * @dev Warning: This does not validate the inputs. Operands must be sorted ascending to be valid.
      * @return ruleId The ruleId that will be generated if the configuration is valid
      */
     function generateRuleId(
