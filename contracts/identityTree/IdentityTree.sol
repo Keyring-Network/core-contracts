@@ -18,6 +18,7 @@ contract IdentityTree is IIdentityTree, KeyringAccessControl {
     using Bytes32Set for Bytes32Set.Set;
 
     uint256 private constant INFINITY = ~uint256(0);
+    address private constant NULL_ADDRESS = address(0);
     bytes32 private constant NULL_BYTES32 = bytes32(0);
     bytes32 public constant override ROLE_AGGREGATOR = keccak256("aggregator role");
 
@@ -33,6 +34,8 @@ contract IdentityTree is IIdentityTree, KeyringAccessControl {
      @param trustedForwarder Contract address that is allowed to relay message signers.
      */
     constructor(address trustedForwarder) KeyringAccessControl(trustedForwarder) {
+        if(trustedForwarder == NULL_ADDRESS)
+            revert Unacceptable("trustedForwarder cannot be empty");
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 

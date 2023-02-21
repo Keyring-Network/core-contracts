@@ -15,6 +15,7 @@ contract WalletCheck is IWalletCheck, KeyringAccessControl {
      wallet check for each on-chain check. 
      */
 
+    address private constant NULL_ADDRESS = address(0);
     bytes32 public constant override ROLE_WALLETCHECK_ADMIN = keccak256("wallet check admin role");
 
     mapping(address => bool) public override isWhitelisted;
@@ -25,6 +26,8 @@ contract WalletCheck is IWalletCheck, KeyringAccessControl {
     }
 
     constructor(address trustedForwarder) KeyringAccessControl(trustedForwarder) {
+        if(trustedForwarder == NULL_ADDRESS)
+            revert Unacceptable("trustedForwarder cannot be empty");
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 

@@ -4,6 +4,8 @@ pragma solidity 0.8.14;
 
 interface IWalletCheck {
 
+    error Unacceptable(string reason);
+    
     event SetWalletWhitelist(address admin, address wallet, bool isWhitelisted);
 
     function ROLE_WALLETCHECK_ADMIN() external view returns (bytes32);
