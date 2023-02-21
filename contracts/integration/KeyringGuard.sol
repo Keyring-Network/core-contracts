@@ -84,6 +84,7 @@ abstract contract KeyringGuard is IKeyringGuard {
      credential cache and the trader wallet is present on all policy wallet check lists. 
      @dev Use static call to inspect.
      @param trader The user address, normally a trading wallet, to check.
+     @param isIndeed True if the user as a fresh, cached credential.
      */
     function checkCache(address trader) public override returns (bool isIndeed) {
         uint32 userPolicyId = IUserPolicies(userPolicies).userPolicies(trader);
