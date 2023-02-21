@@ -16,6 +16,8 @@ library PolicyStorage {
     using AddressSet for AddressSet.Set;
 
     uint32 private constant MAX_POLICIES = 2 ** 20;
+    // Approximately 100 years. Does not account for leap years.
+    uint32 private constant MAX_TTL = 100 * 365 days;
     address private constant NULL_ADDRESS = address(0);
 
     error Unacceptable(string reason);
@@ -426,6 +428,8 @@ library PolicyStorage {
         uint32 ttl
     ) public
     {
+        if(ttl > MAX_TTL) 
+            revert Unacceptable({ reason: "ttl exceeds maximum duration" });
         self.scalarPending.ttl = ttl;
     }
 
