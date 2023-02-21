@@ -120,7 +120,7 @@ contract KeyringCredentials is IKeyringCredentials, KeyringAccessControl, Initia
      @param version Cache organization version.
      @param trader The user to inspect.
      @param admissionPolicyId The admission policy for the credential to inspect.
-     @return timestamp The timestamp established when the credential was recorded.
+     @return timestamp The timestamp established when the credential was recorded. 0 if no credential.
      */
     function getCredential(
         uint8 version, 
