@@ -50,6 +50,10 @@ contract IdentityTree is IIdentityTree, KeyringAccessControl {
             revert Unacceptable({
                 reason: "birthday cannot be in the future"
             });
+        if (merkleRoot == NULL_BYTES32)
+            revert Unacceptable({
+                reason: "merkle root cannot be empty"
+            });
         merkleRootBirthday[merkleRoot] = birthday;
         merkleRootSet.insert(merkleRoot, "IdentityTree::setMerkleRoot");
         emit SetMerkleRootBirthday(merkleRoot, birthday);
