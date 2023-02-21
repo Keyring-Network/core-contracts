@@ -20,7 +20,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     using PolicyStorage for PolicyStorage.Policy;
     using AddressSet for AddressSet.Set;
 
-    uint32 private constant DEFAULT_TTL = 1440 * 60; 
+    uint32 private constant DEFAULT_TTL = 1 days; 
     address private constant NULL_ADDRESS = address(0);
     bytes32 private constant SEED_POLICY_OWNER = keccak256("spo");
 
