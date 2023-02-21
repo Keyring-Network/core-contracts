@@ -216,6 +216,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         policyObj.processStaged();
         policyObj.writeDescription(descriptionUtf8);
         policyObj.setDeadline(deadline);
+        emit UpdatePolicyDescription(_msgSender(), policyId, descriptionUtf8, deadline);
     }
 
     /**
