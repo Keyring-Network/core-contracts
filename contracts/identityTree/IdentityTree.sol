@@ -97,11 +97,12 @@ contract IdentityTree is IIdentityTree, KeyringAccessControl {
 
     /**
      * @notice Returns the count of roots recorded after the root to inspect.
-     * @dev Returns 2 ^ 256 - 1 if no merkle roots have been recorded.
+     * @dev Returns 2 ^ 256 - 1 if no merkle roots have been recorded or merkle root is not recorded.
      * @param merkleRoot The root to inspect.
      * @return successors The count of roots recorded after the root to inspect.
      */
     function merkleRootSuccessors(bytes32 merkleRoot) external view override returns (uint256 successors) {
+        if (!merkleRootSet.exists(merkleRoot)) return INFINITY;
         successors = (merkleRootSet.count() > 0) ?
             merkleRootSet.count() - merkleRootSet.keyPointers[merkleRoot] - 1 :
             INFINITY;
