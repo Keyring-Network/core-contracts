@@ -3,6 +3,7 @@ pragma solidity 0.8.14;
 
 import "./AddressSet.sol";
 import "../interfaces/IRuleRegistry.sol";
+import "../interfaces/IKeyringCredentials.sol";
 
 /**
  @notice PolicyStorage attends to state management concerns for the PolicyManager. It establishes the
@@ -25,6 +26,7 @@ library PolicyStorage {
     /// @dev The App struct contains the essential PolicyManager state including an array of Policies. 
 
     struct App {
+        address credentialCache;
         Policy[] policies;
         AddressSet.Set globalAttestorSet;
         mapping(address => string) attestorUris;
@@ -202,7 +204,7 @@ library PolicyStorage {
             deadline
         );
 
-        processStaged(policy);
+        processStaged(self, policyId);
 
         for(i=0; i<attestors.length; i++) {
             address attestor = attestors[i];
@@ -244,65 +246,70 @@ library PolicyStorage {
      * @param self A Policy object.
      */
     function processStaged(
-        Policy storage self
+        App storage self,
+        uint32 policyId
     ) public
     {
-        uint256 deadline = self.deadline;
+        Policy storage policy = self.policies[policyId];
+        uint256 deadline = policy.deadline;
         if(deadline > 0 && deadline <= block.timestamp) {
-            self.scalarActive = self.scalarPending;
-            while(self.attestors.pendingAdditionSet.count() > 0) {
-                address attestor = self.attestors.pendingAdditionSet.keyAtIndex(
-                    self.attestors.pendingAdditionSet.count() - 1
+            policy.scalarActive = policy.scalarPending;
+            while(policy.attestors.pendingAdditionSet.count() > 0) {
+                address attestor = policy.attestors.pendingAdditionSet.keyAtIndex(
+                    policy.attestors.pendingAdditionSet.count() - 1
                 );
-                self.attestors.activeSet.insert(
+                policy.attestors.activeSet.insert(
                     attestor,
                     "policyStorage:processStaged"
                 );
-                self.attestors.pendingAdditionSet.remove(
-                    attestor,
-                    "policyStorage:processStaged"
-                );
-            }
-            while(self.attestors.pendingRemovalSet.count() > 0) {
-                address attestor = self.attestors.pendingRemovalSet.keyAtIndex(
-                    self.attestors.pendingRemovalSet.count() - 1
-                );
-                self.attestors.activeSet.remove(
-                    attestor,
-                    "policyStorage:processStaged"
-                );
-                self.attestors.pendingRemovalSet.remove(
+                policy.attestors.pendingAdditionSet.remove(
                     attestor,
                     "policyStorage:processStaged"
                 );
             }
-            while(self.walletChecks.pendingAdditionSet.count() > 0) {
-                address walletCheck = self.walletChecks.pendingAdditionSet.keyAtIndex(
-                    self.walletChecks.pendingAdditionSet.count() - 1
+            while(policy.attestors.pendingRemovalSet.count() > 0) {
+                address attestor = policy.attestors.pendingRemovalSet.keyAtIndex(
+                    policy.attestors.pendingRemovalSet.count() - 1
                 );
-                self.walletChecks.activeSet.insert(
+                policy.attestors.activeSet.remove(
+                    attestor,
+                    "policyStorage:processStaged"
+                );
+                policy.attestors.pendingRemovalSet.remove(
+                    attestor,
+                    "policyStorage:processStaged"
+                );
+            }
+            while(policy.walletChecks.pendingAdditionSet.count() > 0) {
+                address walletCheck = policy.walletChecks.pendingAdditionSet.keyAtIndex(
+                    policy.walletChecks.pendingAdditionSet.count() - 1
+                );
+                policy.walletChecks.activeSet.insert(
                     walletCheck,
                     "policyStorage:processStaged"
                 );
-                self.walletChecks.pendingAdditionSet.remove(
+                policy.walletChecks.pendingAdditionSet.remove(
                     walletCheck,
                     "policyStorage:processStaged"
                 );
             }
-            while(self.walletChecks.pendingRemovalSet.count() > 0) {
-                address walletCheck = self.walletChecks.pendingRemovalSet.keyAtIndex(
-                    self.walletChecks.pendingRemovalSet.count() - 1
+            while(policy.walletChecks.pendingRemovalSet.count() > 0) {
+                address walletCheck = policy.walletChecks.pendingRemovalSet.keyAtIndex(
+                    policy.walletChecks.pendingRemovalSet.count() - 1
                 );
-                self.walletChecks.activeSet.remove(
+                policy.walletChecks.activeSet.remove(
                     walletCheck,
                     "policyStorage:processStaged"
                 );
-                self.walletChecks.pendingRemovalSet.remove(
+                policy.walletChecks.pendingRemovalSet.remove(
                     walletCheck,
                     "policyStorage:processStaged"
                 );
             }
-            self.deadline = 0;
+            if (policyId != 0) {
+                IKeyringCredentials(self.credentialCache).resetPolicyCredentials(policyId);
+            }
+            policy.deadline = 0;
         }
     }
 
@@ -338,23 +345,25 @@ library PolicyStorage {
      * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
      */
     function setDeadline(
-        Policy storage self, 
+        App storage self,
+        uint32 policyId, 
         uint256 deadline
     ) public
     {
-        processStaged(self);
-        checkLock(self);
+        processStaged(self, policyId);
+        Policy storage policy = self.policies[policyId];
+        checkLock(policy);
 
         // Deadline of 0 allows staging of changes with no implementation schedule.
         // Positive deadlines must be at least graceTime seconds in the future.
      
         if(deadline != 0 && 
-            (deadline < block.timestamp + self.scalarActive.gracePeriod)
+            (deadline < block.timestamp + policy.scalarActive.gracePeriod)
         )
             revert Unacceptable({
                 reason: "deadline in the past or too soon"
         });
-        self.deadline = deadline;
+        policy.deadline = deadline;
     }
 
     /**
@@ -373,13 +382,13 @@ library PolicyStorage {
         uint256 deadline
     ) public {
         PolicyStorage.Policy storage policyObj = policyRawData(self, policyId);
-        processStaged(policyObj);
+        processStaged(self, policyId);
         writeRuleId(policyObj, policyScalar.ruleId, ruleRegistry);
         writeDescription(policyObj, policyScalar.descriptionUtf8);
         writeTtl(policyObj, policyScalar.ttl);
         writeGracePeriod(policyObj, policyScalar.gracePeriod);
         writeAcceptRoots(policyObj, policyScalar.acceptRoots);
-        setDeadline(policyObj, deadline);
+        setDeadline(self, policyId, deadline);
     }
 
     /**

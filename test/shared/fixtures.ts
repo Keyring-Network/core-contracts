@@ -135,7 +135,6 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
     unsafeAllow: ["constructor", "delegatecall", "state-variable-immutable", "external-library-linking"],
   })) as PolicyManager;
   await policyManager.deployed();
-  await policyManager.init();
 
   /* ------------------------------ UserPolicies ------------------------------ */
 
@@ -159,6 +158,10 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
   })) as KeyringCredentials;
   await credentials.deployed();
   await credentials.init();
+
+  const role_credential_updater = await credentials.ROLE_CREDENTIAL_UPDATER();
+  await credentials.grantRole(role_credential_updater, policyManager.address);
+  await policyManager.init(credentials.address);
 
   /* ---------------------- KeyringZkCredentialUpdater ----------------------- */
   /**

@@ -96,8 +96,11 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      * @dev Initializer function MUST be called directly after deployment.
      because anyone can call it but overall only once.
      */
-    function init() external override initializer {
+    function init(address credentialCache) external override initializer {
+        if (credentialCache == NULL_ADDRESS)
+            revert Unacceptable({ reason: "credentialCache cannot be empty" });
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        policyStorage.credentialCache = credentialCache;
         address[] memory emptyList;
         (bytes32 universeRule, ) = IRuleRegistry(ruleRegistry).genesis();
         // no one owns the default, permissive user policy, which is always policy 0
@@ -116,7 +119,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
             emptyList,
             ruleRegistry
         );
-        emit PolicyManagerInitialized(_msgSender());
+        emit PolicyManagerInitialized(_msgSender(), credentialCache);
     }
 
     /**
@@ -213,9 +216,9 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         onlyPolicyAdmin(policyId)
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         policyObj.writeDescription(descriptionUtf8);
-        policyObj.setDeadline(deadline);
+        policyStorage.setDeadline(policyId, deadline);
         emit UpdatePolicyDescription(_msgSender(), policyId, descriptionUtf8, deadline);
     }
 
@@ -232,9 +235,9 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         onlyPolicyAdmin(policyId)
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         policyObj.writeRuleId(ruleId, ruleRegistry);
-        policyObj.setDeadline(deadline);
+        policyStorage.setDeadline(policyId, deadline);
         emit UpdatePolicyRuleId(_msgSender(), policyId, ruleId, deadline);
     }
 
@@ -251,9 +254,9 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         onlyPolicyAdmin(policyId)
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         policyObj.writeTtl(ttl);
-        policyObj.setDeadline(deadline);
+        policyStorage.setDeadline(policyId, deadline);
         emit UpdatePolicyTtl(_msgSender(), policyId, ttl, deadline);
     }
 
@@ -270,9 +273,9 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         onlyPolicyAdmin(policyId) 
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         policyObj.writeGracePeriod(gracePeriod);
-        policyObj.setDeadline(deadline);
+        policyStorage.setDeadline(policyId, deadline);
         emit UpdatePolicyGracePeriod(_msgSender(), policyId, gracePeriod, deadline);
     }
 
@@ -291,9 +294,9 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         onlyPolicyAdmin(policyId) 
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         policyObj.writeAcceptRoots(acceptRoots);
-        policyObj.setDeadline(deadline);
+        policyStorage.setDeadline(policyId, deadline);
         emit UpdatePolicyAcceptRoots(_msgSender(), policyId, acceptRoots, deadline);
     }
 
@@ -310,9 +313,9 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         onlyPolicyAdmin(policyId) 
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         policyObj.writeAllowWhitelists(allowWhitelists);
-        policyObj.setDeadline(deadline);
+        policyStorage.setDeadline(policyId, deadline);
         emit UpdatePolicyAllowWhitelists(_msgSender(), policyId, allowWhitelists, deadline);
     }
 
@@ -329,10 +332,10 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         onlyPolicyAdmin(policyId)
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         if(policyObj.scalarPending.locked != locked) {
             policyObj.writePolicyLock(locked);
-            policyObj.setDeadline(deadline);
+            policyStorage.setDeadline(policyId, deadline);
             emit UpdatePolicyLock(_msgSender(), policyId, locked, deadline);
         }
     }
@@ -348,9 +351,8 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         override 
         onlyPolicyAdmin(policyId) 
     {
-        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
-        policyObj.setDeadline(deadline);
+        policyStorage.processStaged(policyId);
+        policyStorage.setDeadline(policyId, deadline);
         emit UpdatePolicyDeadline(_msgSender(), policyId, deadline);
     }
 
@@ -368,9 +370,9 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         onlyPolicyAdmin(policyId)
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         policyStorage.writeAttestorAdditions(policyObj, attestors);
-        policyObj.setDeadline(deadline);
+        policyStorage.setDeadline(policyId, deadline);
         emit AddPolicyAttestors(_msgSender(), policyId, attestors, deadline);
     }
 
@@ -388,9 +390,9 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         onlyPolicyAdmin(policyId)
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         policyObj.writeAttestorRemovals(attestors);
-        policyObj.setDeadline(deadline);
+        policyStorage.setDeadline(policyId, deadline);
         emit RemovePolicyAttestors(_msgSender(), policyId, attestors, deadline);
     }
 
@@ -408,9 +410,9 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         onlyPolicyAdmin(policyId)
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         policyStorage.writeWalletCheckAdditions(policyObj, walletChecks);
-        policyObj.setDeadline(deadline);
+        policyStorage.setDeadline(policyId, deadline);
         emit AddPolicyWalletChecks(_msgSender(), policyId, walletChecks, deadline);
     }
 
@@ -428,9 +430,9 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         onlyPolicyAdmin(policyId)
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         policyObj.writeWalletCheckRemovals(walletChecks);
-        policyObj.setDeadline(deadline);
+        policyStorage.setDeadline(policyId, deadline);
         emit RemovePolicyWalletChecks(_msgSender(), policyId, walletChecks, deadline);
     }
 
@@ -531,7 +533,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         )
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         config = policyObj.scalarActive;
         attestors = policyObj.attestors.activeSet.keyList;
         walletChecks = policyObj.walletChecks.activeSet.keyList;
@@ -596,7 +598,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         returns (string memory descriptionUtf8)
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         descriptionUtf8 = policyObj.scalarActive.descriptionUtf8;
     }
 
@@ -607,7 +609,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      */
     function policyRuleId(uint32 policyId) external override returns (bytes32 ruleId) {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         ruleId = policyObj.scalarActive.ruleId;
     }
 
@@ -618,7 +620,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      */
     function policyTtl(uint32 policyId) external override returns (uint128 ttl) {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         ttl = policyObj.scalarActive.ttl;
     }
 
@@ -629,7 +631,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      */
     function policyGracePeriod(uint32 policyId) external override returns(uint128 gracePeriod) {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         gracePeriod = policyObj.scalarActive.gracePeriod;
     }
 
@@ -645,7 +647,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         returns (uint16 acceptRoots)
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         acceptRoots = policyObj.scalarActive.acceptRoots;
     }
 
@@ -656,7 +658,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      */
     function policyAllowWhitelists(uint32 policyId) external returns (bool isAllowed){
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         isAllowed = policyObj.scalarActive.allowWhitelists;
     }
 
@@ -667,7 +669,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      */
     function policyLocked(uint32 policyId) external override returns (bool isLocked) {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         isLocked = policyObj.scalarActive.locked;
     }
 
@@ -679,7 +681,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      */
     function policyDeadline(uint32 policyId) external override returns (uint256 deadline) {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         deadline = policyObj.deadline;
     }
 
@@ -690,7 +692,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      */
     function policyAttestorCount(uint32 policyId) public override returns (uint256 count) {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         count = policyObj.attestors.activeSet.count();
     }
 
@@ -706,7 +708,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         returns (address attestor)
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         if (index >= policyObj.attestors.activeSet.count())
             revert Unacceptable({
                 reason: "index"
@@ -721,7 +723,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      */
     function policyAttestors(uint32 policyId) external override returns (address[] memory attestors) {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         attestors = policyObj.attestors.activeSet.keyList;
     }
 
@@ -737,7 +739,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         returns (bool isIndeed)
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         isIndeed = policyObj.attestors.activeSet.exists(attestor);
     }    
 
@@ -748,7 +750,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      */
     function policyWalletCheckCount(uint32 policyId) public override returns (uint256 count) {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         count = policyObj.walletChecks.activeSet.count();
     }
 
@@ -764,7 +766,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         returns (address walletCheck)
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         if (index >= policyObj.walletChecks.activeSet.count())
             revert Unacceptable({
                 reason: "index"
@@ -779,7 +781,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      */
     function policyWalletChecks(uint32 policyId) external override returns (address[] memory walletChecks) {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         walletChecks = policyObj.walletChecks.activeSet.keyList;
     }
 
@@ -795,7 +797,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         returns (bool isIndeed)
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyObj.processStaged();
+        policyStorage.processStaged(policyId);
         isIndeed = policyObj.walletChecks.activeSet.exists(walletCheck);
     }    
 

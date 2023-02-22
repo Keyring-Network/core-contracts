@@ -25,6 +25,8 @@ interface IKeyringCredentials {
 
     function tearDownAdmissionPolicyCredentials(uint32 policyId) external;
 
+    function resetPolicyCredentials(uint32 policyId) external;
+
     function cache(
         uint8 version, 
         address trader, 

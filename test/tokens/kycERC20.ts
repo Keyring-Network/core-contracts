@@ -237,7 +237,10 @@ describe("Compliant Token", function () {
       const universeRule = "0x0000000000000000000000000000000000000000000000000000000000000001";
       const emptyRule = "0x0000000000000000000000000000000000000000000000000000000000000002";
 
-      const { _policyManager, _mockERC20 } = await mockInvalidRuleRegistry(NULL_BYTES32, emptyRule);
+      const { _policyManager, _mockERC20 } = await mockInvalidRuleRegistry(
+        NULL_BYTES32, 
+        emptyRule,
+        credentials);
 
       await expect(
         deployKycERC20(_mockERC20, credentials, userPolicies, _policyManager, 0, TOKEN_NAME, TOKEN_SYMBOL),
@@ -246,6 +249,7 @@ describe("Compliant Token", function () {
       const { _policyManager: __policyManager, _mockERC20: __mockERC20 } = await mockInvalidRuleRegistry(
         universeRule,
         NULL_BYTES32,
+        credentials
       );
 
       await expect(
@@ -594,7 +598,7 @@ const unacceptable = (reason: string) => {
   return `Unacceptable("${reason}")`;
 };
 
-const mockInvalidRuleRegistry = async function (universeRule: string, emptyRule: string) {
+const mockInvalidRuleRegistry = async function (universeRule: string, emptyRule: string, credentials: KeyringCredentials) {
   const randomAddress = "0x44017a895f26275166b1d449BCb1573fD324b456";
   const MockRuleRegistryFactory = await ethers.getContractFactory("MockRuleRegistry");
   const MockRuleRegistry = (await MockRuleRegistryFactory.deploy(
@@ -617,7 +621,7 @@ const mockInvalidRuleRegistry = async function (universeRule: string, emptyRule:
     unsafeAllow: ["constructor", "delegatecall", "state-variable-immutable", "external-library-linking"],
   })) as PolicyManager;
   await _policyManager.deployed();
-  await _policyManager.init();
+  await _policyManager.init(credentials.address);
 
   const _mockERC20 = await deployMockERC20();
 

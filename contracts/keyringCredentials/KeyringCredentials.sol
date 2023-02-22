@@ -95,6 +95,15 @@ contract KeyringCredentials is IKeyringCredentials, KeyringAccessControl, Initia
     }
 
     /**
+     * @notice An updater can tear down all stored credentials for a given policy. 
+     * @param policyId The policy with credentials to tear down
+     */
+    function resetPolicyCredentials(uint32 policyId) external override onlyUpdater {
+        policyEpochs[policyId]++;
+        emit TearDownAdmissionPolicyCredentials(_msgSender(), policyId);
+    }
+
+    /**
      @notice This function is called by a trusted and permitted contract such as the 
      KeyringZkCredentialUpdater. There is no prohibition on multiple proving schemes 
      at the cache level since this contract requires only that the caller has permission.
