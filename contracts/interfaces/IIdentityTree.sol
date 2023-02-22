@@ -26,4 +26,8 @@ interface IIdentityTree {
     function isMerkleRoot(bytes32 merkleRoot) external view returns (bool isIndeed);
 
     function merkleRootSuccessors(bytes32 merkleRoot) external view returns (uint256 successors);
+
+    function latestBirthday() external view returns (uint256 birthday);
+
+    function latestRoot() external view returns (bytes32 root);
 }

@@ -54,6 +54,10 @@ contract IdentityTree is IIdentityTree, KeyringAccessControl {
             revert Unacceptable({
                 reason: "merkle root cannot be empty"
             });
+        if (birthday < latestBirthday()) 
+            revert Unacceptable({
+                reason: "birthday precedes previously recorded birthday"
+            });
         merkleRootBirthday[merkleRoot] = birthday;
         merkleRootSet.insert(merkleRoot, "IdentityTree::setMerkleRoot");
         emit SetMerkleRootBirthday(merkleRoot, birthday);
@@ -101,5 +105,25 @@ contract IdentityTree is IIdentityTree, KeyringAccessControl {
         successors = (merkleRootSet.count() > 0) ?
             merkleRootSet.count() - merkleRootSet.keyPointers[merkleRoot] - 1 :
             INFINITY;
+    }
+
+    /**
+     @notice Return the latest birthday recorded.
+     @return birthday The birthday of the latest root recorded.
+     */
+    function latestBirthday() public view override returns (uint256 birthday) {
+        if (merkleRootSet.count() > 0) {
+            birthday = merkleRootBirthday[merkleRootSet.keyAtIndex(merkleRootSet.count() - 1)];
+        }
+    }
+
+    /**
+     @notice Return the lastest merkle root recorded. 
+     @return root The latest merkle root recorded.
+     */
+    function latestRoot() external view override returns (bytes32 root) {
+        if (merkleRootSet.count() > 0) {
+            root= merkleRootSet.keyAtIndex(merkleRootSet.count() - 1);
+        }
     }
 }
