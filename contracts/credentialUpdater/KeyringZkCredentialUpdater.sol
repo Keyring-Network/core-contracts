@@ -94,6 +94,9 @@ contract KeyringZkCredentialUpdater is
         IKeyringZkVerifier.IdentityMembershipProof calldata membershipProof,
         IKeyringZkVerifier.IdentityAuthorisationProof calldata authorizationProof
     ) external override {
+
+        if (!IPolicyManager(POLICY_MANAGER).isGlobalAttestor(attestor))
+            revert Unacceptable({ reason: "attestor unacceptable" });
         
         uint256 disclosureGroup;
         uint256 index;
