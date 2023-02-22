@@ -4,11 +4,6 @@ pragma solidity 0.8.14;
 
 interface IIdentityTree {
 
-    struct MerkleRoot {
-        bytes32 root;
-        uint256 birthday;
-    }
-
     error Unacceptable(string reason);
 
     event SetMerkleRootBirthday(bytes32 merkleRoot, uint256 birthday);

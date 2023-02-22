@@ -89,23 +89,18 @@ contract IdentityTree is IIdentityTree, KeyringAccessControl {
      * @return isIndeed True if the root has been recorded.
      */
     function isMerkleRoot(bytes32 merkleRoot) external view override returns (bool isIndeed) {
-        if (!merkleRootSet.exists(merkleRoot)) return false;
-        uint256 pointer = merkleRootSet.keyPointers[merkleRoot];
-        bytes32 storedKey = merkleRootSet.keyList[pointer];
-        isIndeed = storedKey != NULL_BYTES32;
+        isIndeed = merkleRootSet.exists(merkleRoot);
     }
 
     /**
      * @notice Returns the count of roots recorded after the root to inspect.
-     * @dev Returns 2 ^ 256 - 1 if no merkle roots have been recorded or merkle root is not recorded.
+     * @dev Returns 2 ^ 256 - 1 if merkle root is not recorded.
      * @param merkleRoot The root to inspect.
      * @return successors The count of roots recorded after the root to inspect.
      */
     function merkleRootSuccessors(bytes32 merkleRoot) external view override returns (uint256 successors) {
         if (!merkleRootSet.exists(merkleRoot)) return INFINITY;
-        successors = (merkleRootSet.count() > 0) ?
-            merkleRootSet.count() - merkleRootSet.keyPointers[merkleRoot] - 1 :
-            INFINITY;
+        successors = merkleRootSet.count() - merkleRootSet.keyPointers[merkleRoot] - 1;
     }
 
     /**
