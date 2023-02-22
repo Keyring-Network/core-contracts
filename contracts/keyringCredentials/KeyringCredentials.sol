@@ -121,6 +121,10 @@ contract KeyringCredentials is IKeyringCredentials, KeyringAccessControl, Initia
                 reason: "timestamp must be in the past"
             });
         uint256 admissionPolicyEpoch = policyEpochs[admissionPolicyId];
+        if (cache[VERSION][trader][admissionPolicyId][admissionPolicyEpoch] > timestamp)
+            revert Unacceptable({
+                reason: "timestamp is older than existing credential"
+            });
         cache[VERSION][trader][admissionPolicyId][admissionPolicyEpoch] = timestamp;
         emit UpdateCredential(1, _msgSender(), trader, admissionPolicyId, admissionPolicyEpoch);
     }
