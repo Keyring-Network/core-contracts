@@ -388,6 +388,8 @@ library PolicyStorage {
         writeTtl(policyObj, policyScalar.ttl);
         writeGracePeriod(policyObj, policyScalar.gracePeriod);
         writeAcceptRoots(policyObj, policyScalar.acceptRoots);
+        writeAllowWhitelists(policyObj, policyScalar.allowWhitelists);
+        writePolicyLock(policyObj, policyScalar.locked);
         setDeadline(self, policyId, deadline);
     }
 
