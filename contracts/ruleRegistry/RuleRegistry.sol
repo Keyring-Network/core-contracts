@@ -174,23 +174,24 @@ contract RuleRegistry is IRuleRegistry, KeyringAccessControl, Initializable {
         Operator operator,
         uint256 operandCount
     ) private pure {
-        if (operator == Operator.Complement) {
-            if (operandCount != 1) _validationError("complement must have exactly one operand");
-        } else if (operator == Operator.Union) {
-            if (operandCount < 2) _validationError("union must have two or more operands");
-        } else if (operator == Operator.Intersection) {
-            if (operandCount < 2) _validationError("intersection must have two or more operands");
-        } 
         
-        if (operator != Operator.Base) {
-            if (bytes(description).length != 0)
-                _validationError("only base rules can have a description");
-            if (bytes(uri).length != 0) _validationError("only base rules can have a uri");
-        } else {
+        if (operator == Operator.Base) {
             if (operandCount != 0) _validationError("base rules cannot have operands");
             if (bytes(description).length == 0)
                 _validationError("base rules must have a description");
             if (bytes(uri).length == 0) _validationError("base rules must have a uri");
+        } else {
+            if (bytes(description).length != 0)
+                _validationError("only base rules can have a description");
+            if (bytes(uri).length != 0) _validationError("only base rules can have a uri");
+
+            if (operator == Operator.Complement) {
+                if (operandCount != 1) _validationError("complement must have exactly one operand");
+            } else if (operator == Operator.Union) {
+                if (operandCount < 2) _validationError("union must have two or more operands");
+            } else if (operator == Operator.Intersection) {
+                if (operandCount < 2) _validationError("intersection must have two or more operands");
+            } 
         }
     }
 
