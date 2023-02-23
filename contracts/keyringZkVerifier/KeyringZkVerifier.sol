@@ -84,15 +84,12 @@ contract KeyringZkVerifier is IKeyringZkVerifier {
         override
         returns (bool verified)
     {
-        bool valid = IIdentityConstructionProofVerifier(IDENTITY_CONSTRUCTION_PROOF_VERIFIER).verifyProof(
+        verified = IIdentityConstructionProofVerifier(IDENTITY_CONSTRUCTION_PROOF_VERIFIER).verifyProof(
             constructionProof.proof.a,
             constructionProof.proof.b,
             constructionProof.proof.c,
             [constructionProof.identity, constructionProof.policyCommitment, constructionProof.maxAddresses]
         );
-
-        if (!valid) return false;
-        verified = true;
     }
 
     /**
@@ -136,9 +133,7 @@ contract KeyringZkVerifier is IKeyringZkVerifier {
         override
         returns (bool verified)
     {
-        if (
-            !(
-                IAuthorizationProofVerifier(AUTHORIZATION_PROOF_VERIFIER).verifyProof(
+        verified = IAuthorizationProofVerifier(AUTHORIZATION_PROOF_VERIFIER).verifyProof(
                     authorisationProof.proof.a,
                     authorisationProof.proof.b,
                     authorisationProof.proof.c,
@@ -149,10 +144,6 @@ contract KeyringZkVerifier is IKeyringZkVerifier {
                         authorisationProof.policyDisclosures[1],
                         authorisationProof.tradingAddress
                     ]
-                )
-            )
-        ) return false;
-
-        verified = true;
+                );
     }
 }
