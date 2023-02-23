@@ -120,7 +120,6 @@ abstract contract KeyringGuard is IKeyringGuard {
      if counterparties are explicitly whitelisted by the other. 
      */
     function checkGuard(address from, address to) public override returns (bool isAuthorised) {
-        isAuthorised = true;
         bool fromAuthorised;
         bool toAuthorised;
         bool fromIsWhitelistedByTo;
