@@ -98,8 +98,6 @@ contract KeyringZkCredentialUpdater is
         if (!IPolicyManager(POLICY_MANAGER).isGlobalAttestor(attestor))
             revert Unacceptable({ reason: "attestor unacceptable" });
         
-        uint256 disclosureGroup;
-        uint256 index;
         uint32 policyId;
         address sender = _msgSender();
         address trader = address(uint160(authorizationProof.tradingAddress));
@@ -117,9 +115,8 @@ contract KeyringZkCredentialUpdater is
         uint256 rootTime = IIdentityTree(attestor).merkleRootBirthday(root);
         
         for(uint256 i = 0; i < 24; i++) {
-            disclosureGroup = i / 12;
-            index = i % 12;
-            policyId = (disclosureGroup == 0) ? policyList0[index] : policyList1[index];
+
+            policyId = (i / 12 == 0) ? policyList0[i % 12] : policyList1[i % 12];
             if(policyId == 0) break;
             
             if(!checkPolicy(policyId, attestor))
@@ -129,21 +126,26 @@ contract KeyringZkCredentialUpdater is
             
             resetWalletChecks(policyId, trader);
 
-            uint256 credentialTime = rootTime;
-
             if(rootTime + IPolicyManager(POLICY_MANAGER).policyTtl(policyId) < block.timestamp) {
-                if(IIdentityTree(attestor).merkleRootSuccessors(bytes32(membershipProof.root)) <= 
-                    IPolicyManager(POLICY_MANAGER).policyAcceptRoots(policyId) && 
-                    IPolicyManager(POLICY_MANAGER).policyAcceptRoots(policyId) > 0) 
-                {
-                    credentialTime = block.timestamp;
+                uint256 ar = IPolicyManager(POLICY_MANAGER).policyAcceptRoots(policyId);
+                if(IIdentityTree(attestor).merkleRootSuccessors(bytes32(membershipProof.root)) <= ar && ar > 0) {
+                    IKeyringCredentials(KEYRING_CREDENTIALS).setCredential(
+                        trader, 
+                        policyId,                
+                        block.timestamp);
+                } else {
+                    IKeyringCredentials(KEYRING_CREDENTIALS).setCredential(
+                        trader, 
+                        policyId,                
+                        rootTime);                    
                 }
+            } else {
+                IKeyringCredentials(KEYRING_CREDENTIALS).setCredential(
+                    trader, 
+                    policyId,                
+                    rootTime);
             }
             
-            IKeyringCredentials(KEYRING_CREDENTIALS).setCredential(
-                trader, 
-                policyId,                
-                credentialTime);
         }
         emit AcceptCredentialUpdate(
             sender, 
