@@ -27,6 +27,7 @@ contract KeyringZkCredentialUpdater is
     using Pack12x20 for uint256;
 
     address private constant NULL_ADDRESS = address(0);
+    IRuleRegistry private immutable RULE_REGISTRY;
     address public immutable override POLICY_MANAGER;
     address public immutable override KEYRING_CREDENTIALS;
     address public immutable override KEYRING_ZK_VERIFIER;
@@ -59,6 +60,7 @@ contract KeyringZkCredentialUpdater is
             revert Unacceptable({
                 reason: "keyringZkVerifier cannot be empty"
             });
+        RULE_REGISTRY = IRuleRegistry(IPolicyManager(policyManager).ruleRegistry());
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
 
         POLICY_MANAGER = policyManager;
@@ -170,7 +172,7 @@ contract KeyringZkCredentialUpdater is
         IPolicyManager p = IPolicyManager(POLICY_MANAGER);
         if(!p.isPolicy(policyId)) return false;
 
-        acceptable = !(IRuleRegistry(p.ruleRegistry()).ruleIsToxic(p.policyRuleId(policyId))) &&
+        acceptable = !(RULE_REGISTRY.ruleIsToxic(p.policyRuleId(policyId))) &&
             p.isPolicyAttestor(policyId, attestor);
     }
 
