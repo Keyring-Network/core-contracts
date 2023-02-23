@@ -39,8 +39,8 @@ library Bytes32Set {
                 reason: "exists",
                 context: context
             });
+        self.keyPointers[key] = self.keyList.length;
         self.keyList.push(key);
-        self.keyPointers[key] = self.keyList.length - 1;
     }
 
     /**
