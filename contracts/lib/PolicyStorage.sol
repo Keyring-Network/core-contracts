@@ -520,7 +520,7 @@ library PolicyStorage {
     function writeAttestorAdditions(
         App storage self,
         Policy storage policy,
-        address[] memory attestors
+        address[] calldata attestors
     ) public
     {
         for(uint i = 0; i < attestors.length; i++) {
@@ -564,7 +564,7 @@ library PolicyStorage {
      */
     function writeAttestorRemovals(
         Policy storage self,
-        address[] memory attestors
+        address[] calldata attestors
     ) public
     {
         for(uint i = 0; i < attestors.length; i++) {
