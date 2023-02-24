@@ -50,7 +50,8 @@ contract KeyringCredentials is IKeyringCredentials, KeyringAccessControl, Initia
      * @notice Only the PolicyAdmin can tear down user credentials.
      */
     modifier onlyPolicyAdmin(uint32 policyId) {
-        bytes32 ownerRole = IPolicyManager(policyManager).policyOwnerRole(policyId);
+        // IPolicyManager(policyManager).policyOwnerRole(policyId);
+        bytes32 ownerRole = bytes32(uint256(policyId));
         if(!IPolicyManager(policyManager).hasRole(ownerRole, _msgSender())) {
            revert Unacceptable({
                 reason: "unauthorized"
