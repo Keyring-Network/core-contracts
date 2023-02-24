@@ -252,9 +252,11 @@ library PolicyStorage {
     {
         Policy storage policy = self.policies[policyId];
         uint256 deadline = policy.deadline;
+
+        uint256 count = policy.attestors.pendingAdditionSet.count();
         if(deadline > 0 && deadline <= block.timestamp) {
             policy.scalarActive = policy.scalarPending;
-            while(policy.attestors.pendingAdditionSet.count() > 0) {
+            while(count > 0) {
                 address attestor = policy.attestors.pendingAdditionSet.keyAtIndex(
                     policy.attestors.pendingAdditionSet.count() - 1
                 );
@@ -266,8 +268,11 @@ library PolicyStorage {
                     attestor,
                     "policyStorage:processStaged"
                 );
+                count--;
             }
-            while(policy.attestors.pendingRemovalSet.count() > 0) {
+            
+            count = policy.attestors.pendingRemovalSet.count();
+            while(count > 0) {
                 address attestor = policy.attestors.pendingRemovalSet.keyAtIndex(
                     policy.attestors.pendingRemovalSet.count() - 1
                 );
@@ -279,8 +284,11 @@ library PolicyStorage {
                     attestor,
                     "policyStorage:processStaged"
                 );
+                count--;
             }
-            while(policy.walletChecks.pendingAdditionSet.count() > 0) {
+
+            count = policy.walletChecks.pendingAdditionSet.count();
+            while(count > 0) {
                 address walletCheck = policy.walletChecks.pendingAdditionSet.keyAtIndex(
                     policy.walletChecks.pendingAdditionSet.count() - 1
                 );
@@ -292,8 +300,11 @@ library PolicyStorage {
                     walletCheck,
                     "policyStorage:processStaged"
                 );
+                count--;
             }
-            while(policy.walletChecks.pendingRemovalSet.count() > 0) {
+
+            count = policy.walletChecks.pendingRemovalSet.count();
+            while(count > 0) {
                 address walletCheck = policy.walletChecks.pendingRemovalSet.keyAtIndex(
                     policy.walletChecks.pendingRemovalSet.count() - 1
                 );
@@ -305,6 +316,7 @@ library PolicyStorage {
                     walletCheck,
                     "policyStorage:processStaged"
                 );
+                count--;
             }
             if (policyId != 0) {
                 IKeyringCredentials(self.credentialCache).resetPolicyCredentials(policyId);
