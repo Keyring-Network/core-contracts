@@ -16,8 +16,8 @@ interface IRuleRegistry {
     struct Rule {
         string description;
         string uri;
-        Operator operator;
         Bytes32Set.Set operandSet;
+        Operator operator;
         bool toxic;
     }
 
