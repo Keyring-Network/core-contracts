@@ -1,0 +1,4 @@
+[submodule "circuits"]
+	path = circuits
+	url = https://github.com/Keyring-Network/keyring-circuits.git
+	branch = cleanup/audit
