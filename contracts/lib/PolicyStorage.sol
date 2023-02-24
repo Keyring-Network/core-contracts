@@ -362,7 +362,6 @@ library PolicyStorage {
         uint256 deadline
     ) public
     {
-        processStaged(self, policyId);
         Policy storage policy = self.policies[policyId];
         checkLock(policy);
 
