@@ -61,14 +61,9 @@ contract KeyringZkVerifier is IKeyringZkVerifier {
         IdentityMembershipProof calldata membershipProof,
         IdentityAuthorisationProof calldata authorisationProof
     ) external view override returns (bool verified) {
-        if (
-            !(membershipProof.externalNullifier == authorisationProof.externalNullifier) ||
-            !(membershipProof.nullifierHash == authorisationProof.nullifierHash)
-        ) return false;
-
+        if (!(membershipProof.nullifierHash == authorisationProof.nullifierHash)) return false;
         if (!checkIdentityMembershipProof(membershipProof)) return false;
         if (!checkIdentityAuthorisationProof(authorisationProof)) return false;
-
         return true;
     }
 
