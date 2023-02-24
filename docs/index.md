@@ -81,12 +81,6 @@ This contract acts as a credentials cache updater. It needs the ROLE_CREDENTIAL_
  client-generated zero-knowledge proofs of attestations about admission policy eligibility and 
  therefore enforces the protocol.
 
-### ROLE_IDENTITY_TREE_ADMIN
-
-```solidity
-bytes32 ROLE_IDENTITY_TREE_ADMIN
-```
-
 ### POLICY_MANAGER
 
 ```solidity
@@ -132,7 +126,8 @@ _The attestor must be valid for all policy disclosures. For this to be possible,
      to the system globally before it was selected for a policy. The two zero-knowledge proof share parameters that 
      ensure that both proofs were derived from the same identity commitment. If the root age used to construct proofs
      if older than the policy time to live (ttl), the root will be considered acceptable with an age of zero, provided
-     that the number of root successors is less than or equal to the policy acceptRoots (accept most recent n roots)._
+     that the number of root successors is less than or equal to the policy acceptRoots (accept most recent n roots).
+     Credential updates clear on-chain wallet checks and thus force an off-chain check and update._
 
 #### Parameters
 
@@ -142,20 +137,20 @@ _The attestor must be valid for all policy disclosures. For this to be possible,
 | membershipProof | struct IKeyringZkVerifier.IdentityMembershipProof | A zero-knowledge proof of identity commitment membership in the identity tree. Contains an      external nullifier and nullifier hash that must match the parameters of the authorization proof. |
 | authorizationProof | struct IKeyringZkVerifier.IdentityAuthorisationProof | A zero-knowledge proof of compliance with up to 24 policy disclosures. Contains an      external nullifier and nullifier hash that must match the parameters of the membershiip proof. |
 
-### checkPolicyAndWallet
+### checkPolicy
 
 ```solidity
-function checkPolicyAndWallet(address trader, uint32 policyId, address attestor) public returns (bool acceptable)
+function checkPolicy(uint32 policyId, address attestor) public returns (bool acceptable)
 ```
 
-The identity tree must be a policy attestor, the wallet must be whitelisted by all policy wallet
-check and the policy rule cannot be toxic.
+The identity tree must be a policy attestor and the policy rule cannot be toxic.
+
+_Use static call to inspect response._
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| trader | address | The trader wallet to inspect. |
 | policyId | uint32 | The policy to inspect. |
 | attestor | address | The identity tree contract address to compare to the policy attestors. |
 
@@ -163,7 +158,7 @@ check and the policy rule cannot be toxic.
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| acceptable | bool | True if the policy rule is not toxic, the identity tree is authoritative for the policy       and the wallet is listed in all wallet check contracts that are authoritative for the policy. |
+| acceptable | bool | True if the policy rule is not toxic and the identity tree is authoritative for the policy. |
 
 ### pack12x20
 
@@ -218,12 +213,6 @@ This contract holds the history of identity tree merkle roots announced by the a
 
 ```solidity
 bytes32 ROLE_AGGREGATOR
-```
-
-### MAX_SUCCESSORS
-
-```solidity
-uint256 MAX_SUCCESSORS
 ```
 
 ### merkleRootBirthday
@@ -333,7 +322,7 @@ function merkleRootSuccessors(bytes32 merkleRoot) external view returns (uint256
 
 Returns the count of roots recorded after the root to inspect.
 
-_Returns 2 ^ 256 - 1 if no merkle roots have been recorded._
+_Returns 2 ^ 256 - 1 if merkle root is not recorded._
 
 #### Parameters
 
@@ -346,6 +335,24 @@ _Returns 2 ^ 256 - 1 if no merkle roots have been recorded._
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | successors | uint256 | The count of roots recorded after the root to inspect. |
+
+### latestBirthday
+
+```solidity
+function latestBirthday() public view returns (uint256 birthday)
+```
+
+Return the latest birthday recorded.
+     @return birthday The birthday of the latest root recorded.
+
+### latestRoot
+
+```solidity
+function latestRoot() external view returns (bytes32 root)
+```
+
+Return the lastest merkle root recorded. 
+     @return root The latest merkle root recorded.
 
 ## KeyringGuard
 
@@ -415,10 +422,11 @@ constructor(address keyringCredentials_, address policyManager_, address userPol
 function checkCache(address trader) public returns (bool isIndeed)
 ```
 
-Checks if the given user has a stored, fresh credential for the admission policy in the
-     credential cache.
+Checks if the given trader has a stored, fresh credential for the admission policy in the
+     credential cache and the trader wallet is present on all policy wallet check lists. 
      @dev Use static call to inspect.
      @param trader The user address, normally a trading wallet, to check.
+     @param isIndeed True if the user as a fresh, cached credential.
 
 ### checkGuard
 
@@ -461,15 +469,6 @@ function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[4] inp
 
 ## IIdentityTree
 
-### MerkleRoot
-
-```solidity
-struct MerkleRoot {
-  bytes32 root;
-  uint256 birthday;
-}
-```
-
 ### Unacceptable
 
 ```solidity
@@ -486,12 +485,6 @@ event SetMerkleRootBirthday(bytes32 merkleRoot, uint256 birthday)
 
 ```solidity
 function ROLE_AGGREGATOR() external view returns (bytes32)
-```
-
-### MAX_SUCCESSORS
-
-```solidity
-function MAX_SUCCESSORS() external view returns (uint256)
 ```
 
 ### merkleRootBirthday
@@ -528,6 +521,18 @@ function isMerkleRoot(bytes32 merkleRoot) external view returns (bool isIndeed)
 
 ```solidity
 function merkleRootSuccessors(bytes32 merkleRoot) external view returns (uint256 successors)
+```
+
+### latestBirthday
+
+```solidity
+function latestBirthday() external view returns (uint256 birthday)
+```
+
+### latestRoot
+
+```solidity
+function latestRoot() external view returns (bytes32 root)
 ```
 
 ## IKeyringCredentials
@@ -578,6 +583,12 @@ function init() external
 
 ```solidity
 function tearDownAdmissionPolicyCredentials(uint32 policyId) external
+```
+
+### resetPolicyCredentials
+
+```solidity
+function resetPolicyCredentials(uint32 policyId) external
 ```
 
 ### cache
@@ -658,12 +669,6 @@ event RemoveIdentityTree(address admin, address identityTree)
 event AcceptCredentialUpdate(address sender, address trader, struct IKeyringZkVerifier.IdentityMembershipProof membershipProof, struct IKeyringZkVerifier.IdentityAuthorisationProof authorizationProof, uint256 rootTime)
 ```
 
-### ROLE_IDENTITY_TREE_ADMIN
-
-```solidity
-function ROLE_IDENTITY_TREE_ADMIN() external view returns (bytes32)
-```
-
 ### POLICY_MANAGER
 
 ```solidity
@@ -688,10 +693,10 @@ function KEYRING_ZK_VERIFIER() external view returns (address)
 function updateCredentials(address attestor, struct IKeyringZkVerifier.IdentityMembershipProof membershipProof, struct IKeyringZkVerifier.IdentityAuthorisationProof authorizationProof) external
 ```
 
-### checkPolicyAndWallet
+### checkPolicy
 
 ```solidity
-function checkPolicyAndWallet(address trader, uint32 policyId, address attestor) external returns (bool acceptable)
+function checkPolicy(uint32 policyId, address attestor) external returns (bool acceptable)
 ```
 
 ### pack12x20
@@ -841,7 +846,7 @@ event PolicyManagerDeployed(address deployer, address trustedForwarder, address 
 ### PolicyManagerInitialized
 
 ```solidity
-event PolicyManagerInitialized(address admin)
+event PolicyManagerInitialized(address admin, address credentialCache)
 ```
 
 ### CreatePolicy
@@ -985,7 +990,7 @@ function ruleRegistry() external view returns (address)
 ### init
 
 ```solidity
-function init() external
+function init(address credentialCache) external
 ```
 
 ### createPolicy
@@ -1295,8 +1300,8 @@ enum Operator {
 struct Rule {
   string description;
   string uri;
-  enum IRuleRegistry.Operator operator;
   struct Bytes32Set.Set operandSet;
+  enum IRuleRegistry.Operator operator;
   bool toxic;
 }
 ```
@@ -1503,16 +1508,22 @@ function isWhitelisted(address trader, address counterparty) external view retur
 
 ## IWalletCheck
 
+### Unacceptable
+
+```solidity
+error Unacceptable(string reason)
+```
+
 ### SetWalletWhitelist
 
 ```solidity
 event SetWalletWhitelist(address admin, address wallet, bool isWhitelisted)
 ```
 
-### ROLE_WALLET_CHECK_ADMIN
+### ROLE_WALLETCHECK_ADMIN
 
 ```solidity
-function ROLE_WALLET_CHECK_ADMIN() external view returns (bytes32)
+function ROLE_WALLETCHECK_ADMIN() external view returns (bytes32)
 ```
 
 ### isWhitelisted
@@ -1621,6 +1632,20 @@ The policy admin can invalidate all stored credentials for a given policy.
 | ---- | ---- | ----------- |
 | policyId | uint32 | The policy with credentials to tear down |
 
+### resetPolicyCredentials
+
+```solidity
+function resetPolicyCredentials(uint32 policyId) external
+```
+
+An updater can tear down all stored credentials for a given policy.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policy with credentials to tear down |
+
 ### setCredential
 
 ```solidity
@@ -1644,7 +1669,7 @@ Inspect the credential cache.
      @param version Cache organization version.
      @param trader The user to inspect.
      @param admissionPolicyId The admission policy for the credential to inspect.
-     @return timestamp The timestamp established when the credential was recorded.
+     @return timestamp The timestamp established when the credential was recorded. 0 if no credential.
 
 ## KeyringZkVerifier
 
@@ -1945,7 +1970,7 @@ Retrieve an bytes32 by its position in the Set. Use for enumeration.
 | ---- | ---- | ----------- |
 | [0] | bytes32 | bytes32 The key stored in the Set at the index position. |
 
-## PackLib
+## Pack12x20
 
 ### FIELD_SIZE
 
@@ -1972,7 +1997,7 @@ Pack 12 20-bit integers into a 240-bit object.
 ### unpack
 
 ```solidity
-function unpack(uint256 packed) public pure returns (uint32[12] output)
+function unpack(uint256 packed) internal pure returns (uint32[12] output)
 ```
 
 Unpack 12 20-bit integers from 240-bit input
@@ -1997,6 +2022,7 @@ error Unacceptable(string reason)
 
 ```solidity
 struct App {
+  address credentialCache;
   struct PolicyStorage.Policy[] policies;
   struct AddressSet.Set globalAttestorSet;
   mapping(address => string) attestorUris;
@@ -2187,7 +2213,7 @@ _Staged changes with deadlines in the past are presented as pending._
 ### processStaged
 
 ```solidity
-function processStaged(struct PolicyStorage.Policy self) public
+function processStaged(struct PolicyStorage.App self, uint32 policyId) public
 ```
 
 Updates policy storage if the deadline is in the past.
@@ -2198,7 +2224,8 @@ _Always call this before inspecting the the active policy state. ._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| self | struct PolicyStorage.Policy | A Policy object. |
+| self | struct PolicyStorage.App | A Policy object. |
+| policyId | uint32 |  |
 
 ### checkLock
 
@@ -2239,7 +2266,7 @@ Inspect the active policy lock.
 ### setDeadline
 
 ```solidity
-function setDeadline(struct PolicyStorage.Policy self, uint256 deadline) public
+function setDeadline(struct PolicyStorage.App self, uint32 policyId, uint256 deadline) public
 ```
 
 Processes staged changes if the current deadline has passed and updates the deadline.
@@ -2250,7 +2277,8 @@ _The deadline must be at least as far in the future as the active policy gracePe
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| self | struct PolicyStorage.Policy | A Policy object. |
+| self | struct PolicyStorage.App | A Policy object. |
+| policyId | uint32 |  |
 | deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
 
 ### writePolicyScalar
@@ -2852,7 +2880,7 @@ constructor(address trustedForwarder, address ruleRegistryAddr) public
 ### init
 
 ```solidity
-function init() external
+function init(address credentialCache) external
 ```
 
 This upgradeable contract must be initialized.
@@ -4050,7 +4078,7 @@ function generateRuleId(string description, enum IRuleRegistry.Operator operator
 
 Generate a deterministic ruleId
 
-_Warning: This does not validate the inputs_
+_Warning: This does not validate the inputs. Operands must be sorted ascending to be valid._
 
 #### Return Values
 
@@ -4272,17 +4300,11 @@ check if a counterparty is whitelisted by a trader.
 
 ## WalletCheck
 
-### ROLE_WALLET_CHECK_ADMIN
+### ROLE_WALLETCHECK_ADMIN
 
 ```solidity
-bytes32 ROLE_WALLET_CHECK_ADMIN
+bytes32 ROLE_WALLETCHECK_ADMIN
 ```
-
-Wallet checks are on-chain whitelists that can contain information gathered by
-     off-chain processes. Policies can specify which wallet checks must be checked on a just-in-time
-     basis. This contract establishes the interface that all wallet check contracts must implement. 
-     Future wallet check instances may employ additional logic. There is a distinct instance of a 
-     wallet check for each on-chain check.
 
 ### isWhitelisted
 
@@ -4316,51 +4338,6 @@ Set the whitelisted boolean for a specific trading wallet to true or false.
 | ---- | ---- | ----------- |
 | wallet | address | The subject wallet. |
 | whitelisted | bool | True if the wallet has passed the checks represented by this contract. |
-
-## NoImplementation
-
-This stub provides a hint for hardhat artifacts and typings. It is a non-functional
- implementation to deploy behind a TransparentUpgradeableProxy. The proxy address will be passed
- to constructors that expect an immutable trusted forwarder for future gasless transaction
- support (trustedForwarder). This contract implements the essential functions as stubs that
- fail harmlessly.
-
-### ForwardRequest
-
-```solidity
-struct ForwardRequest {
-  address from;
-  address to;
-  uint256 value;
-  uint256 gas;
-  uint256 nonce;
-  bytes data;
-}
-```
-
-### NotImplemented
-
-```solidity
-error NotImplemented(address sender, string message)
-```
-
-### getNonce
-
-```solidity
-function getNonce(address) public pure returns (uint256)
-```
-
-### verify
-
-```solidity
-function verify(struct NoImplementation.ForwardRequest, bytes) public pure returns (bool)
-```
-
-### execute
-
-```solidity
-function execute(struct NoImplementation.ForwardRequest, bytes) public payable returns (bool, bytes)
-```
 
 ## Pairing
 
@@ -4671,6 +4648,51 @@ function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[3] inp
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | r | bool | bool true if proof is valid |
+
+## NoImplementation
+
+This stub provides a hint for hardhat artifacts and typings. It is a non-functional
+ implementation to deploy behind a TransparentUpgradeableProxy. The proxy address will be passed
+ to constructors that expect an immutable trusted forwarder for future gasless transaction
+ support (trustedForwarder). This contract implements the essential functions as stubs that
+ fail harmlessly.
+
+### ForwardRequest
+
+```solidity
+struct ForwardRequest {
+  address from;
+  address to;
+  uint256 value;
+  uint256 gas;
+  uint256 nonce;
+  bytes data;
+}
+```
+
+### NotImplemented
+
+```solidity
+error NotImplemented(address sender, string message)
+```
+
+### getNonce
+
+```solidity
+function getNonce(address) public pure returns (uint256)
+```
+
+### verify
+
+```solidity
+function verify(struct NoImplementation.ForwardRequest, bytes) public pure returns (bool)
+```
+
+### execute
+
+```solidity
+function execute(struct NoImplementation.ForwardRequest, bytes) public payable returns (bool, bytes)
+```
 
 ## Pairing
 
