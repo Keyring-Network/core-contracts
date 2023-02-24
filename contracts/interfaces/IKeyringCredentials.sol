@@ -16,22 +16,16 @@ interface IKeyringCredentials {
         uint8 version, 
         address updater, 
         address indexed trader, 
-        uint32 indexed admissionPolicyId,
-        uint256 admissionPolicyEpoch);
+        uint32 indexed admissionPolicyId);
 
     function ROLE_CREDENTIAL_UPDATER() external view returns (bytes32);
 
     function init() external;
 
-    function tearDownAdmissionPolicyCredentials(uint32 policyId) external;
-
-    function resetPolicyCredentials(uint32 policyId) external;
-
     function cache(
         uint8 version, 
         address trader, 
-        uint32 admissionPolicyId,
-        uint256 admissionPolicyEpoch
+        uint32 admissionPolicyId
     ) external view returns (uint256);
 
     function setCredential(

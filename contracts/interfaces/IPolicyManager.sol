@@ -13,7 +13,7 @@ interface IPolicyManager {
         address trustedForwarder, 
         address ruleRegistry);
     
-    event PolicyManagerInitialized(address admin, address credentialCache);
+    event PolicyManagerInitialized(address admin);
 
     event CreatePolicy(
         address indexed owner,
@@ -101,7 +101,7 @@ interface IPolicyManager {
 
     function ruleRegistry() external view returns (address);
 
-    function init(address credentialCache) external;
+    function init() external;
 
     function createPolicy(
         PolicyStorage.PolicyScalar calldata policyScalar,

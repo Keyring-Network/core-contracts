@@ -96,11 +96,8 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      * @dev Initializer function MUST be called directly after deployment.
      because anyone can call it but overall only once.
      */
-    function init(address credentialCache) external override initializer {
-        if (credentialCache == NULL_ADDRESS)
-            revert Unacceptable({ reason: "credentialCache cannot be empty" });
+    function init() external override initializer {
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
-        policyStorage.credentialCache = credentialCache;
         address[] memory emptyList;
         (bytes32 universeRule, ) = IRuleRegistry(ruleRegistry).genesis();
         // no one owns the default, permissive user policy, which is always policy 0
@@ -119,7 +116,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
             emptyList,
             ruleRegistry
         );
-        emit PolicyManagerInitialized(_msgSender(), credentialCache);
+        emit PolicyManagerInitialized(_msgSender());
     }
 
     /**

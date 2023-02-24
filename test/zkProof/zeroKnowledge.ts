@@ -295,14 +295,6 @@ describe("Zero-knowledge", function () {
       const unpacked2 = await credentialsUpdater.unpack12x20(authorisationProof2.policyDisclosures[1]);
       const policies = [...unpacked1, ...unpacked2];
       const index = 5;
-
-      await expect(
-        credentials.connect(attackerAsSigner).tearDownAdmissionPolicyCredentials(policies[index]),
-      ).to.revertedWith(unacceptable("unauthorized"));
-
-      await credentials.tearDownAdmissionPolicyCredentials(policies[index]);
-      const timestamp = await credentials.getCredential(version, trader2.address, policies[index]);
-      expect(timestamp.toNumber()).to.be.equal(0);
     });
 
     it("should not allow update credentials with invalid proofs of a trader", async function () {
@@ -341,12 +333,6 @@ describe("Zero-knowledge", function () {
       ).to.revertedWith(unacceptable("policy or attestor unacceptable"));
 
       await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
-    });
-
-    it("should only allow policy admin to tear down credentials", async function () {
-      await expect(credentials.connect(attackerAsSigner).tearDownAdmissionPolicyCredentials(0)).to.revertedWith(
-        unacceptable("unauthorized"),
-      );
     });
 
     it("should allow extend validity of credentials to forever in case of attestor failure", async function () {

@@ -621,7 +621,7 @@ const mockInvalidRuleRegistry = async function (universeRule: string, emptyRule:
     unsafeAllow: ["constructor", "delegatecall", "state-variable-immutable", "external-library-linking"],
   })) as PolicyManager;
   await _policyManager.deployed();
-  await _policyManager.init(credentials.address);
+  await _policyManager.init();
 
   const _mockERC20 = await deployMockERC20();
 

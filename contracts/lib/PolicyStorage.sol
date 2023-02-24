@@ -26,7 +26,6 @@ library PolicyStorage {
     /// @dev The App struct contains the essential PolicyManager state including an array of Policies. 
 
     struct App {
-        address credentialCache;
         Policy[] policies;
         AddressSet.Set globalAttestorSet;
         mapping(address => string) attestorUris;
@@ -317,9 +316,6 @@ library PolicyStorage {
                     "policyStorage:processStaged"
                 );
                 count--;
-            }
-            if (policyId != 0) {
-                IKeyringCredentials(self.credentialCache).resetPolicyCredentials(policyId);
             }
             policy.deadline = 0;
         }

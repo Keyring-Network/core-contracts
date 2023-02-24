@@ -158,10 +158,7 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
   })) as KeyringCredentials;
   await credentials.deployed();
   await credentials.init();
-
-  const role_credential_updater = await credentials.ROLE_CREDENTIAL_UPDATER();
-  await credentials.grantRole(role_credential_updater, policyManager.address);
-  await policyManager.init(credentials.address);
+  await policyManager.init();
 
   /* ---------------------- KeyringZkCredentialUpdater ----------------------- */
   /**

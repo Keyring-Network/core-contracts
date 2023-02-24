@@ -23,19 +23,11 @@ contract KeyringCredentials is IKeyringCredentials, KeyringAccessControl, Initia
     address public immutable policyManager;
 
     /**
-     @dev Epochs enable immediate and O(1) destruction of all cached credentials for a single policy. This
-     is a contingency function for extraordinary circumstances. For example, ejecting especially troublesome
-     users with cached credentials with immediate effect by forcing everyone to attempt to gather new
-     attestations and refresh their cached credentials if they want to interact with the subject policy.
-     */
-    mapping(uint32 => uint256) public policyEpochs;
-
-    /**
      @dev The credentials are indexed by (version => trader => admissionPolicyId => epoch) => updateTime
      where the version is always 1 and the epoch supports emergency tear-down of all cached credentials
      for a given policy, if the policy owner orders it. 
      */
-    mapping(uint8 => mapping(address => mapping(uint32 => mapping(uint256 => uint256))))
+    mapping(uint8 => mapping(address => mapping(uint32 => uint256)))
         public override cache;
 
     /**
@@ -87,24 +79,6 @@ contract KeyringCredentials is IKeyringCredentials, KeyringAccessControl, Initia
     }
 
     /**
-     * @notice The policy admin can invalidate all stored credentials for a given policy. 
-     * @param policyId The policy with credentials to tear down
-     */
-    function tearDownAdmissionPolicyCredentials(uint32 policyId) external override onlyPolicyAdmin(policyId) {
-        policyEpochs[policyId]++;
-        emit TearDownAdmissionPolicyCredentials(_msgSender(), policyId);
-    }
-
-    /**
-     * @notice An updater can tear down all stored credentials for a given policy. 
-     * @param policyId The policy with credentials to tear down
-     */
-    function resetPolicyCredentials(uint32 policyId) external override onlyUpdater {
-        policyEpochs[policyId]++;
-        emit TearDownAdmissionPolicyCredentials(_msgSender(), policyId);
-    }
-
-    /**
      @notice This function is called by a trusted and permitted contract such as the 
      KeyringZkCredentialUpdater. There is no prohibition on multiple proving schemes 
      at the cache level since this contract requires only that the caller has permission.
@@ -121,13 +95,12 @@ contract KeyringCredentials is IKeyringCredentials, KeyringAccessControl, Initia
             revert Unacceptable({
                 reason: "timestamp must be in the past"
             });
-        uint256 admissionPolicyEpoch = policyEpochs[admissionPolicyId];
-        if (cache[VERSION][trader][admissionPolicyId][admissionPolicyEpoch] > timestamp)
+        if (cache[VERSION][trader][admissionPolicyId] > timestamp)
             revert Unacceptable({
                 reason: "timestamp is older than existing credential"
             });
-        cache[VERSION][trader][admissionPolicyId][admissionPolicyEpoch] = timestamp;
-        emit UpdateCredential(1, _msgSender(), trader, admissionPolicyId, admissionPolicyEpoch);
+        cache[VERSION][trader][admissionPolicyId] = timestamp;
+        emit UpdateCredential(1, _msgSender(), trader, admissionPolicyId);
     }
 
     /**
@@ -142,7 +115,6 @@ contract KeyringCredentials is IKeyringCredentials, KeyringAccessControl, Initia
         address trader, 
         uint32 admissionPolicyId
     ) external view returns (uint256 timestamp) {
-        uint256 admissionPolicyEpoch = policyEpochs[admissionPolicyId];
-        timestamp = cache[version][trader][admissionPolicyId][admissionPolicyEpoch];
+        timestamp = cache[version][trader][admissionPolicyId];
     }
 }
