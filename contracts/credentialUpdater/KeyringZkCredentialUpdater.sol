@@ -188,8 +188,7 @@ contract KeyringZkCredentialUpdater is
     ) private {
         address[] memory walletChecks = IPolicyManager(POLICY_MANAGER).policyWalletChecks(policyId);
         for(uint256 i = 0; i < walletChecks.length; i++) {
-            if(IWalletCheck(walletChecks[i]).isWhitelisted(trader)) 
-                IWalletCheck(walletChecks[i]).setWalletWhitelist(trader, false);
+            IWalletCheck(walletChecks[i]).setWalletWhitelist(trader, false);
         }
     }
 
