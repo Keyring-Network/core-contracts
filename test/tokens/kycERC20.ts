@@ -116,7 +116,11 @@ describe("Compliant Token", function () {
 
       // whitelist trader
       await walletCheck.setWalletWhitelist(trader2.address, true);
+      let whitelistTime = await helpers.time.latest();
+      expect((await walletCheck.birthday(trader2.address)).toString()).to.equal(whitelistTime.toString());
       await walletCheck.setWalletWhitelist(trader3.address, true);
+      whitelistTime = await helpers.time.latest();
+      expect((await walletCheck.birthday(trader3.address)).toString()).to.equal(whitelistTime.toString());
 
       // check if credentials are set properly
       const version = 1;
@@ -174,7 +178,6 @@ describe("Compliant Token", function () {
 
       await expect(kycERC20.transfer(bob, 50)).to.be.revertedWith(unacceptable("trader not authorized"));
 
-
       // NOTE trader needs to whitelist themself for depositFor
       await expect(kycERC20.depositFor(admin, 100)).to.be.revertedWith(unacceptable("trader not authorized"));
       await userPolicies.addWhitelistedTrader(admin);
@@ -189,8 +192,8 @@ describe("Compliant Token", function () {
       expect(bobKycBalance.toString()).to.equal("40");
 
       // missing whitelisting in WalletCheck should not affect the transfer
-      expect(await walletCheck.isWhitelisted(admin)).to.equal(false);
-      expect(await walletCheck.isWhitelisted(bob)).to.equal(false);
+      expect((await walletCheck.birthday(admin)).toString()).to.equal("0");
+      expect((await walletCheck.birthday(bob)).toString()).to.equal("0");
 
       // remove trader from whitelist
       await userPolicies.removeWhitelistedTrader(bob);
@@ -237,10 +240,7 @@ describe("Compliant Token", function () {
       const universeRule = "0x0000000000000000000000000000000000000000000000000000000000000001";
       const emptyRule = "0x0000000000000000000000000000000000000000000000000000000000000002";
 
-      const { _policyManager, _mockERC20 } = await mockInvalidRuleRegistry(
-        NULL_BYTES32, 
-        emptyRule,
-        credentials);
+      const { _policyManager, _mockERC20 } = await mockInvalidRuleRegistry(NULL_BYTES32, emptyRule, credentials);
 
       await expect(
         deployKycERC20(_mockERC20, credentials, userPolicies, _policyManager, 0, TOKEN_NAME, TOKEN_SYMBOL),
@@ -249,7 +249,7 @@ describe("Compliant Token", function () {
       const { _policyManager: __policyManager, _mockERC20: __mockERC20 } = await mockInvalidRuleRegistry(
         universeRule,
         NULL_BYTES32,
-        credentials
+        credentials,
       );
 
       await expect(
@@ -513,7 +513,6 @@ describe("Compliant Token", function () {
         traderAsSigner2,
       );
 
-      expect(await walletCheck.isWhitelisted(trader2.address)).to.equal(true);
       await mockERC20.approve(kycERC20.address, 1000);
       await kycERC20.depositFor(trader2.address, 100);
 
@@ -523,13 +522,6 @@ describe("Compliant Token", function () {
       // user updates credential for Policy A
       // NOTE proof incluceds Policy B as well as Policy A
       await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
-      expect(await walletCheck.isWhitelisted(trader2.address)).to.equal(false);
-
-      // user should not be able to trade under Policy B or Policy A until wallet is whitelisted in WalletCheck again
-      await expect(kycERC20.depositFor(trader2.address, 100)).to.be.revertedWith(unacceptable("trader not authorized"));
-
-      // whitelist trader
-      await walletCheck.setWalletWhitelist(trader2.address, true);
 
       await kycERC20.depositFor(trader2.address, 100);
       kycBalanceTrader2 = await kycERC20.balanceOf(trader2.address);
@@ -598,7 +590,11 @@ const unacceptable = (reason: string) => {
   return `Unacceptable("${reason}")`;
 };
 
-const mockInvalidRuleRegistry = async function (universeRule: string, emptyRule: string, credentials: KeyringCredentials) {
+const mockInvalidRuleRegistry = async function (
+  universeRule: string,
+  emptyRule: string,
+  credentials: KeyringCredentials,
+) {
   const randomAddress = "0x44017a895f26275166b1d449BCb1573fD324b456";
   const MockRuleRegistryFactory = await ethers.getContractFactory("MockRuleRegistry");
   const MockRuleRegistry = (await MockRuleRegistryFactory.deploy(

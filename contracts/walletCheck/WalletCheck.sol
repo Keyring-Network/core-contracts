@@ -18,7 +18,7 @@ contract WalletCheck is IWalletCheck, KeyringAccessControl {
     address private constant NULL_ADDRESS = address(0);
     bytes32 public constant override ROLE_WALLETCHECK_ADMIN = keccak256("wallet check admin role");
 
-    mapping(address => bool) public override isWhitelisted;
+    mapping(address => uint256) public override birthday;
 
     modifier onlyWalletCheckAdmin() {
         _checkRole(ROLE_WALLETCHECK_ADMIN, _msgSender(), "WalletCheck::onlyWalletCheckAdmin");
@@ -29,6 +29,7 @@ contract WalletCheck is IWalletCheck, KeyringAccessControl {
         if(trustedForwarder == NULL_ADDRESS)
             revert Unacceptable("trustedForwarder cannot be empty");
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        emit Deployed(_msgSender(), trustedForwarder);
     }
 
     /**
@@ -37,7 +38,7 @@ contract WalletCheck is IWalletCheck, KeyringAccessControl {
      * @param whitelisted True if the wallet has passed the checks represented by this contract.
      */
     function setWalletWhitelist(address wallet, bool whitelisted) external override onlyWalletCheckAdmin {
-        isWhitelisted[wallet] = whitelisted;
+        birthday[wallet] = (whitelisted) ? block.timestamp: 0;
         emit SetWalletWhitelist(_msgSender(), wallet, whitelisted);
     }
 

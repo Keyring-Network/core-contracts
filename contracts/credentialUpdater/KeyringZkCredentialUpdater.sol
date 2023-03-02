@@ -125,8 +125,6 @@ contract KeyringZkCredentialUpdater is
                 revert Unacceptable({
                     reason: "policy or attestor unacceptable"
                 });
-            
-            resetWalletChecks(policyId, trader);
 
             if(rootTime + IPolicyManager(POLICY_MANAGER).policyTtl(policyId) < block.timestamp) {
                 uint256 ar = IPolicyManager(POLICY_MANAGER).policyAcceptRoots(policyId);
@@ -174,22 +172,6 @@ contract KeyringZkCredentialUpdater is
 
         acceptable = !(RULE_REGISTRY.ruleIsToxic(p.policyRuleId(policyId))) &&
             p.isPolicyAttestor(policyId, attestor);
-    }
-
-    /**
-     * @notice Removes the active trader wallet from applicable wallet check whitelists. 
-     * @dev Requires walletCheck admin role in the walletCheck contract.
-     * @param policyId Policy to inspect. 
-     * @param trader Trading wallet to reset wallet checks.
-     */
-    function resetWalletChecks(
-        uint32 policyId,
-        address trader 
-    ) private {
-        address[] memory walletChecks = IPolicyManager(POLICY_MANAGER).policyWalletChecks(policyId);
-        for(uint256 i = 0; i < walletChecks.length; i++) {
-            IWalletCheck(walletChecks[i]).setWalletWhitelist(trader, false);
-        }
     }
 
     /**

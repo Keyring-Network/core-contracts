@@ -92,8 +92,11 @@ abstract contract KeyringGuard is IKeyringGuard {
         bytes32 admissionPolicyRuleId = IPolicyManager(policyManager).policyRuleId(admissionPolicyId);
         address[] memory walletChecks = IPolicyManager(policyManager).policyWalletChecks(admissionPolicyId);
 
+        uint256 expiryTime = IPolicyManager(policyManager).policyTtl(admissionPolicyId);
+
         for(uint256 i = 0; i < walletChecks.length; i++) {
-            if(!IWalletCheck(walletChecks[i]).isWhitelisted(trader)) return false;
+            uint256 checkAge = block.timestamp - IWalletCheck(walletChecks[i]).birthday(trader);
+            if(checkAge > expiryTime) return false;
         }
 
         if (admissionPolicyRuleId == universeRule && userRuleId == universeRule) {
@@ -105,7 +108,6 @@ abstract contract KeyringGuard is IKeyringGuard {
                 VERSION, 
                 trader, 
                 admissionPolicyId);
-            uint256 expiryTime = IPolicyManager(policyManager).policyTtl(admissionPolicyId);
             uint256 cacheAge = block.timestamp - timestamp;
             isIndeed = cacheAge <= expiryTime;
         }

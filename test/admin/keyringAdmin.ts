@@ -106,7 +106,7 @@ describe("Admin", function () {
       await expect(CredentialsFactory.deploy(forwarder.address, NULL_ADDRESS)).to.be.revertedWith(
         unacceptable("policyManager_ cannot be empty"),
       );
-    
+
       const CredentialsUpdaterFactory = await ethers.getContractFactory("KeyringZkCredentialUpdater");
 
       await expect(
@@ -983,7 +983,7 @@ describe("Admin", function () {
 
     /* ------------------------------- WalletCheck ------------------------------ */
     it("should only let wallet check admin whitelist wallet addresses", async function () {
-      expect(await walletCheck.isWhitelisted(bob)).to.equal(false);
+      expect((await walletCheck.birthday(bob)).toString()).to.equal("0");
       await expect(walletCheck.connect(attackerAsSigner).setWalletWhitelist(bob, true)).to.be.revertedWith(
         unauthorized(
           attacker,
@@ -995,7 +995,9 @@ describe("Admin", function () {
         ),
       );
       await walletCheck.setWalletWhitelist(bob, true);
-      expect(await walletCheck.isWhitelisted(bob)).to.equal(true);
+      const currentBlock = await ethers.provider.getBlockNumber();
+      const blockTimestamp = (await ethers.provider.getBlock(currentBlock)).timestamp;
+      expect((await walletCheck.birthday(bob)).toString()).to.equal(blockTimestamp.toString());
     });
   });
 });
