@@ -36,9 +36,12 @@ contract WalletCheck is IWalletCheck, KeyringAccessControl {
      * @notice Set the whitelisted boolean for a specific trading wallet to true or false.
      * @param wallet The subject wallet.
      * @param whitelisted True if the wallet has passed the checks represented by this contract.
+     * @param timestamp The effective time of the wallet check.
      */
-    function setWalletWhitelist(address wallet, bool whitelisted) external override onlyWalletCheckAdmin {
-        birthday[wallet] = (whitelisted) ? block.timestamp: 0;
+    function setWalletWhitelist(address wallet, bool whitelisted, uint256 timestamp) external override onlyWalletCheckAdmin {
+        if(timestamp > block.timestamp) 
+            revert Unacceptable("timestamp cannot be in the future");
+        birthday[wallet] = (whitelisted) ? timestamp : 0;
         emit SetWalletWhitelist(_msgSender(), wallet, whitelisted);
     }
 

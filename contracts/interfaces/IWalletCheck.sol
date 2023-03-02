@@ -14,5 +14,5 @@ interface IWalletCheck {
 
     function birthday(address wallet) external view returns(uint256 timestamp);
 
-    function setWalletWhitelist(address wallet, bool whitelisted) external;
+    function setWalletWhitelist(address wallet, bool whitelisted, uint256 timestamp) external;
 }
