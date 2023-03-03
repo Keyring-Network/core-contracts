@@ -23,9 +23,8 @@ contract KeyringCredentials is IKeyringCredentials, KeyringAccessControl, Initia
     address public immutable policyManager;
 
     /**
-     @dev The credentials are indexed by (version => trader => admissionPolicyId => epoch) => updateTime
-     where the version is always 1 and the epoch supports emergency tear-down of all cached credentials
-     for a given policy, if the policy owner orders it. 
+     @dev The credentials are indexed by (version => trader => admissionPolicyId) => updateTime
+     where the version is always 1.
      */
     mapping(uint8 => mapping(address => mapping(uint32 => uint256)))
         public override cache;
@@ -35,20 +34,6 @@ contract KeyringCredentials is IKeyringCredentials, KeyringAccessControl, Initia
      */
     modifier onlyUpdater() {
         _checkRole(ROLE_CREDENTIAL_UPDATER, _msgSender(), "KeyringCredentials:onlyUpdater");
-        _;
-    }
-
-    /**
-     * @notice Only the PolicyAdmin can tear down user credentials.
-     */
-    modifier onlyPolicyAdmin(uint32 policyId) {
-        // IPolicyManager(policyManager).policyOwnerRole(policyId);
-        bytes32 ownerRole = bytes32(uint256(policyId));
-        if(!IPolicyManager(policyManager).hasRole(ownerRole, _msgSender())) {
-           revert Unacceptable({
-                reason: "unauthorized"
-            }); 
-        }
         _;
     }
 

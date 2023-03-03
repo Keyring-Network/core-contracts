@@ -27,6 +27,7 @@ import {
   trader2,
   ROLE_AGGREGATOR,
   proofMerkleRoot3,
+  NULL_BYTES32,
 } from "../../constants";
 import {
   AuthorizationProofVerifier,
@@ -125,12 +126,23 @@ describe("Zero-knowledge", function () {
       expect((await identityTree.merkleRootSuccessors(merkleRoot)).toNumber()).to.equal(0);
     });
 
-    it("should not allow to set birthdays in the future", async function () {
-      const birthday = (await helpers.time.latest()) + 1000;
+    it("should not allow to set invalid merkle roots", async function () {
+      const validBirthday = await helpers.time.latest();
+      let invalidBirthday = validBirthday + 1000;
       const merkleRoot = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("some merkle root"));
 
-      await expect(identityTree.setMerkleRootBirthday(merkleRoot, birthday)).to.be.revertedWith(
+      await expect(identityTree.setMerkleRootBirthday(merkleRoot, invalidBirthday)).to.be.revertedWith(
         unacceptable("birthday cannot be in the future"),
+      );
+
+      await expect(identityTree.setMerkleRootBirthday(NULL_BYTES32, validBirthday)).to.be.revertedWith(
+        unacceptable("merkle root cannot be empty"),
+      );
+
+      await identityTree.setMerkleRootBirthday(merkleRoot, validBirthday);
+      invalidBirthday = validBirthday - 1000;
+      await expect(identityTree.setMerkleRootBirthday(merkleRoot, invalidBirthday)).to.be.revertedWith(
+        unacceptable("birthday precedes previously recorded birthday"),
       );
     });
 
@@ -145,6 +157,29 @@ describe("Zero-knowledge", function () {
       await identityTree.setMerkleRootBirthday(merkleRoot2, birthday);
 
       expect((await identityTree.merkleRootSuccessors(merkleRoot1)).toNumber()).to.equal(1);
+    });
+
+    it("should not allow access merkle roots out of bounds", async function () {
+      const validBirthday = await helpers.time.latest();
+      const merkleRoot1 = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("some merkle root"));
+      await identityTree.setMerkleRootBirthday(merkleRoot1, validBirthday);
+      const merkleRootCount = await identityTree.merkleRootCount();
+      await expect(identityTree.merkleRootAtIndex(merkleRootCount)).to.be.revertedWith("index");
+      expect(await identityTree.merkleRootAtIndex(merkleRootCount.toNumber() - 1)).to.equal(merkleRoot1);
+    });
+
+    it("should provide the latest root stored", async function () {
+      expect(await identityTree.latestRoot()).to.equal(NULL_BYTES32);
+
+      const birthday1 = await helpers.time.latest();
+      const merkleRoot1 = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("some merkle root"));
+      await identityTree.setMerkleRootBirthday(merkleRoot1, birthday1);
+      expect(await identityTree.latestRoot()).to.equal(merkleRoot1);
+
+      const birthday2 = await helpers.time.latest();
+      const merkleRoot2 = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("some merkle root 2"));
+      await identityTree.setMerkleRootBirthday(merkleRoot2, birthday2);
+      expect(await identityTree.latestRoot()).to.equal(merkleRoot2);
     });
   });
 
@@ -253,6 +288,12 @@ describe("Zero-knowledge", function () {
       const packed = await credentialsUpdater.pack12x20(policyIdArray);
       const unpacked = await credentialsUpdater.unpack12x20(packed);
       expect(unpacked).to.have.members(policyIdArray);
+
+      // max value is 2^240 - 1
+      const invalidInput = ethers.BigNumber.from('0x1').shl(241).sub(1);
+      await expect(credentialsUpdater.unpack12x20(invalidInput)).to.be.revertedWith("input out of range");
+      const validInput = ethers.BigNumber.from('0x1').shl(240).sub(1);
+      await credentialsUpdater.unpack12x20(validInput);
     });
 
     it("should allow update credentials with valid proofs of a trader", async function () {
@@ -280,6 +321,7 @@ describe("Zero-knowledge", function () {
       }
     });
 
+    /* NOTE this test includes no assertions anymore
     it("should allow only policy admin to tear down credentials", async function () {
       const now = await helpers.time.latest();
       await identityTree.setMerkleRootBirthday(proofMerkleRoot2, now);
@@ -296,6 +338,7 @@ describe("Zero-knowledge", function () {
       const policies = [...unpacked1, ...unpacked2];
       const index = 5;
     });
+    */
 
     it("should not allow update credentials with invalid proofs of a trader", async function () {
       const invalidAuthorisationProof: IKeyringZkVerifier.IdentityAuthorisationProofStruct = {
@@ -308,6 +351,10 @@ describe("Zero-knowledge", function () {
     });
 
     it("should not allow invalid policies or invalid trees (policy attestors)", async function () {
+      await expect(
+        credentialsUpdater.updateCredentials(attacker, membershipProof2, authorisationProof2),
+      ).to.revertedWith(unacceptable("attestor unacceptable"));
+
       await expect(
         credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2),
       ).to.revertedWith(unacceptable("policy or attestor unacceptable"));
@@ -324,7 +371,7 @@ describe("Zero-knowledge", function () {
 
       // deploy another identity tree which is not allowed to be used by the policy
       const identityTreeFactory = await ethers.getContractFactory("IdentityTree");
-      const forwarder =  "0x0000000000000000000000000000000000000001"
+      const forwarder = "0x0000000000000000000000000000000000000001";
       const identityTree2 = await identityTreeFactory.deploy(forwarder);
       await policyManager.admitAttestor(identityTree2.address, "attestor2");
 
@@ -396,7 +443,7 @@ describe("Zero-knowledge", function () {
       // update credentials with old merkle root
       await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
 
-     // check for updated credentials without new merkle root
+      // check for updated credentials without new merkle root
       for (let i = 0; i < policies.length; i++) {
         if (policies[i] === 0 || policies[i] === 1) continue;
         // set the merkleRootSuccessors to 1, after 10 policies
@@ -418,11 +465,19 @@ describe("Zero-knowledge", function () {
 
   /* --------------------------- KeyringCredentials --------------------------- */
   describe("KeyringCredentials", function () {
-    it("should not allow set credentials with timestamp in the future", async function () {
+    it("should not allow set credentials with invalid timestamp", async function () {
       const future = (await helpers.time.latest()) + 1000;
       await credentials.grantRole(await credentials.ROLE_CREDENTIAL_UPDATER(), admin);
       await expect(credentials.setCredential(admin, 0, future)).to.revertedWith(
         unacceptable("timestamp must be in the past"),
+      );
+
+      const validTimestamp = await helpers.time.latest();
+      await credentials.setCredential(admin, 0, validTimestamp);
+      expect(await credentials.getCredential(1, admin, 0)).to.be.equal(validTimestamp);
+      const invalidTimestamp = validTimestamp - 1000;
+      await expect(credentials.setCredential(admin, 0, invalidTimestamp)).to.revertedWith(
+        unacceptable("timestamp is older than existing credential"),
       );
     });
     it("should not allow unauthorized entities to set credentials", async function () {

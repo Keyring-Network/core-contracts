@@ -115,11 +115,10 @@ describe("Compliant Token", function () {
       await credentialsUpdater.updateCredentials(identityTree.address, membershipProof3, authorisationProof3);
 
       // whitelist trader
-      await walletCheck.setWalletWhitelist(trader2.address, true);
-      let whitelistTime = await helpers.time.latest();
+      const whitelistTime = await helpers.time.latest();
+      await walletCheck.setWalletWhitelist(trader2.address, true, whitelistTime);
       expect((await walletCheck.birthday(trader2.address)).toString()).to.equal(whitelistTime.toString());
-      await walletCheck.setWalletWhitelist(trader3.address, true);
-      whitelistTime = await helpers.time.latest();
+      await walletCheck.setWalletWhitelist(trader3.address, true, whitelistTime);
       expect((await walletCheck.birthday(trader3.address)).toString()).to.equal(whitelistTime.toString());
 
       // check if credentials are set properly
@@ -449,8 +448,9 @@ describe("Compliant Token", function () {
         unacceptable("trader not authorized"),
       );
 
-      await walletCheck.setWalletWhitelist(admin, true);
-      await walletCheck.setWalletWhitelist(aliceWallet.address, true);
+      const now = await helpers.time.latest();
+      await walletCheck.setWalletWhitelist(admin, true, now);
+      await walletCheck.setWalletWhitelist(aliceWallet.address, true, now);
 
       await mockERC20.approve(kycERC20.address, 100);
       await kycERC20.depositFor(admin, 100);

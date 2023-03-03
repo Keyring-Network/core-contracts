@@ -176,6 +176,16 @@ describe("Admin", function () {
       await expect(KeyringZkVerifierFactory.deploy(verifier, verifier, NULL_ADDRESS)).to.be.revertedWith(
         unacceptable("authorisationProofVerifier cannot be empty"),
       );
+
+      const WalletCheckFactory = await ethers.getContractFactory("WalletCheck");
+      await expect(WalletCheckFactory.deploy(NULL_ADDRESS)).to.be.revertedWith(
+        unacceptable("trustedForwarder cannot be empty"),
+      );
+
+      const IdentityTreeFactory = await ethers.getContractFactory("IdentityTree");
+      await expect(IdentityTreeFactory.deploy(NULL_ADDRESS)).to.be.revertedWith(
+        unacceptable("trustedForwarder cannot be empty"),
+      );
     });
 
     it("should not allow to init if inputs are empty", async function () {
@@ -589,6 +599,12 @@ describe("Admin", function () {
       deadline = 0;
       await policyManager.removePolicyWalletChecks(policyId, [walletCheck.address], deadline);
       await policyManager.addPolicyWalletChecks(policyId, [walletCheck.address], deadline);
+
+      const globalWalletCheckCount = await policyManager.callStatic.globalWalletCheckCount();
+      await expect(policyManager.callStatic.globalWalletCheckAtIndex(globalWalletCheckCount)).to.be.revertedWith(
+        "index",
+      );
+      await policyManager.globalWalletCheckAtIndex(globalWalletCheckCount.toNumber() - 1);
     });
 
     it("should not allow invalid additions or removals of walletchecks", async function () {
@@ -767,6 +783,14 @@ describe("Admin", function () {
       await expect(policyManager.callStatic.policyAttestorAtIndex(policy, policyAttestors.length)).to.be.revertedWith(
         "index",
       );
+    });
+
+    it("should not allow ttl greater than max ttl", async function () {
+      const MAX_TTL = 100 * 24 * 60 * 60 * 365; // 100 years
+      await expect(policyManager.updatePolicyTtl(1, MAX_TTL + 1, 0)).to.be.revertedWith(
+        unacceptable("ttl exceeds maximum duration"),
+      );
+      await policyManager.updatePolicyTtl(1, MAX_TTL, 0);
     });
 
     /* NOTE not feasible to test this
@@ -984,7 +1008,8 @@ describe("Admin", function () {
     /* ------------------------------- WalletCheck ------------------------------ */
     it("should only let wallet check admin whitelist wallet addresses", async function () {
       expect((await walletCheck.birthday(bob)).toString()).to.equal("0");
-      await expect(walletCheck.connect(attackerAsSigner).setWalletWhitelist(bob, true)).to.be.revertedWith(
+      const now = await helpers.time.latest();
+      await expect(walletCheck.connect(attackerAsSigner).setWalletWhitelist(bob, true, now)).to.be.revertedWith(
         unauthorized(
           attacker,
           "KeyringAccessControl",
@@ -994,10 +1019,15 @@ describe("Admin", function () {
           "WalletCheck::onlyWalletCheckAdmin",
         ),
       );
-      await walletCheck.setWalletWhitelist(bob, true);
-      const currentBlock = await ethers.provider.getBlockNumber();
-      const blockTimestamp = (await ethers.provider.getBlock(currentBlock)).timestamp;
-      expect((await walletCheck.birthday(bob)).toString()).to.equal(blockTimestamp.toString());
+      await walletCheck.setWalletWhitelist(bob, true, now);
+      expect((await walletCheck.birthday(bob)).toNumber()).to.equal(now);
+    });
+
+    it("should not allow timestamps that are in the future", async function () {
+      const now = await helpers.time.latest();
+      await expect(walletCheck.setWalletWhitelist(bob, true, now + 100)).to.be.revertedWith(
+        unacceptable("timestamp cannot be in the future"),
+      );
     });
   });
 });
