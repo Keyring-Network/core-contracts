@@ -8,25 +8,44 @@ import "../interfaces/IPolicyManager.sol";
 import "../interfaces/IUserPolicies.sol";
 import "../interfaces/IWalletCheck.sol";
 import "../interfaces/IKeyringCredentials.sol";
+import "../access/KeyringAccessControl.sol";
 
 /**
  * @notice KeyringGuard implementation that uses immutable configuration parameters and presents 
  a simplified modifier for use in derived contracts.
  */
 
-abstract contract KeyringGuard is IKeyringGuard {
+abstract contract KeyringGuard is IKeyringGuard, KeyringAccessControl {
 
-    string private constant MODULE = "KeyringGuard";
+    using AddressSet for AddressSet.Set;
+    
     uint8 private constant VERSION = 1;
     bytes32 private constant NULL_BYTES32 = bytes32(0);
     address internal constant NULL_ADDRESS = address(0);
 
+    bytes32 public constant ROLE_GLOBAL_WHITELIST_ADMIN = keccak256("whitelist admin");
     address public immutable keyringCredentials;
     address public immutable policyManager;
     address public immutable userPolicies;
     uint32 public immutable admissionPolicyId;
     bytes32 public immutable universeRule;
     bytes32 public immutable emptyRule;
+
+    AddressSet.Set globalWhitelistSet;
+
+    modifier onlyPolicyAdmin {
+        bytes32 role = bytes32(uint256(uint32(admissionPolicyId)));
+        if (!IPolicyManager(policyManager).hasRole(role, _msgSender()))
+            revert Unauthorized({
+                sender: _msgSender(),
+                module: "KeyringAccessControl",
+                method: "_checkRole",
+                role: role,
+                reason: "sender does not have the required role",
+                context: "KeyringGuard:onlyPolicyAdmin"
+            });
+        _;
+    }
 
      /**
      @param keyringCredentials_ The KeyringCredentials contract to rely on.
@@ -35,11 +54,14 @@ abstract contract KeyringGuard is IKeyringGuard {
      @param admissionPolicyId_ The unique identifier of a Policy against which user accounts will be compared.
      */
     constructor(
+        address trustedForwarder,
         address keyringCredentials_,
         address policyManager_,
         address userPolicies_,
         uint32 admissionPolicyId_
-    ) {
+    ) 
+        KeyringAccessControl(trustedForwarder)
+    {
         if (keyringCredentials_ == NULL_ADDRESS)
             revert Unacceptable({
                 reason: "credentials cannot be empty"
@@ -77,6 +99,43 @@ abstract contract KeyringGuard is IKeyringGuard {
             universeRule,
             emptyRule
         );
+    }
+
+    /**
+     * @notice Policy admins can maintain a global list of whitelisted addresses, usually contracts.
+     * @param subject The address to whitelist or delist.
+     */
+    function whitelistAddress(address subject) external onlyPolicyAdmin {
+        if (globalWhitelistSet.exists(subject)) 
+            revert Unacceptable({ reason: "subject is already whitelisted" });
+        globalWhitelistSet.insert(subject, "internal error");
+        emit WhitelistAddress(_msgSender());
+    }
+
+    /**
+     * @notice Count the globally whitelisted addresses.
+     * @return count The number of globally whitelisted addresses.
+     */
+    function whitelistAddressCount() external view override returns (uint256 count) {
+        count = globalWhitelistSet.count();
+    }
+
+    /**
+     * @notice Enumerate the globally whitelisted addresses.
+     * @param index The row to inspect.
+     * @return whitelisted A whitelisted address.
+     */
+    function whitelistAddressAtIndex(uint256 index) external view override returns (address whitelisted) {
+        whitelisted = globalWhitelistSet.keyAtIndex(index);
+    }
+
+    /**
+     * @notice Check if an address is whitelisted globally.
+     * @param checkAddress The address to inspect.
+     * @return isIndeed True if the checkAddress is whitelisted.
+     */
+    function isWhitelisted(address checkAddress) external view override returns (bool isIndeed) {
+        isIndeed = globalWhitelistSet.exists(checkAddress);
     }
 
     /**
@@ -122,17 +181,31 @@ abstract contract KeyringGuard is IKeyringGuard {
      if counterparties are explicitly whitelisted by the other. 
      */
     function checkGuard(address from, address to) public override returns (bool isAuthorised) {
+        bool fromGlobalWhitelisted;
+        bool toGlobalWhitelisted;
         bool fromAuthorised;
         bool toAuthorised;
         bool fromIsWhitelistedByTo;
         bool toIsWhitelistedByFrom;
+        bool allowUserWhitelists;
 
-        if (IPolicyManager(policyManager).policyAllowWhitelists(admissionPolicyId)) {
+        fromGlobalWhitelisted = globalWhitelistSet.exists(from);
+        toGlobalWhitelisted = globalWhitelistSet.exists(to);
+        allowUserWhitelists = IPolicyManager(policyManager).policyAllowWhitelists(admissionPolicyId);
+        
+        if (!fromGlobalWhitelisted && allowUserWhitelists) {
             fromIsWhitelistedByTo = IUserPolicies(userPolicies).isWhitelisted(to, from);
+        }
+        if (!toGlobalWhitelisted && allowUserWhitelists) {
             toIsWhitelistedByFrom = IUserPolicies(userPolicies).isWhitelisted(from, to);
         }
-        if (!fromIsWhitelistedByTo) fromAuthorised = checkCache(from);
-        if (!toIsWhitelistedByFrom) toAuthorised = checkCache(to);
-        isAuthorised = (fromIsWhitelistedByTo || fromAuthorised) && (toIsWhitelistedByFrom || toAuthorised);
+
+        if (!fromIsWhitelistedByTo && !fromGlobalWhitelisted) fromAuthorised = checkCache(from);
+        if (!toIsWhitelistedByFrom && !toGlobalWhitelisted) toAuthorised = checkCache(to);
+
+        isAuthorised = (
+            fromIsWhitelistedByTo || fromAuthorised || fromGlobalWhitelisted) && (
+            toIsWhitelistedByFrom || toAuthorised || toGlobalWhitelisted
+        );
     }
 }

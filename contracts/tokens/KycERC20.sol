@@ -40,6 +40,7 @@ contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuard {
      @param symbol_ The symbol for the new wrapped token. Passed to ERC20.constructor to set the ERC20.symbol
      */
     constructor(
+        address trustedForwarder,
         address collateralToken,
         address keyringCredentials,
         address policyManager,
@@ -51,7 +52,7 @@ contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuard {
         ERC20(name_, symbol_)
         ERC20Permit(name_)
         ERC20Wrapper(IERC20(collateralToken))
-        KeyringGuard(keyringCredentials, policyManager, userPolicies, policyId)
+        KeyringGuard(trustedForwarder, keyringCredentials, policyManager, userPolicies, policyId)
     {
         if (collateralToken == NULL_ADDRESS)
             revert Unacceptable({
@@ -133,4 +134,35 @@ contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuard {
     {
         return ERC20.transferFrom(from, to, amount);
     }
+
+    /**
+     * @notice Returns ERC2771 signer if msg.sender is a trusted forwarder, otherwise returns msg.sender.
+     * @return sender User deemed to have signed the transaction.
+     */
+    function _msgSender()
+        internal
+        view
+        virtual
+        override(KeyringAccessControl, Context)
+        returns (address sender)
+    {
+        return ERC2771Context._msgSender();
+    }
+
+    /**
+     * @notice Returns msg.data if not from a trusted forwarder, or truncated msg.data if the signer was 
+     appended to msg.data
+     * @dev Although not currently used, this function forms part of ERC2771 so is included for completeness.
+     * @return data Data deemed to be the msg.data
+     */
+    function _msgData()
+        internal
+        view
+        virtual
+        override(KeyringAccessControl, Context)
+        returns (bytes calldata)
+    {
+        return ERC2771Context._msgData();
+    }
+    
 }

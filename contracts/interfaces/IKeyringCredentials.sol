@@ -10,8 +10,6 @@ interface IKeyringCredentials {
 
     event CredentialsInitialized(address admin);
 
-    event TearDownAdmissionPolicyCredentials(address sender, uint32 policyId);
-
     event UpdateCredential(
         uint8 version, 
         address updater, 

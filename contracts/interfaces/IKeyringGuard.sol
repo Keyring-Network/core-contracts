@@ -19,6 +19,14 @@ interface IKeyringGuard {
         bytes32 emptyRule
     );
 
+    event WhitelistAddress(address admin);
+
+    function whitelistAddressCount() external view returns (uint256 count);
+
+    function whitelistAddressAtIndex(uint256 index) external view returns (address whitelisted);
+
+    function isWhitelisted(address checkAddress) external view returns (bool isIndeed);
+
     function checkCache(address trader) external returns (bool isIndeed);
 
     function checkGuard(address from, address to) external returns (bool isAuthorized);
