@@ -48,6 +48,7 @@ abstract contract KeyringGuard is IKeyringGuard, KeyringAccessControl {
     }
 
      /**
+     @param trustedForwarder Contract address that is allowed to relay message signers.
      @param keyringCredentials_ The KeyringCredentials contract to rely on.
      @param policyManager_ The address of the deployed PolicyManager to rely on.
      @param userPolicies_ The address of the deployed UserPolicies contract to rely on. 

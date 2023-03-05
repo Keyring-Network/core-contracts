@@ -11,8 +11,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  @notice This contract illustrates how an immutable KeyringGuard can be wrapped around collateral tokens 
- (e.g. DAI Token). Tokens can only be transferred to an address that maintains compliance with the configured 
- policy.
+ (e.g. DAI Token). Specify the token to wrap and the new name/symbol of the wrapped token - then good to go!
+ Tokens can only be transferred to an address that maintains compliance with the configured policy.
  */
 
 contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuard {
@@ -30,7 +30,7 @@ contract KycERC20 is IKycERC20, ERC20Permit, ERC20Wrapper, KeyringGuard {
     }
 
     /**
-     @notice Specify the token to wrap and the new name/symbol of the wrapped token - then good to go!
+     @param trustedForwarder Contract address that is allowed to relay message signers.
      @param collateralToken The contract address of the token that is to be wrapped
      @param keyringCredentials The address for the deployed KeyringCredentials contract.
      @param policyManager The address for the deployed PolicyManager contract.
