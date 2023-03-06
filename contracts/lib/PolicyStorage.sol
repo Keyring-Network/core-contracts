@@ -40,7 +40,7 @@ library PolicyStorage {
         uint32 ttl;
         uint32 gracePeriod;
         uint16 acceptRoots;
-        bool allowWhitelists;
+        bool allowUserWhitelists;
         bool locked;
     }
 
@@ -395,7 +395,7 @@ library PolicyStorage {
         writeTtl(policyObj, policyScalar.ttl);
         writeGracePeriod(policyObj, policyScalar.gracePeriod);
         writeAcceptRoots(policyObj, policyScalar.acceptRoots);
-        writeAllowWhitelists(policyObj, policyScalar.allowWhitelists);
+        writeAllowUserWhitelists(policyObj, policyScalar.allowUserWhitelists);
         writePolicyLock(policyObj, policyScalar.locked);
         setDeadline(self, policyId, deadline);
     }
@@ -467,16 +467,16 @@ library PolicyStorage {
     }
 
     /**
-     * @notice Writes a new allowWhitelists state in the pending Policy changes in a Policy. 
+     * @notice Writes a new allowUserWhitelists state in the pending Policy changes in a Policy. 
      * @param self A Policy object.
-     * @param allowWhitelists True if whitelists are allowed, otherwise false.
+     * @param allowUserWhitelists True if whitelists are allowed, otherwise false.
      */
-    function writeAllowWhitelists(
+    function writeAllowUserWhitelists(
         Policy storage self,
-        bool allowWhitelists
+        bool allowUserWhitelists
     ) public
     {
-        self.scalarPending.allowWhitelists = allowWhitelists;
+        self.scalarPending.allowUserWhitelists = allowUserWhitelists;
     }
 
     /**

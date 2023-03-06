@@ -258,7 +258,7 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
     gracePeriod: THIRTY_DAYS_IN_SECONDS,
     acceptRoots: 1,
     locked: false,
-    allowWhitelists: false,
+    allowUserWhitelists: false,
   };
   await policyManager.createPolicy(policyScalar, [attestor1, attestor2, identityTree.address], [walletCheck.address]);
 

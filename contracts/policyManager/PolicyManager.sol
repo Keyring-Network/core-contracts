@@ -107,7 +107,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
             ttl: DEFAULT_TTL,
             gracePeriod: 0,
             acceptRoots: 0,
-            allowWhitelists: true,
+            allowUserWhitelists: true,
             locked: true
         });
         policyStorage.newPolicy(
@@ -301,19 +301,19 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      * @notice Policy owners can allow users to set whitelists of counterparties to exempt from
      compliance checks.
      * @param policyId The policy to update.
-     * @param allowWhitelists True if whitelists are allowed, otherwise false.
+     * @param allowUserWhitelists True if whitelists are allowed, otherwise false.
      * @param deadline The timestamp when the staged changes will take effect. Overrides previous deadline.
      */
-    function updatePolicyAllowWhitelists(uint32 policyId, bool allowWhitelists,uint256 deadline) 
+    function updatePolicyAllowUserWhitelists(uint32 policyId, bool allowUserWhitelists,uint256 deadline) 
         external 
         override 
         onlyPolicyAdmin(policyId) 
     {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
         policyStorage.processStaged(policyId);
-        policyObj.writeAllowWhitelists(allowWhitelists);
+        policyObj.writeAllowUserWhitelists(allowUserWhitelists);
         policyStorage.setDeadline(policyId, deadline);
-        emit UpdatePolicyAllowWhitelists(_msgSender(), policyId, allowWhitelists, deadline);
+        emit UpdatePolicyAllowUserWhitelists(_msgSender(), policyId, allowUserWhitelists, deadline);
     }
 
     /**
@@ -653,10 +653,10 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
      * @param policyId The policy to inspect. 
      * @return isAllowed True if whitelists can be used to override compliance checks. 
      */
-    function policyAllowWhitelists(uint32 policyId) external returns (bool isAllowed){
+    function policyAllowUserWhitelists(uint32 policyId) external returns (bool isAllowed){
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
         policyStorage.processStaged(policyId);
-        isAllowed = policyObj.scalarActive.allowWhitelists;
+        isAllowed = policyObj.scalarActive.allowUserWhitelists;
     }
 
     /**

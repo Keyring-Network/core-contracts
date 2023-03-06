@@ -47,10 +47,10 @@ interface IPolicyManager {
 
     event UpdatePolicyLock(address indexed owner, uint32 indexed policyId, bool locked, uint256 deadline);
 
-    event UpdatePolicyAllowWhitelists(
+    event UpdatePolicyAllowUserWhitelists(
         address indexed owner, 
         uint32 indexed policyId, 
-        bool allowWhitelists, 
+        bool allowUserWhitelists, 
         uint256 deadline);
 
     event UpdatePolicyDeadline(address indexed owner, uint32 indexed policyId, uint256 deadline);
@@ -125,7 +125,7 @@ interface IPolicyManager {
 
     function updatePolicyAcceptRoots(uint32 policyId, uint16 acceptRoots, uint256 deadline) external;
 
-    function updatePolicyAllowWhitelists(uint32 policyId, bool allowWhitelists,uint256 deadline) external;
+    function updatePolicyAllowUserWhitelists(uint32 policyId, bool allowUserWhitelists,uint256 deadline) external;
     
     function updatePolicyLock(uint32 policyId, bool locked, uint256 deadline) external;
 
@@ -184,7 +184,7 @@ interface IPolicyManager {
 
     function policyAcceptRoots(uint32 policyId) external returns (uint16 acceptRoots);
 
-    function policyAllowWhitelists(uint32 policyId) external returns (bool isAllowed);
+    function policyAllowUserWhitelists(uint32 policyId) external returns (bool isAllowed);
 
     function policyLocked(uint32 policyId) external returns (bool isLocked);
 

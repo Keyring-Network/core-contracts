@@ -11,7 +11,7 @@ import "../interfaces/IPolicyManager.sol";
  @notice Users select one policy. Attestors are required to confirm compatibility of the user policy with
  the admission policy to check before issuing attestations. Traders may also define whitelists which are
  counterparties they will trade with even if compliance cannot be confirmed by an attestor. Whitelists
- only apply where admission policy owners have set the admission policy allowWhitelists flag to true. 
+ only apply where admission policy owners have set the admission policy allowUserWhitelists flag to true. 
  */
 
 contract UserPolicies is IUserPolicies, KeyringAccessControl {
@@ -60,6 +60,8 @@ contract UserPolicies is IUserPolicies, KeyringAccessControl {
      @param whitelisted A counterparty address to trade with unconditionally. Must not be whitelisted. 
      */
     function addWhitelistedTrader(address whitelisted) external override {
+        if (whitelisted == _msgSender())
+            revert Unacceptable({ reason: "self whitelisting is not permitted" });
         AddressSet.Set storage wl = traderWhitelists[_msgSender()];
         wl.insert(whitelisted, "UserPolicies:addTraderWhitelisted");
         emit AddTraderWhitelisted(_msgSender(), whitelisted);

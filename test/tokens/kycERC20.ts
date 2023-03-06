@@ -170,7 +170,6 @@ describe("Compliant Token", function () {
         TOKEN_SYMBOL,
       );
       await mockERC20.approve(kycERC20.address, 100);
-      await expect(kycERC20.depositFor(admin, 100)).to.be.revertedWith(unacceptable("trader not authorized"));
 
       // if policy is allowing whitelisting, it should allow the transfer
       // BUT only when parties are whitelisted
@@ -179,18 +178,14 @@ describe("Compliant Token", function () {
       const now = await helpers.time.latest();
       const timeToNextBlock = 1; // 1 second, because the next block is happening 1 second after now
       const deadline = now + THIRTY_DAYS_IN_SECONDS + timeToNextBlock;
-      await policyManager.updatePolicyAllowWhitelists(admissionPolicyId, true, deadline);
+      await policyManager.updatePolicyAllowUserWhitelists(admissionPolicyId, true, deadline);
       await helpers.time.increaseTo(deadline);
       await policyManager.policy(admissionPolicyId);
-      expect(await policyManager.callStatic.policyAllowWhitelists(admissionPolicyId)).to.be.true;
+      expect(await policyManager.callStatic.policyAllowUserWhitelists(admissionPolicyId)).to.be.true;
 
       await expect(kycERC20.transfer(bob, 50)).to.be.revertedWith(unacceptable("trader not authorized"));
 
-      // NOTE trader needs to whitelist themself for depositFor
-      await expect(kycERC20.depositFor(admin, 100)).to.be.revertedWith(unacceptable("trader not authorized"));
-      await userPolicies.addWhitelistedTrader(admin);
       await kycERC20.depositFor(admin, 100);
-
       await userPolicies.connect(bobAsSigner).addWhitelistedTrader(admin);
       await kycERC20.transfer(bob, 40);
 
@@ -466,7 +461,6 @@ describe("Compliant Token", function () {
       );
 
       // whitelisting in WalletCheck is still required for the universeRule
-      await expect(kycERC20.depositFor(admin, 100)).to.be.revertedWith(unacceptable("trader not authorized"));
       await expect(kycERC20.transfer(aliceWallet.address, 40)).to.be.revertedWith(
         unacceptable("trader not authorized"),
       );
@@ -514,7 +508,7 @@ describe("Compliant Token", function () {
       await userPolicies.connect(traderAsSigner2).setUserPolicy(emptyRulePolicy);
 
       await mockERC20.approve(kycERC20.address, 100);
-      await expect(kycERC20.depositFor(trader2.address, 100)).to.be.revertedWith(unacceptable("trader not authorized"));
+      await expect(kycERC20.transfer(trader2.address, 100)).to.be.revertedWith(unacceptable("trader not authorized"));
     });
 
     it("should reject Policy B by wallet check whitelist check after Policy A credential is refreshed", async function () {
@@ -583,25 +577,30 @@ describe("Compliant Token", function () {
       const now = await helpers.time.latest();
       const timeToNextBlock = 1; // 1 second, because the next block is happening 1 second after now
       const deadline = now + THIRTY_DAYS_IN_SECONDS + timeToNextBlock;
-      await policyManager.updatePolicyAllowWhitelists(admissionPolicyId, true, deadline);
+      await policyManager.updatePolicyAllowUserWhitelists(admissionPolicyId, true, deadline);
       await helpers.time.increaseTo(deadline);
       await policyManager.policy(admissionPolicyId);
-      expect(await policyManager.callStatic.policyAllowWhitelists(admissionPolicyId)).to.be.true;
+      expect(await policyManager.callStatic.policyAllowUserWhitelists(admissionPolicyId)).to.be.true;
 
       // trader needs to whitelist themself for depositFor
-      await userPolicies.addWhitelistedTrader(admin);
       await mockERC20.approve(kycERC20.address, 100);
       await kycERC20.depositFor(admin, 100);
-      
+
       // from must whitelist to
       await expect(kycERC20.transfer(bob, 50)).to.be.revertedWith(unacceptable("trader not authorized"));
       await userPolicies.connect(bobAsSigner).addWhitelistedTrader(admin);
-      await kycERC20.transfer(bob, 40)
+      await kycERC20.transfer(bob, 40);
 
       const adminKycBalance = await kycERC20.balanceOf(admin);
       const bobKycBalance = await kycERC20.balanceOf(bob);
       expect(adminKycBalance.toString()).to.equal("60");
       expect(bobKycBalance.toString()).to.equal("40");
+    });
+
+    it("should not allow users to whitelist themselves", async function () {
+      await expect(userPolicies.addWhitelistedTrader(admin)).to.be.revertedWith(
+        unacceptable("self whitelisting is not permitted"),
+      );
     });
   });
 });

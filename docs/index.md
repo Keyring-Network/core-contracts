@@ -365,6 +365,12 @@ KeyringGuard implementation that uses immutable configuration parameters and pre
 address NULL_ADDRESS
 ```
 
+### ROLE_GLOBAL_WHITELIST_ADMIN
+
+```solidity
+bytes32 ROLE_GLOBAL_WHITELIST_ADMIN
+```
+
 ### keyringCredentials
 
 ```solidity
@@ -401,20 +407,101 @@ bytes32 universeRule
 bytes32 emptyRule
 ```
 
+### globalWhitelistSet
+
+```solidity
+struct AddressSet.Set globalWhitelistSet
+```
+
+### onlyPolicyAdmin
+
+```solidity
+modifier onlyPolicyAdmin()
+```
+
 ### constructor
 
 ```solidity
-constructor(address keyringCredentials_, address policyManager_, address userPolicies_, uint32 admissionPolicyId_) internal
+constructor(address trustedForwarder, address keyringCredentials_, address policyManager_, address userPolicies_, uint32 admissionPolicyId_) internal
 ```
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| keyringCredentials_ | address | The KeyringCredentials contract to rely on.      @param policyManager_ The address of the deployed PolicyManager to rely on.      @param userPolicies_ The address of the deployed UserPolicies contract to rely on.       @param admissionPolicyId_ The unique identifier of a Policy against which user accounts will be compared. |
+| trustedForwarder | address | Contract address that is allowed to relay message signers.      @param keyringCredentials_ The KeyringCredentials contract to rely on.      @param policyManager_ The address of the deployed PolicyManager to rely on.      @param userPolicies_ The address of the deployed UserPolicies contract to rely on.       @param admissionPolicyId_ The unique identifier of a Policy against which user accounts will be compared. |
+| keyringCredentials_ | address |  |
 | policyManager_ | address |  |
 | userPolicies_ | address |  |
 | admissionPolicyId_ | uint32 |  |
+
+### whitelistAddress
+
+```solidity
+function whitelistAddress(address subject) external
+```
+
+Policy admins can maintain a global list of whitelisted addresses, usually contracts.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| subject | address | The address to whitelist or delist. |
+
+### whitelistAddressCount
+
+```solidity
+function whitelistAddressCount() external view returns (uint256 count)
+```
+
+Count the globally whitelisted addresses.
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| count | uint256 | The number of globally whitelisted addresses. |
+
+### whitelistAddressAtIndex
+
+```solidity
+function whitelistAddressAtIndex(uint256 index) external view returns (address whitelisted)
+```
+
+Enumerate the globally whitelisted addresses.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| index | uint256 | The row to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| whitelisted | address | A whitelisted address. |
+
+### isWhitelisted
+
+```solidity
+function isWhitelisted(address checkAddress) external view returns (bool isIndeed)
+```
+
+Check if an address is whitelisted globally.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| checkAddress | address | The address to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| isIndeed | bool | True if the checkAddress is whitelisted. |
 
 ### checkCache
 
@@ -555,16 +642,10 @@ event CredentialsDeployed(address deployer, address trustedForwarder, address po
 event CredentialsInitialized(address admin)
 ```
 
-### TearDownAdmissionPolicyCredentials
-
-```solidity
-event TearDownAdmissionPolicyCredentials(address sender, uint32 policyId)
-```
-
 ### UpdateCredential
 
 ```solidity
-event UpdateCredential(uint8 version, address updater, address trader, uint32 admissionPolicyId, uint256 admissionPolicyEpoch)
+event UpdateCredential(uint8 version, address updater, address trader, uint32 admissionPolicyId)
 ```
 
 ### ROLE_CREDENTIAL_UPDATER
@@ -579,22 +660,10 @@ function ROLE_CREDENTIAL_UPDATER() external view returns (bytes32)
 function init() external
 ```
 
-### tearDownAdmissionPolicyCredentials
-
-```solidity
-function tearDownAdmissionPolicyCredentials(uint32 policyId) external
-```
-
-### resetPolicyCredentials
-
-```solidity
-function resetPolicyCredentials(uint32 policyId) external
-```
-
 ### cache
 
 ```solidity
-function cache(uint8 version, address trader, uint32 admissionPolicyId, uint256 admissionPolicyEpoch) external view returns (uint256)
+function cache(uint8 version, address trader, uint32 admissionPolicyId) external view returns (uint256)
 ```
 
 ### setCredential
@@ -623,6 +692,30 @@ error Unacceptable(string reason)
 
 ```solidity
 event KeyringGuardConfigured(address keyringCredentials, address policyManager, address userPolicies, uint32 admissionPolicyId, bytes32 universeRule, bytes32 emptyRule)
+```
+
+### WhitelistAddress
+
+```solidity
+event WhitelistAddress(address admin)
+```
+
+### whitelistAddressCount
+
+```solidity
+function whitelistAddressCount() external view returns (uint256 count)
+```
+
+### whitelistAddressAtIndex
+
+```solidity
+function whitelistAddressAtIndex(uint256 index) external view returns (address whitelisted)
+```
+
+### isWhitelisted
+
+```solidity
+function isWhitelisted(address checkAddress) external view returns (bool isIndeed)
 ```
 
 ### checkCache
@@ -846,7 +939,7 @@ event PolicyManagerDeployed(address deployer, address trustedForwarder, address 
 ### PolicyManagerInitialized
 
 ```solidity
-event PolicyManagerInitialized(address admin, address credentialCache)
+event PolicyManagerInitialized(address admin)
 ```
 
 ### CreatePolicy
@@ -897,10 +990,10 @@ event UpdatePolicyAcceptRoots(address owner, uint32 policyId, uint16 acceptRoots
 event UpdatePolicyLock(address owner, uint32 policyId, bool locked, uint256 deadline)
 ```
 
-### UpdatePolicyAllowWhitelists
+### UpdatePolicyAllowUserWhitelists
 
 ```solidity
-event UpdatePolicyAllowWhitelists(address owner, uint32 policyId, bool allowWhitelists, uint256 deadline)
+event UpdatePolicyAllowUserWhitelists(address owner, uint32 policyId, bool allowUserWhitelists, uint256 deadline)
 ```
 
 ### UpdatePolicyDeadline
@@ -990,7 +1083,7 @@ function ruleRegistry() external view returns (address)
 ### init
 
 ```solidity
-function init(address credentialCache) external
+function init() external
 ```
 
 ### createPolicy
@@ -1035,10 +1128,10 @@ function updatePolicyGracePeriod(uint32 policyId, uint32 gracePeriod, uint256 de
 function updatePolicyAcceptRoots(uint32 policyId, uint16 acceptRoots, uint256 deadline) external
 ```
 
-### updatePolicyAllowWhitelists
+### updatePolicyAllowUserWhitelists
 
 ```solidity
-function updatePolicyAllowWhitelists(uint32 policyId, bool allowWhitelists, uint256 deadline) external
+function updatePolicyAllowUserWhitelists(uint32 policyId, bool allowUserWhitelists, uint256 deadline) external
 ```
 
 ### updatePolicyLock
@@ -1155,10 +1248,10 @@ function policyGracePeriod(uint32 policyId) external returns (uint128 gracePerio
 function policyAcceptRoots(uint32 policyId) external returns (uint16 acceptRoots)
 ```
 
-### policyAllowWhitelists
+### policyAllowUserWhitelists
 
 ```solidity
-function policyAllowWhitelists(uint32 policyId) external returns (bool isAllowed)
+function policyAllowUserWhitelists(uint32 policyId) external returns (bool isAllowed)
 ```
 
 ### policyLocked
@@ -1514,6 +1607,12 @@ function isWhitelisted(address trader, address counterparty) external view retur
 error Unacceptable(string reason)
 ```
 
+### Deployed
+
+```solidity
+event Deployed(address admin, address trustedForwarder)
+```
+
 ### SetWalletWhitelist
 
 ```solidity
@@ -1526,16 +1625,16 @@ event SetWalletWhitelist(address admin, address wallet, bool isWhitelisted)
 function ROLE_WALLETCHECK_ADMIN() external view returns (bytes32)
 ```
 
-### isWhitelisted
+### birthday
 
 ```solidity
-function isWhitelisted(address wallet) external view returns (bool isWhitelisted)
+function birthday(address wallet) external view returns (uint256 timestamp)
 ```
 
 ### setWalletWhitelist
 
 ```solidity
-function setWalletWhitelist(address wallet, bool flagged) external
+function setWalletWhitelist(address wallet, bool whitelisted, uint256 timestamp) external
 ```
 
 ## KeyringCredentials
@@ -1558,26 +1657,14 @@ bytes32 ROLE_CREDENTIAL_UPDATER
 address policyManager
 ```
 
-### policyEpochs
-
-```solidity
-mapping(uint32 => uint256) policyEpochs
-```
-
-_Epochs enable immediate and O(1) destruction of all cached credentials for a single policy. This
-     is a contingency function for extraordinary circumstances. For example, ejecting especially troublesome
-     users with cached credentials with immediate effect by forcing everyone to attempt to gather new
-     attestations and refresh their cached credentials if they want to interact with the subject policy._
-
 ### cache
 
 ```solidity
-mapping(uint8 => mapping(address => mapping(uint32 => mapping(uint256 => uint256)))) cache
+mapping(uint8 => mapping(address => mapping(uint32 => uint256))) cache
 ```
 
-_The credentials are indexed by (version => trader => admissionPolicyId => epoch) => updateTime
-     where the version is always 1 and the epoch supports emergency tear-down of all cached credentials
-     for a given policy, if the policy owner orders it._
+_The credentials are indexed by (version => trader => admissionPolicyId) => updateTime
+     where the version is always 1._
 
 ### onlyUpdater
 
@@ -1586,14 +1673,6 @@ modifier onlyUpdater()
 ```
 
 Revert if the message sender doesn't have the Credentials updater role.
-
-### onlyPolicyAdmin
-
-```solidity
-modifier onlyPolicyAdmin(uint32 policyId)
-```
-
-Only the PolicyAdmin can tear down user credentials.
 
 ### constructor
 
@@ -1617,34 +1696,6 @@ function init() external
 This upgradeable contract must be initialized.
      @dev The initializer function MUST be called directly after deployment 
      because anyone can call it but overall only once.
-
-### tearDownAdmissionPolicyCredentials
-
-```solidity
-function tearDownAdmissionPolicyCredentials(uint32 policyId) external
-```
-
-The policy admin can invalidate all stored credentials for a given policy.
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| policyId | uint32 | The policy with credentials to tear down |
-
-### resetPolicyCredentials
-
-```solidity
-function resetPolicyCredentials(uint32 policyId) external
-```
-
-An updater can tear down all stored credentials for a given policy.
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| policyId | uint32 | The policy with credentials to tear down |
 
 ### setCredential
 
@@ -2022,7 +2073,6 @@ error Unacceptable(string reason)
 
 ```solidity
 struct App {
-  address credentialCache;
   struct PolicyStorage.Policy[] policies;
   struct AddressSet.Set globalAttestorSet;
   mapping(address => string) attestorUris;
@@ -2039,7 +2089,7 @@ struct PolicyScalar {
   uint32 ttl;
   uint32 gracePeriod;
   uint16 acceptRoots;
-  bool allowWhitelists;
+  bool allowUserWhitelists;
   bool locked;
 }
 ```
@@ -2362,20 +2412,20 @@ _Deadlines must always be >= the active policy grace period._
 | self | struct PolicyStorage.Policy | A Policy object. |
 | gracePeriod | uint32 | The minimum acceptable deadline. |
 
-### writeAllowWhitelists
+### writeAllowUserWhitelists
 
 ```solidity
-function writeAllowWhitelists(struct PolicyStorage.Policy self, bool allowWhitelists) public
+function writeAllowUserWhitelists(struct PolicyStorage.Policy self, bool allowUserWhitelists) public
 ```
 
-Writes a new allowWhitelists state in the pending Policy changes in a Policy.
+Writes a new allowUserWhitelists state in the pending Policy changes in a Policy.
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | self | struct PolicyStorage.Policy | A Policy object. |
-| allowWhitelists | bool | True if whitelists are allowed, otherwise false. |
+| allowUserWhitelists | bool | True if whitelists are allowed, otherwise false. |
 
 ### writePolicyLock
 
@@ -2880,7 +2930,7 @@ constructor(address trustedForwarder, address ruleRegistryAddr) public
 ### init
 
 ```solidity
-function init(address credentialCache) external
+function init() external
 ```
 
 This upgradeable contract must be initialized.
@@ -3022,10 +3072,10 @@ _Deadlines must always be >= the active policy grace period._
 | acceptRoots | uint16 | The depth of most recent roots to always accept. |
 | deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
 
-### updatePolicyAllowWhitelists
+### updatePolicyAllowUserWhitelists
 
 ```solidity
-function updatePolicyAllowWhitelists(uint32 policyId, bool allowWhitelists, uint256 deadline) external
+function updatePolicyAllowUserWhitelists(uint32 policyId, bool allowUserWhitelists, uint256 deadline) external
 ```
 
 Policy owners can allow users to set whitelists of counterparties to exempt from
@@ -3036,7 +3086,7 @@ Policy owners can allow users to set whitelists of counterparties to exempt from
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | policyId | uint32 | The policy to update. |
-| allowWhitelists | bool | True if whitelists are allowed, otherwise false. |
+| allowUserWhitelists | bool | True if whitelists are allowed, otherwise false. |
 | deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
 
 ### updatePolicyLock
@@ -3381,10 +3431,10 @@ Check the number of latest identity roots to accept, regardless of age.
 | ---- | ---- | ----------- |
 | acceptRoots | uint16 | The number of latest identity roots to accept unconditionally for the construction      of zero-knowledge proofs. |
 
-### policyAllowWhitelists
+### policyAllowUserWhitelists
 
 ```solidity
-function policyAllowWhitelists(uint32 policyId) external returns (bool isAllowed)
+function policyAllowUserWhitelists(uint32 policyId) external returns (bool isAllowed)
 ```
 
 Check if the policy allows user whitelisting.
@@ -4089,8 +4139,8 @@ _Warning: This does not validate the inputs. Operands must be sorted ascending t
 ## KycERC20
 
 This contract illustrates how an immutable KeyringGuard can be wrapped around collateral tokens 
- (e.g. DAI Token). Tokens can only be transferred to an address that maintains compliance with the configured 
- policy.
+ (e.g. DAI Token). Specify the token to wrap and the new name/symbol of the wrapped token - then good to go!
+ Tokens can only be transferred to an address that maintains compliance with the configured policy.
 
 ### checkAuthorisations
 
@@ -4101,17 +4151,21 @@ modifier checkAuthorisations(address from, address to)
 ### constructor
 
 ```solidity
-constructor(address collateralToken, address keyringCredentials, address policyManager, address userPolicies, uint32 policyId, string name_, string symbol_) public
+constructor(address trustedForwarder, address collateralToken, address keyringCredentials, address policyManager, address userPolicies, uint32 policyId, string name_, string symbol_) public
 ```
 
-Specify the token to wrap and the new name/symbol of the wrapped token - then good to go!
-     @param collateralToken The contract address of the token that is to be wrapped
-     @param keyringCredentials The address for the deployed KeyringCredentials contract.
-     @param policyManager The address for the deployed PolicyManager contract.
-     @param userPolicies The address for the deployed UserPolicies contract.
-     @param policyId The unique identifier of a Policy.
-     @param name_ The name of the new wrapped token. Passed to ERC20.constructor to set the ERC20.name
-     @param symbol_ The symbol for the new wrapped token. Passed to ERC20.constructor to set the ERC20.symbol
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| trustedForwarder | address | Contract address that is allowed to relay message signers.      @param collateralToken The contract address of the token that is to be wrapped      @param keyringCredentials The address for the deployed KeyringCredentials contract.      @param policyManager The address for the deployed PolicyManager contract.      @param userPolicies The address for the deployed UserPolicies contract.      @param policyId The unique identifier of a Policy.      @param name_ The name of the new wrapped token. Passed to ERC20.constructor to set the ERC20.name      @param symbol_ The symbol for the new wrapped token. Passed to ERC20.constructor to set the ERC20.symbol |
+| collateralToken | address |  |
+| keyringCredentials | address |  |
+| policyManager | address |  |
+| userPolicies | address |  |
+| policyId | uint32 |  |
+| name_ | string |  |
+| symbol_ | string |  |
 
 ### decimals
 
@@ -4128,7 +4182,7 @@ Returns decimals based on the underlying token decimals
 function depositFor(address trader, uint256 amount) public returns (bool)
 ```
 
-Compliant users deposit underlying tokens and mint the same number of wrapped tokens.
+Deposit underlying tokens and mint the same number of wrapped tokens.
 
 #### Parameters
 
@@ -4143,7 +4197,7 @@ Compliant users deposit underlying tokens and mint the same number of wrapped to
 function withdrawTo(address trader, uint256 amount) public returns (bool)
 ```
 
-Compliant users burn a number of wrapped tokens and withdraw the same number of underlying tokens.
+Burn a number of wrapped tokens and withdraw the same number of underlying tokens.
 
 #### Parameters
 
@@ -4175,12 +4229,43 @@ Wraps the inherited ERC20.transferFrom function with the keyringCompliance guard
      @param amount The amount to be deducted from the to's allowance.
      @return bool True if successfully executed.
 
+### _msgSender
+
+```solidity
+function _msgSender() internal view virtual returns (address sender)
+```
+
+Returns ERC2771 signer if msg.sender is a trusted forwarder, otherwise returns msg.sender.
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| sender | address | User deemed to have signed the transaction. |
+
+### _msgData
+
+```solidity
+function _msgData() internal view virtual returns (bytes)
+```
+
+Returns msg.data if not from a trusted forwarder, or truncated msg.data if the signer was 
+     appended to msg.data
+
+_Although not currently used, this function forms part of ERC2771 so is included for completeness._
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | bytes | data Data deemed to be the msg.data |
+
 ## UserPolicies
 
 Users select one policy. Attestors are required to confirm compatibility of the user policy with
  the admission policy to check before issuing attestations. Traders may also define whitelists which are
  counterparties they will trade with even if compliance cannot be confirmed by an attestor. Whitelists
- only apply where admission policy owners have set the admission policy allowWhitelists flag to true.
+ only apply where admission policy owners have set the admission policy allowUserWhitelists flag to true.
 
 ### policyManager
 
@@ -4306,10 +4391,10 @@ check if a counterparty is whitelisted by a trader.
 bytes32 ROLE_WALLETCHECK_ADMIN
 ```
 
-### isWhitelisted
+### birthday
 
 ```solidity
-mapping(address => bool) isWhitelisted
+mapping(address => uint256) birthday
 ```
 
 ### onlyWalletCheckAdmin
@@ -4327,7 +4412,7 @@ constructor(address trustedForwarder) public
 ### setWalletWhitelist
 
 ```solidity
-function setWalletWhitelist(address wallet, bool whitelisted) external
+function setWalletWhitelist(address wallet, bool whitelisted, uint256 timestamp) external
 ```
 
 Set the whitelisted boolean for a specific trading wallet to true or false.
@@ -4338,6 +4423,52 @@ Set the whitelisted boolean for a specific trading wallet to true or false.
 | ---- | ---- | ----------- |
 | wallet | address | The subject wallet. |
 | whitelisted | bool | True if the wallet has passed the checks represented by this contract. |
+| timestamp | uint256 | The effective time of the wallet check. |
+
+## NoImplementation
+
+This stub provides a hint for hardhat artifacts and typings. It is a non-functional
+ implementation to deploy behind a TransparentUpgradeableProxy. The proxy address will be passed
+ to constructors that expect an immutable trusted forwarder for future gasless transaction
+ support (trustedForwarder). This contract implements the essential functions as stubs that
+ fail harmlessly.
+
+### ForwardRequest
+
+```solidity
+struct ForwardRequest {
+  address from;
+  address to;
+  uint256 value;
+  uint256 gas;
+  uint256 nonce;
+  bytes data;
+}
+```
+
+### NotImplemented
+
+```solidity
+error NotImplemented(address sender, string message)
+```
+
+### getNonce
+
+```solidity
+function getNonce(address) public pure returns (uint256)
+```
+
+### verify
+
+```solidity
+function verify(struct NoImplementation.ForwardRequest, bytes) public pure returns (bool)
+```
+
+### execute
+
+```solidity
+function execute(struct NoImplementation.ForwardRequest, bytes) public payable returns (bool, bytes)
+```
 
 ## Pairing
 
@@ -4648,51 +4779,6 @@ function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[3] inp
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | r | bool | bool true if proof is valid |
-
-## NoImplementation
-
-This stub provides a hint for hardhat artifacts and typings. It is a non-functional
- implementation to deploy behind a TransparentUpgradeableProxy. The proxy address will be passed
- to constructors that expect an immutable trusted forwarder for future gasless transaction
- support (trustedForwarder). This contract implements the essential functions as stubs that
- fail harmlessly.
-
-### ForwardRequest
-
-```solidity
-struct ForwardRequest {
-  address from;
-  address to;
-  uint256 value;
-  uint256 gas;
-  uint256 nonce;
-  bytes data;
-}
-```
-
-### NotImplemented
-
-```solidity
-error NotImplemented(address sender, string message)
-```
-
-### getNonce
-
-```solidity
-function getNonce(address) public pure returns (uint256)
-```
-
-### verify
-
-```solidity
-function verify(struct NoImplementation.ForwardRequest, bytes) public pure returns (bool)
-```
-
-### execute
-
-```solidity
-function execute(struct NoImplementation.ForwardRequest, bytes) public payable returns (bool, bytes)
-```
 
 ## Pairing
 

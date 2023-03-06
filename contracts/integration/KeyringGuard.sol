@@ -188,16 +188,16 @@ abstract contract KeyringGuard is IKeyringGuard, KeyringAccessControl {
         bool toAuthorised;
         bool fromIsWhitelistedByTo;
         bool toIsWhitelistedByFrom;
-        bool allowUserWhitelists;
+        bool policyAllowUserWhitelists;
 
         fromGlobalWhitelisted = globalWhitelistSet.exists(from);
         toGlobalWhitelisted = globalWhitelistSet.exists(to);
-        allowUserWhitelists = IPolicyManager(policyManager).policyAllowWhitelists(admissionPolicyId);
+        policyAllowUserWhitelists = IPolicyManager(policyManager).policyAllowUserWhitelists(admissionPolicyId);
         
-        if (!fromGlobalWhitelisted && allowUserWhitelists) {
+        if (!fromGlobalWhitelisted && policyAllowUserWhitelists) {
             fromIsWhitelistedByTo = IUserPolicies(userPolicies).isWhitelisted(to, from);
         }
-        if (!toGlobalWhitelisted && allowUserWhitelists) {
+        if (!toGlobalWhitelisted && policyAllowUserWhitelists) {
             toIsWhitelistedByFrom = IUserPolicies(userPolicies).isWhitelisted(from, to);
         }
 
