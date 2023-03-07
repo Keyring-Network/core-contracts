@@ -119,8 +119,8 @@ describe("Compliant Token", function () {
       await identityTree.setMerkleRootBirthday(proofMerkleRoot3, now);
 
       // update credentials
-      await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
-      await credentialsUpdater.updateCredentials(identityTree.address, membershipProof3, authorisationProof3);
+      await credentialsUpdater.connect(traderAsSigner2).updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
+      await credentialsUpdater.connect(traderAsSigner3).updateCredentials(identityTree.address, membershipProof3, authorisationProof3);
 
       // whitelist trader
       const whitelistTime = await helpers.time.latest();
@@ -540,7 +540,7 @@ describe("Compliant Token", function () {
 
       // user updates credential for Policy A
       // NOTE proof incluceds Policy B as well as Policy A
-      await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
+      await credentialsUpdater.connect(traderAsSigner2).updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
 
       await kycERC20.depositFor(trader2.address, 100);
       kycBalanceTrader2 = await kycERC20.balanceOf(trader2.address);

@@ -1,4 +1,4 @@
-import { BigNumber, BigNumberish, Signer } from "ethers";
+import { BigNumber, BigNumberish, Signer, Wallet } from "ethers";
 import { createFixtureLoader } from "ethereum-waffle";
 import { ethers as Ethers } from "ethers";
 import { getNamedAccounts, ethers, waffle } from "hardhat";
@@ -28,6 +28,8 @@ import {
   ROLE_AGGREGATOR,
   proofMerkleRoot3,
   NULL_BYTES32,
+  trader3,
+  membershipProof3,
 } from "../../constants";
 import {
   AuthorizationProofVerifier,
@@ -65,6 +67,8 @@ describe("Zero-knowledge", function () {
   // accounts in this test
   let admin: string;
   let bob: string;
+  let traderAsSigner2: Signer;
+  let traderAsSigner3: Signer;
   let attacker: string;
   let attackerAsSigner: Signer;
 
@@ -75,6 +79,11 @@ describe("Zero-knowledge", function () {
     // `attacker` connect's with contract and try to sign invalid
     attacker = attackerAddress;
     attackerAsSigner = ethers.provider.getSigner(attacker);
+    // set up trader wallets with 2000 ETH each
+    traderAsSigner2 = new Wallet(trader2.priv, provider);
+    traderAsSigner3 = new Wallet(trader3.priv, provider);
+    await adminWallet.sendTransaction({ to: trader2.address, value: ethers.utils.parseEther("2000") });
+    await adminWallet.sendTransaction({ to: trader3.address, value: ethers.utils.parseEther("2000") });
     // pre-configure contracts (see /test/shared/fixtures.ts)
     loadFixture = createFixtureLoader([adminWallet], provider);
   });
@@ -283,6 +292,21 @@ describe("Zero-knowledge", function () {
   /* ----------------------- KeyringZkCredentialUpdater ----------------------- */
 
   describe("KeyringZkCredentialUpdater", function () {
+    it("should only allow the trader itself to update their trader credentials", async function () {
+      const now = await helpers.time.latest();
+      await identityTree.setMerkleRootBirthday(proofMerkleRoot2, now);
+
+      // create 20 policies
+      const numberOfPolices = 20;
+      for (let i = 0; i < numberOfPolices; i++) {
+        await policyManager.createPolicy(policyScalar, [identityTree.address], [walletCheck.address]);
+      }
+
+      await expect(
+        credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2),
+      ).to.be.revertedWith(unacceptable("only trader can update trader credentials"));
+    });
+
     it("should pack and unpack policy ids", async function () {
       const policyIdArray = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24];
       const packed = await credentialsUpdater.pack12x20(policyIdArray);
@@ -290,9 +314,9 @@ describe("Zero-knowledge", function () {
       expect(unpacked).to.have.members(policyIdArray);
 
       // max value is 2^240 - 1
-      const invalidInput = ethers.BigNumber.from('0x1').shl(241).sub(1);
+      const invalidInput = ethers.BigNumber.from("0x1").shl(241).sub(1);
       await expect(credentialsUpdater.unpack12x20(invalidInput)).to.be.revertedWith("input out of range");
-      const validInput = ethers.BigNumber.from('0x1').shl(240).sub(1);
+      const validInput = ethers.BigNumber.from("0x1").shl(240).sub(1);
       await credentialsUpdater.unpack12x20(validInput);
     });
 
@@ -306,7 +330,9 @@ describe("Zero-knowledge", function () {
         await policyManager.createPolicy(policyScalar, [identityTree.address], [walletCheck.address]);
       }
 
-      await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
+      await credentialsUpdater
+        .connect(traderAsSigner2)
+        .updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
 
       // check if credentials are set properly
       const version = 1;
@@ -321,42 +347,27 @@ describe("Zero-knowledge", function () {
       }
     });
 
-    /* NOTE this test includes no assertions anymore
-    it("should allow only policy admin to tear down credentials", async function () {
-      const now = await helpers.time.latest();
-      await identityTree.setMerkleRootBirthday(proofMerkleRoot2, now);
-
-      const numberOfPolices = 20;
-      for (let i = 0; i < numberOfPolices; i++) {
-        await policyManager.createPolicy(policyScalar, [identityTree.address], [walletCheck.address]);
-      }
-
-      await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
-      const version = 1;
-      const unpacked1 = await credentialsUpdater.unpack12x20(authorisationProof2.policyDisclosures[0]);
-      const unpacked2 = await credentialsUpdater.unpack12x20(authorisationProof2.policyDisclosures[1]);
-      const policies = [...unpacked1, ...unpacked2];
-      const index = 5;
-    });
-    */
-
     it("should not allow update credentials with invalid proofs of a trader", async function () {
       const invalidAuthorisationProof: IKeyringZkVerifier.IdentityAuthorisationProofStruct = {
         ...authorisationProof2,
-        tradingAddress: bob,
+        proof: membershipProof3.proof,
       };
       await expect(
-        credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, invalidAuthorisationProof),
+        credentialsUpdater
+          .connect(traderAsSigner2)
+          .updateCredentials(identityTree.address, membershipProof2, invalidAuthorisationProof),
       ).to.revertedWith(unacceptable("Proof unacceptable"));
     });
 
     it("should not allow invalid policies or invalid trees (policy attestors)", async function () {
       await expect(
-        credentialsUpdater.updateCredentials(attacker, membershipProof2, authorisationProof2),
+        credentialsUpdater.connect(traderAsSigner2).updateCredentials(attacker, membershipProof2, authorisationProof2),
       ).to.revertedWith(unacceptable("attestor unacceptable"));
 
       await expect(
-        credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2),
+        credentialsUpdater
+          .connect(traderAsSigner2)
+          .updateCredentials(identityTree.address, membershipProof2, authorisationProof2),
       ).to.revertedWith(unacceptable("policy or attestor unacceptable"));
 
       // add merkle root
@@ -376,10 +387,14 @@ describe("Zero-knowledge", function () {
       await policyManager.admitAttestor(identityTree2.address, "attestor2");
 
       await expect(
-        credentialsUpdater.updateCredentials(identityTree2.address, membershipProof2, authorisationProof2),
+        credentialsUpdater
+          .connect(traderAsSigner2)
+          .updateCredentials(identityTree2.address, membershipProof2, authorisationProof2),
       ).to.revertedWith(unacceptable("policy or attestor unacceptable"));
 
-      await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
+      await credentialsUpdater
+        .connect(traderAsSigner2)
+        .updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
     });
 
     it("should allow extend validity of credentials to forever in case of attestor failure", async function () {
@@ -407,7 +422,9 @@ describe("Zero-knowledge", function () {
         }
       }
 
-      await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
+      await credentialsUpdater
+        .connect(traderAsSigner2)
+        .updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
 
       // check if credentials are set properly
       const version = 1;
@@ -441,7 +458,9 @@ describe("Zero-knowledge", function () {
       }
 
       // update credentials with old merkle root
-      await credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
+      await credentialsUpdater
+        .connect(traderAsSigner2)
+        .updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
 
       // check for updated credentials without new merkle root
       for (let i = 0; i < policies.length; i++) {

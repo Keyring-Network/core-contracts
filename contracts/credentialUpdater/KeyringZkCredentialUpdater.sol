@@ -103,6 +103,8 @@ contract KeyringZkCredentialUpdater is
         uint32 policyId;
         address sender = _msgSender();
         address trader = address(uint160(authorizationProof.tradingAddress));
+        if (sender != trader)
+            revert Unacceptable ({ reason: "only trader can update trader credentials" });
         bytes32 root = bytes32(membershipProof.root);
 
         uint32[12] memory policyList0 = unpack12x20(authorizationProof.policyDisclosures[0]);
