@@ -4425,51 +4425,6 @@ Set the whitelisted boolean for a specific trading wallet to true or false.
 | whitelisted | bool | True if the wallet has passed the checks represented by this contract. |
 | timestamp | uint256 | The effective time of the wallet check. |
 
-## NoImplementation
-
-This stub provides a hint for hardhat artifacts and typings. It is a non-functional
- implementation to deploy behind a TransparentUpgradeableProxy. The proxy address will be passed
- to constructors that expect an immutable trusted forwarder for future gasless transaction
- support (trustedForwarder). This contract implements the essential functions as stubs that
- fail harmlessly.
-
-### ForwardRequest
-
-```solidity
-struct ForwardRequest {
-  address from;
-  address to;
-  uint256 value;
-  uint256 gas;
-  uint256 nonce;
-  bytes data;
-}
-```
-
-### NotImplemented
-
-```solidity
-error NotImplemented(address sender, string message)
-```
-
-### getNonce
-
-```solidity
-function getNonce(address) public pure returns (uint256)
-```
-
-### verify
-
-```solidity
-function verify(struct NoImplementation.ForwardRequest, bytes) public pure returns (bool)
-```
-
-### execute
-
-```solidity
-function execute(struct NoImplementation.ForwardRequest, bytes) public payable returns (bool, bytes)
-```
-
 ## Pairing
 
 ### InvalidProof
@@ -4779,6 +4734,51 @@ function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[3] inp
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | r | bool | bool true if proof is valid |
+
+## NoImplementation
+
+This stub provides a hint for hardhat artifacts and typings. It is a non-functional
+ implementation to deploy behind a TransparentUpgradeableProxy. The proxy address will be passed
+ to constructors that expect an immutable trusted forwarder for future gasless transaction
+ support (trustedForwarder). This contract implements the essential functions as stubs that
+ fail harmlessly.
+
+### ForwardRequest
+
+```solidity
+struct ForwardRequest {
+  address from;
+  address to;
+  uint256 value;
+  uint256 gas;
+  uint256 nonce;
+  bytes data;
+}
+```
+
+### NotImplemented
+
+```solidity
+error NotImplemented(address sender, string message)
+```
+
+### getNonce
+
+```solidity
+function getNonce(address) public pure returns (uint256)
+```
+
+### verify
+
+```solidity
+function verify(struct NoImplementation.ForwardRequest, bytes) public pure returns (bool)
+```
+
+### execute
+
+```solidity
+function execute(struct NoImplementation.ForwardRequest, bytes) public payable returns (bool, bytes)
+```
 
 ## Pairing
 

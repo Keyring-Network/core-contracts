@@ -17,7 +17,7 @@ library PolicyStorage {
     using AddressSet for AddressSet.Set;
 
     uint32 private constant MAX_POLICIES = 2 ** 20;
-    // Approximately 100 years. Does not account for leap years.
+    // Approximately 2 years. Does not account for leap years.
     uint32 private constant MAX_TTL = 2 * 365 days;
     address private constant NULL_ADDRESS = address(0);
 
