@@ -786,7 +786,7 @@ describe("Admin", function () {
     });
 
     it("should not allow ttl greater than max ttl", async function () {
-      const MAX_TTL = 100 * 24 * 60 * 60 * 365; // 100 years
+      const MAX_TTL = 2 * 24 * 60 * 60 * 365; // 100 years
       await expect(policyManager.updatePolicyTtl(1, MAX_TTL + 1, 0)).to.be.revertedWith(
         unacceptable("ttl exceeds maximum duration"),
       );
