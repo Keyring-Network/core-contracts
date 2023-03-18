@@ -1,17 +1,13 @@
 name: Build and Deploy
 on:
-  # Triggers the workflow on push to matching branches 
+  # Triggers the workflow on push to matching branches
   push:
     branches:
-      - v2-staging-backend-checks
       - staging
-      - master
-      - V2
-      - V2-staging
-      - bugfix/entrypoint-local-testing-fix
 env:
   duplo_host: https://keyring.duplocloud.net
   duplo_token: "${{ secrets.DUPLO_SECRET }}"
+  ECR_REPO_NAME: core-dev01 
   SERVICE_NAME: core                      
   TENANT_NAME: dev01
   CONTRACT_BUCKET: duploservices-dev01-contracts-178195871625                            
@@ -24,6 +20,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      - name: Set env variables based on branch
+        id: branch_check
+        run: |
+          echo 'TENANT_NAME1 is' $TENANT_NAME
+          echo "Running on branch ${{ github.ref }}"
+          if [ "${{ github.ref }}" = "refs/heads/V1-staging" ]; then
+            echo "TENANT_NAME=stage01" >> $GITHUB_ENV
+            echo "ECR_REPO_NAME=core-stage01" >> $GITHUB_ENV
+            echo "CONTRACT_BUCKET=duploservices-stage01-contracts-178195871625" >> $GITHUB_ENV
+          fi
 
       # Set up for docker build
       - name: Get AWS credentials
@@ -42,12 +48,12 @@ jobs:
           file: dockerfiles/demodata.Dockerfile
           push: true
           tags: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO_NAME }}:${{ github.sha }}
 
       # generates ABIs and byte-codes 
       - uses: addnab/docker-run-action@v3
         with:
-          image: "${{ steps.login-ecr.outputs.registry }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
+          image: "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO_NAME }}:${{ github.sha }}"
           options: "-v ${{ github.workspace }}/generated-contracts:/app/artifacts/contracts -e MODULE=contract-generation"
           shell: bash
           run: /app/bin/entrypoint.sh
