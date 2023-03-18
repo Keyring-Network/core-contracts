@@ -25,7 +25,7 @@ jobs:
         run: |
           echo 'TENANT_NAME1 is' $TENANT_NAME
           echo "Running on branch ${{ github.ref }}"
-          if [ "${{ github.ref }}" = "refs/heads/V1-staging" ]; then
+          if [ "${{ github.ref }}" = "refs/heads/staging" ]; then
             echo "TENANT_NAME=stage01" >> $GITHUB_ENV
             echo "ECR_REPO_NAME=core-stage01" >> $GITHUB_ENV
             echo "CONTRACT_BUCKET=duploservices-stage01-contracts-178195871625" >> $GITHUB_ENV
