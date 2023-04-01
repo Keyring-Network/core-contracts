@@ -53,6 +53,10 @@ interface IPolicyManager {
         bool allowUserWhitelists, 
         uint256 deadline);
 
+    event UpdatePolicyDisablementPeriod(address indexed admin, uint32 indexed policyId, uint256 disablementPeriod);
+
+    event PolicyDisabled(address indexed sender, uint32 indexed policyId);
+
     event UpdatePolicyDeadline(address indexed owner, uint32 indexed policyId, uint256 deadline);
 
     event AddPolicyAttestors(
@@ -93,11 +97,15 @@ interface IPolicyManager {
 
     event RemoveWalletCheck(address indexed admin, address indexed walletCheck);
 
+    event MinimumPolicyDisablementPeriodUpdated(uint256 newPeriod);
+
     function ROLE_POLICY_CREATOR() external view returns (bytes32);
 
     function ROLE_GLOBAL_ATTESTOR_ADMIN() external view returns (bytes32);
 
     function ROLE_GLOBAL_WALLETCHECK_ADMIN() external view returns (bytes32);
+
+    function ROLE_GLOBAL_VALIDATION_ADMIN() external view returns (bytes32);
 
     function ruleRegistry() external view returns (address);
 
@@ -129,6 +137,10 @@ interface IPolicyManager {
     
     function updatePolicyLock(uint32 policyId, bool locked, uint256 deadline) external;
 
+    function updatePolicyDisablementPeriod(uint32 policyId, uint256 disablementPeriod) external;
+
+    function disablePolicy(uint32 policyId) external;
+
     function setDeadline(uint32 policyId, uint256 deadline) external;
 
     function addPolicyAttestors(uint32 policyId, address[] calldata attestors, uint256 deadline) external;
@@ -148,6 +160,8 @@ interface IPolicyManager {
     function admitWalletCheck(address walletCheck) external;
 
     function removeWalletCheck(address walletCheck) external;
+
+    function updateMinimumPolicyDisablementPeriod(uint256 minimumDisablementPeriod) external;
 
     function policy(uint32 policyId)
         external
@@ -172,23 +186,13 @@ interface IPolicyManager {
             address[] memory walletChecksPendingAdditions,
             address[] memory walletChecksPendingRemovals);
 
-    function policyDescription(uint32 policyId) external returns (string memory description);
+    function policyScalarActive(uint32 policyId) 
+        external 
+        returns (PolicyStorage.PolicyScalar memory scalarActive);
 
     function policyOwnerRole(uint32 policyId) external pure returns (bytes32 ownerRole);
 
-    function policyRuleId(uint32 policyId) external returns (bytes32 ruleId);
-    
-    function policyTtl(uint32 policyId) external returns (uint128 ttl);
-
-    function policyGracePeriod(uint32 policyId) external returns(uint128 gracePeriod);
-
-    function policyAcceptRoots(uint32 policyId) external returns (uint16 acceptRoots);
-
-    function policyAllowUserWhitelists(uint32 policyId) external returns (bool isAllowed);
-
-    function policyLocked(uint32 policyId) external returns (bool isLocked);
-
-    function policyDeadline(uint32 policyId) external returns (uint256 deadline);
+    function policyDisabled(uint32 policyId) external view returns (bool isDisabled);
 
     function policyAttestorCount(uint32 policyId) external returns (uint256 count);
 

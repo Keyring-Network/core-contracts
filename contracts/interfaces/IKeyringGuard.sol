@@ -29,5 +29,7 @@ interface IKeyringGuard {
 
     function checkCache(address trader) external returns (bool isIndeed);
 
+    function isWalletCheckPassed(address trader) external returns (bool isPassed);
+
     function checkGuard(address from, address to) external returns (bool isAuthorized);
 }

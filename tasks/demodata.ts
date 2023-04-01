@@ -77,8 +77,9 @@ task("demodata").setAction(async function (taskArguments: TaskArguments, { ether
     ttl: ONE_DAY_IN_SECONDS,
     gracePeriod: THIRTY_DAYS_IN_SECONDS,
     acceptRoots: 1,
-    locked: false,
     allowUserWhitelists: false,
+    disablementPeriod: 30 * 1440 * 60, 
+    locked: false,
   };
 
   const policyCount = await policyManager.policyCount();

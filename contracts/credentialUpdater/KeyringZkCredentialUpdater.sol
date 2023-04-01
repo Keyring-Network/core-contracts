@@ -128,9 +128,13 @@ contract KeyringZkCredentialUpdater is
                     reason: "policy or attestor unacceptable"
                 });
 
-            if(rootTime + IPolicyManager(POLICY_MANAGER).policyTtl(policyId) < block.timestamp) {
-                uint256 ar = IPolicyManager(POLICY_MANAGER).policyAcceptRoots(policyId);
-                if(IIdentityTree(attestor).merkleRootSuccessors(bytes32(membershipProof.root)) <= ar && ar > 0) {
+            PolicyStorage.PolicyScalar memory policyScalar = 
+                IPolicyManager(POLICY_MANAGER).policyScalarActive(policyId);
+
+            if(rootTime + policyScalar.ttl < block.timestamp) {
+                if(IIdentityTree(attestor).merkleRootSuccessors(bytes32(membershipProof.root)) <= 
+                    policyScalar.acceptRoots && policyScalar.acceptRoots > 0) 
+                {
                     IKeyringCredentials(KEYRING_CREDENTIALS).setCredential(
                         trader, 
                         policyId,                
@@ -172,7 +176,10 @@ contract KeyringZkCredentialUpdater is
         IPolicyManager p = IPolicyManager(POLICY_MANAGER);
         if(!p.isPolicy(policyId)) return false;
 
-        acceptable = !(RULE_REGISTRY.ruleIsToxic(p.policyRuleId(policyId))) &&
+        PolicyStorage.PolicyScalar memory policyScalar = 
+            IPolicyManager(POLICY_MANAGER).policyScalarActive(policyId);
+
+        acceptable = !(RULE_REGISTRY.ruleIsToxic(policyScalar.ruleId)) &&
             p.isPolicyAttestor(policyId, attestor);
     }
 
