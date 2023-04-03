@@ -218,8 +218,8 @@ abstract contract KeyringGuard is IKeyringGuard, KeyringAccessControl {
             return true;
         }
 
-        bool fromAuthorised = fromGlobalWhitelisted || fromIsWhitelistedByTo || isWalletCheckPassed(from);
-        bool toAuthorised = toGlobalWhitelisted || toIsWhitelistedByFrom || isWalletCheckPassed(to);
+        bool fromAuthorised = (fromGlobalWhitelisted || fromIsWhitelistedByTo) && isWalletCheckPassed(from);
+        bool toAuthorised = (toGlobalWhitelisted || toIsWhitelistedByFrom) && isWalletCheckPassed(to);
 
         isAuthorised = fromAuthorised && toAuthorised;
     }
