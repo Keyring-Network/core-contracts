@@ -357,7 +357,7 @@ Return the lastest merkle root recorded.
 ## KeyringGuard
 
 KeyringGuard implementation that uses immutable configuration parameters and presents 
- a simplified modifier for use in derived contracts.
+a simplified modifier for use in derived contracts.
 
 ### NULL_ADDRESS
 
@@ -515,18 +515,54 @@ Checks if the given trader has a stored, fresh credential for the admission poli
      @param trader The user address, normally a trading wallet, to check.
      @param isIndeed True if the user as a fresh, cached credential.
 
+### isWalletCheckPassed
+
+```solidity
+function isWalletCheckPassed(address trader) public returns (bool isPassed)
+```
+
+Check if the wallet check has passed for a given trader.
+
+_This function checks if the wallet is compliant with the admission policy by comparing
+the wallet check age with the policy's expiration time. Use static call to inspect._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| trader | address | The user address, usually a trading wallet, to check. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| isPassed | bool | True if the wallet check has passed for the given trader. |
+
 ### checkGuard
 
 ```solidity
 function checkGuard(address from, address to) public returns (bool isAuthorised)
 ```
 
-Check if parties are acceptable to each other, either through compliance with the active policy,
-     or because they are explicitly whitelisted by the trader. 
-     @param from The first of two parties to check. 
-     @param to The second of two parties to check. 
-     @return isAuthorised True if the parties have cached credentials signifying compliance attestations, or
-     if counterparties are explicitly whitelisted by the other.
+Determines if a transaction between two parties is authorized, considering global whitelists,
+user-controlled counterparty whitelists, wallet checks, and disabled policies.
+
+_The function checks if both parties are either globally whitelisted, whitelisted by each other, have
+passed the wallet check according to the admission policy, or the policy is disabled. Use static call to
+inspect._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| from | address | The address of the first party in the transaction. |
+| to | address | The address of the second party in the transaction. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| isAuthorised | bool | True if both parties are authorized to transact with each other, considering the defined rules and the policy's disabled state. |
 
 ## IAuthorizationProofVerifier
 
@@ -722,6 +758,12 @@ function isWhitelisted(address checkAddress) external view returns (bool isIndee
 
 ```solidity
 function checkCache(address trader) external returns (bool isIndeed)
+```
+
+### isWalletCheckPassed
+
+```solidity
+function isWalletCheckPassed(address trader) external returns (bool isPassed)
 ```
 
 ### checkGuard
@@ -996,6 +1038,18 @@ event UpdatePolicyLock(address owner, uint32 policyId, bool locked, uint256 dead
 event UpdatePolicyAllowUserWhitelists(address owner, uint32 policyId, bool allowUserWhitelists, uint256 deadline)
 ```
 
+### UpdatePolicyDisablementPeriod
+
+```solidity
+event UpdatePolicyDisablementPeriod(address admin, uint32 policyId, uint256 disablementPeriod)
+```
+
+### PolicyDisabled
+
+```solidity
+event PolicyDisabled(address sender, uint32 policyId)
+```
+
 ### UpdatePolicyDeadline
 
 ```solidity
@@ -1056,6 +1110,12 @@ event AdmitWalletCheck(address admin, address walletCheck)
 event RemoveWalletCheck(address admin, address walletCheck)
 ```
 
+### MinimumPolicyDisablementPeriodUpdated
+
+```solidity
+event MinimumPolicyDisablementPeriodUpdated(uint256 newPeriod)
+```
+
 ### ROLE_POLICY_CREATOR
 
 ```solidity
@@ -1072,6 +1132,12 @@ function ROLE_GLOBAL_ATTESTOR_ADMIN() external view returns (bytes32)
 
 ```solidity
 function ROLE_GLOBAL_WALLETCHECK_ADMIN() external view returns (bytes32)
+```
+
+### ROLE_GLOBAL_VALIDATION_ADMIN
+
+```solidity
+function ROLE_GLOBAL_VALIDATION_ADMIN() external view returns (bytes32)
 ```
 
 ### ruleRegistry
@@ -1140,6 +1206,18 @@ function updatePolicyAllowUserWhitelists(uint32 policyId, bool allowUserWhitelis
 function updatePolicyLock(uint32 policyId, bool locked, uint256 deadline) external
 ```
 
+### updatePolicyDisablementPeriod
+
+```solidity
+function updatePolicyDisablementPeriod(uint32 policyId, uint256 disablementPeriod) external
+```
+
+### disablePolicy
+
+```solidity
+function disablePolicy(uint32 policyId) external
+```
+
 ### setDeadline
 
 ```solidity
@@ -1200,6 +1278,12 @@ function admitWalletCheck(address walletCheck) external
 function removeWalletCheck(address walletCheck) external
 ```
 
+### updateMinimumPolicyDisablementPeriod
+
+```solidity
+function updateMinimumPolicyDisablementPeriod(uint256 minimumDisablementPeriod) external
+```
+
 ### policy
 
 ```solidity
@@ -1212,10 +1296,10 @@ function policy(uint32 policyId) external returns (struct PolicyStorage.PolicySc
 function policyRawData(uint32 policyId) external view returns (uint256 deadline, struct PolicyStorage.PolicyScalar scalarActive, struct PolicyStorage.PolicyScalar scalarPending, address[] attestorsActive, address[] attestorsPendingAdditions, address[] attestorsPendingRemovals, address[] walletChecksActive, address[] walletChecksPendingAdditions, address[] walletChecksPendingRemovals)
 ```
 
-### policyDescription
+### policyScalarActive
 
 ```solidity
-function policyDescription(uint32 policyId) external returns (string description)
+function policyScalarActive(uint32 policyId) external returns (struct PolicyStorage.PolicyScalar scalarActive)
 ```
 
 ### policyOwnerRole
@@ -1224,46 +1308,10 @@ function policyDescription(uint32 policyId) external returns (string description
 function policyOwnerRole(uint32 policyId) external pure returns (bytes32 ownerRole)
 ```
 
-### policyRuleId
+### policyDisabled
 
 ```solidity
-function policyRuleId(uint32 policyId) external returns (bytes32 ruleId)
-```
-
-### policyTtl
-
-```solidity
-function policyTtl(uint32 policyId) external returns (uint128 ttl)
-```
-
-### policyGracePeriod
-
-```solidity
-function policyGracePeriod(uint32 policyId) external returns (uint128 gracePeriod)
-```
-
-### policyAcceptRoots
-
-```solidity
-function policyAcceptRoots(uint32 policyId) external returns (uint16 acceptRoots)
-```
-
-### policyAllowUserWhitelists
-
-```solidity
-function policyAllowUserWhitelists(uint32 policyId) external returns (bool isAllowed)
-```
-
-### policyLocked
-
-```solidity
-function policyLocked(uint32 policyId) external returns (bool isLocked)
-```
-
-### policyDeadline
-
-```solidity
-function policyDeadline(uint32 policyId) external returns (uint256 deadline)
+function policyDisabled(uint32 policyId) external view returns (bool isDisabled)
 ```
 
 ### policyAttestorCount
@@ -2073,10 +2121,12 @@ error Unacceptable(string reason)
 
 ```solidity
 struct App {
+  uint256 minimumPolicyDisablementPeriod;
   struct PolicyStorage.Policy[] policies;
   struct AddressSet.Set globalAttestorSet;
   mapping(address => string) attestorUris;
   struct AddressSet.Set globalWalletCheckSet;
+  mapping(uint32 => bool) policyDisabled;
 }
 ```
 
@@ -2090,6 +2140,7 @@ struct PolicyScalar {
   uint32 gracePeriod;
   uint16 acceptRoots;
   bool allowUserWhitelists;
+  uint256 disablementPeriod;
   bool locked;
 }
 ```
@@ -2118,6 +2169,7 @@ struct PolicyWalletChecks {
 
 ```solidity
 struct Policy {
+  bool disabled;
   uint256 deadline;
   struct PolicyStorage.PolicyScalar scalarActive;
   struct PolicyStorage.PolicyScalar scalarPending;
@@ -2125,6 +2177,21 @@ struct Policy {
   struct PolicyStorage.PolicyWalletChecks walletChecks;
 }
 ```
+
+### updateMinimumPolicyDisablementPeriod
+
+```solidity
+function updateMinimumPolicyDisablementPeriod(struct PolicyStorage.App self, uint256 minimumDisablementPeriod) public
+```
+
+Updates the minimumPolicyDisablementPeriod property of the Policy struct.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.App | A storage reference to the App storage |
+| minimumDisablementPeriod | uint256 | The new value for the minimumPolicyDisablementPeriod property. |
 
 ### insertGlobalAttestor
 
@@ -2313,6 +2380,27 @@ Inspect the active policy lock.
 | ---- | ---- | ----------- |
 | isIndeed | bool | True if the active policy locked parameter is set to true. True value if PolicyStorage      is locked, otherwise False. |
 
+### disablePolicy
+
+```solidity
+function disablePolicy(struct PolicyStorage.Policy policy, uint256 deadline) public
+```
+
+Disable a policy if all its active attestors have a latest birthday older than the deadline and there
+are no pending attestor additions.
+
+_This function iterates through the active attestors in the policy's attestor set, and checks if all
+attestors have a latest birthday older than the specified deadline. It also checks if there are no pending
+attestor additions. If both conditions are met, it disables the policy. Note that this function can be called
+by anyone as long as the conditions are met._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policy | struct PolicyStorage.Policy | The storage reference to the Policy struct. |
+| deadline | uint256 | The timestamp representing the latest birthday that is allowed for an active attestor. |
+
 ### setDeadline
 
 ```solidity
@@ -2441,6 +2529,24 @@ Writes a new locked state in the pending Policy changes in a Policy.
 | ---- | ---- | ----------- |
 | self | struct PolicyStorage.Policy | A Policy object. |
 | setPolicyLocked | bool | True if the policy is to be locked, otherwise false. |
+
+### writeDisablementPeriod
+
+```solidity
+function writeDisablementPeriod(struct PolicyStorage.App self, uint32 policyId, uint256 disablementPeriod) public
+```
+
+Writes a new disablement deadline to the pending Policy changes of a Policy.
+
+_If the provided disablement deadline is in the past, this function will revert._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.App | A PolicyStorage object. |
+| policyId | uint32 |  |
+| disablementPeriod | uint256 | The new disablement deadline to set, in seconds since the Unix epoch.   If set to 0, the policy can be disabled at any time.   If set to a non-zero value, the policy can only be disabled after that time. |
 
 ### writeAcceptRoots
 
@@ -2856,6 +2962,12 @@ bytes32 ROLE_GLOBAL_ATTESTOR_ADMIN
 bytes32 ROLE_GLOBAL_WALLETCHECK_ADMIN
 ```
 
+### ROLE_GLOBAL_VALIDATION_ADMIN
+
+```solidity
+bytes32 ROLE_GLOBAL_VALIDATION_ADMIN
+```
+
 ### ruleRegistry
 
 ```solidity
@@ -2913,6 +3025,16 @@ modifier onlyWalletCheckAdmin()
 Keyring Governance has exclusive access to the global whitelist of Wallet Checks.
 
 _Reverts if the user doesn't have the global wallet check admin role._
+
+### onlyValidationAdmin
+
+```solidity
+modifier onlyValidationAdmin()
+```
+
+Keyring Governance has exclusive access to input validation parameters.
+
+_Reverts if the user doesn't have the global validation admin role._
 
 ### constructor
 
@@ -3107,6 +3229,43 @@ _Deadlines must always be >= the active policy grace period._
 | locked | bool | True if the policy is to be locked. False if the scheduled lock is to be cancelled. |
 | deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
 
+### updatePolicyDisablementPeriod
+
+```solidity
+function updatePolicyDisablementPeriod(uint32 policyId, uint256 disablementPeriod) external
+```
+
+Update the disablement period of a policy. See disable Policy.
+
+_This function updates the disablement period of the policy specified by `policyId` to `disablementPeriod`.
+Only the policy admin can call this function._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The ID of the policy to update. |
+| disablementPeriod | uint256 | The new disablement period for the policy. |
+
+### disablePolicy
+
+```solidity
+function disablePolicy(uint32 policyId) public
+```
+
+Disable a policy if all its active attestors have a latest birthday older than the calculated 
+deadline and there are no pending attestor additions.
+
+_This function retrieves the storage reference to the policy specified by `policyId`, and calculates 
+the earliest time when disabling the policy will be permitted. Any user can disable a policy provided
+that the policy meets the conditions for disabling._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The ID of the policy to be disabled. |
+
 ### setDeadline
 
 ```solidity
@@ -3276,6 +3435,20 @@ _Does not automatically remove Wallet Checks from affected Policies._
 | ---- | ---- | ----------- |
 | walletCheck | address | The address of a Wallet Check contract in the global whitelist. |
 
+### updateMinimumPolicyDisablementPeriod
+
+```solidity
+function updateMinimumPolicyDisablementPeriod(uint256 minimumDisablementPeriod) external
+```
+
+_Updates the minimumPolicyDisablementPeriod_
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| minimumDisablementPeriod | uint256 | The new value for the minimumPolicyDisablementPeriod property. |
+
 ### policy
 
 ```solidity
@@ -3315,6 +3488,28 @@ _A non-zero deadline in the past indicates that staged updates are already in ef
 | ---- | ---- | ----------- |
 | policyId | uint32 | The policy to inspect. |
 
+### policyScalarActive
+
+```solidity
+function policyScalarActive(uint32 policyId) external returns (struct PolicyStorage.PolicyScalar scalarActive)
+```
+
+Inspect the active scalar values of a specific policy.
+
+_Use static call to inspect current values._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The unique identifier of the policy. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| scalarActive | struct PolicyStorage.PolicyScalar | The active scalar values of the policy. |
+
 ### policyOwnerRole
 
 ```solidity
@@ -3335,159 +3530,25 @@ Generate the corresponding admin/owner role for a policyId
 | ---- | ---- | ----------- |
 | ownerRole | bytes32 | The bytes32 owner role that corresponds to the policyId |
 
-### policyDescription
+### policyDisabled
 
 ```solidity
-function policyDescription(uint32 policyId) external returns (string descriptionUtf8)
+function policyDisabled(uint32 policyId) external view returns (bool isDisabled)
 ```
 
-_Use static calls to inspect current information._
+Inspect the policy disablement flag.
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| policyId | uint32 | The unique identifier of a Policy. |
+| policyId | uint32 | The policyId. |
 
 #### Return Values
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| descriptionUtf8 | string | Not used for any on-chain logic. |
-
-### policyRuleId
-
-```solidity
-function policyRuleId(uint32 policyId) external returns (bytes32 ruleId)
-```
-
-_Use static calls to inspect current information._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| policyId | uint32 | The unique identifier of a Policy. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| ruleId | bytes32 | Rule to enforce, defined in the RuleRegistry. |
-
-### policyTtl
-
-```solidity
-function policyTtl(uint32 policyId) external returns (uint128 ttl)
-```
-
-_Use static calls to inspect current information._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| policyId | uint32 | The unique identifier of a Policy. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| ttl | uint128 | The maximum age of acceptable credentials. |
-
-### policyGracePeriod
-
-```solidity
-function policyGracePeriod(uint32 policyId) external returns (uint128 gracePeriod)
-```
-
-Inspect a policy grace period.
-
-_Use static calls to inspect current information._
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| gracePeriod | uint128 | Seconds until policy changes take effect. |
-
-### policyAcceptRoots
-
-```solidity
-function policyAcceptRoots(uint32 policyId) external returns (uint16 acceptRoots)
-```
-
-Check the number of latest identity roots to accept, regardless of age.
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| policyId | uint32 | The policy to inspect. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| acceptRoots | uint16 | The number of latest identity roots to accept unconditionally for the construction      of zero-knowledge proofs. |
-
-### policyAllowUserWhitelists
-
-```solidity
-function policyAllowUserWhitelists(uint32 policyId) external returns (bool isAllowed)
-```
-
-Check if the policy allows user whitelisting.
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| policyId | uint32 | The policy to inspect. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| isAllowed | bool | True if whitelists can be used to override compliance checks. |
-
-### policyLocked
-
-```solidity
-function policyLocked(uint32 policyId) external returns (bool isLocked)
-```
-
-Check if the policy is locked.
-
-_Use static calls to inspect current information._
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| isLocked | bool | True if the policy cannot be changed |
-
-### policyDeadline
-
-```solidity
-function policyDeadline(uint32 policyId) external returns (uint256 deadline)
-```
-
-Inspect the schedule to implementing staged policy updates.
-
-_Use static calls to inspect current information._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| policyId | uint32 | The policy to inspect. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| deadline | uint256 | The scheduled time to active the pending policy update. |
+| isDisabled | bool | True if the policy is disabled. |
 
 ### policyAttestorCount
 
@@ -4571,170 +4632,6 @@ function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[4] inp
 
 _Verifies a Semaphore proof. Reverts with InvalidProof if the proof is invalid._
 
-## Pairing
-
-### G1Point
-
-```solidity
-struct G1Point {
-  uint256 X;
-  uint256 Y;
-}
-```
-
-### G2Point
-
-```solidity
-struct G2Point {
-  uint256[2] X;
-  uint256[2] Y;
-}
-```
-
-### P1
-
-```solidity
-function P1() internal pure returns (struct Pairing.G1Point)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | struct Pairing.G1Point | the generator of G1 |
-
-### P2
-
-```solidity
-function P2() internal pure returns (struct Pairing.G2Point)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | struct Pairing.G2Point | the generator of G2 |
-
-### negate
-
-```solidity
-function negate(struct Pairing.G1Point p) internal pure returns (struct Pairing.G1Point r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | struct Pairing.G1Point | the negation of p, i.e. p.addition(p.negate()) should be zero. |
-
-### addition
-
-```solidity
-function addition(struct Pairing.G1Point p1, struct Pairing.G1Point p2) internal view returns (struct Pairing.G1Point r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | struct Pairing.G1Point | the sum of two points of G1 |
-
-### scalar_mul
-
-```solidity
-function scalar_mul(struct Pairing.G1Point p, uint256 s) internal view returns (struct Pairing.G1Point r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | struct Pairing.G1Point | the product of a point on G1 and a scalar, i.e. p == p.scalar_mul(1) and p.addition(p) == p.scalar_mul(2) for all points p. |
-
-### pairing
-
-```solidity
-function pairing(struct Pairing.G1Point[] p1, struct Pairing.G2Point[] p2) internal view returns (bool)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | bool | the result of computing the pairing check e(p1[0], p2[0]) *  .... * e(p1[n], p2[n]) == 1 For example pairing([P1(), P1().negate()], [P2(), P2()]) should return true. |
-
-### pairingProd2
-
-```solidity
-function pairingProd2(struct Pairing.G1Point a1, struct Pairing.G2Point a2, struct Pairing.G1Point b1, struct Pairing.G2Point b2) internal view returns (bool)
-```
-
-Convenience method for a pairing check for two pairs.
-
-### pairingProd3
-
-```solidity
-function pairingProd3(struct Pairing.G1Point a1, struct Pairing.G2Point a2, struct Pairing.G1Point b1, struct Pairing.G2Point b2, struct Pairing.G1Point c1, struct Pairing.G2Point c2) internal view returns (bool)
-```
-
-Convenience method for a pairing check for three pairs.
-
-### pairingProd4
-
-```solidity
-function pairingProd4(struct Pairing.G1Point a1, struct Pairing.G2Point a2, struct Pairing.G1Point b1, struct Pairing.G2Point b2, struct Pairing.G1Point c1, struct Pairing.G2Point c2, struct Pairing.G1Point d1, struct Pairing.G2Point d2) internal view returns (bool)
-```
-
-Convenience method for a pairing check for four pairs.
-
-## Verifier
-
-### VerifyingKey
-
-```solidity
-struct VerifyingKey {
-  struct Pairing.G1Point alfa1;
-  struct Pairing.G2Point beta2;
-  struct Pairing.G2Point gamma2;
-  struct Pairing.G2Point delta2;
-  struct Pairing.G1Point[] IC;
-}
-```
-
-### Proof
-
-```solidity
-struct Proof {
-  struct Pairing.G1Point A;
-  struct Pairing.G2Point B;
-  struct Pairing.G1Point C;
-}
-```
-
-### verifyingKey
-
-```solidity
-function verifyingKey() internal pure returns (struct Verifier.VerifyingKey vk)
-```
-
-### verify
-
-```solidity
-function verify(uint256[] input, struct Verifier.Proof proof) internal view returns (uint256)
-```
-
-### verifyProof
-
-```solidity
-function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[3] input) public view returns (bool r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | bool | bool true if proof is valid |
-
 ## NoImplementation
 
 This stub provides a hint for hardhat artifacts and typings. It is a non-functional
@@ -4936,6 +4833,170 @@ function verify(uint256[] input, struct Verifier.Proof proof) internal view retu
 
 ```solidity
 function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[5] input) public view returns (bool r)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| r | bool | bool true if proof is valid |
+
+## Pairing
+
+### G1Point
+
+```solidity
+struct G1Point {
+  uint256 X;
+  uint256 Y;
+}
+```
+
+### G2Point
+
+```solidity
+struct G2Point {
+  uint256[2] X;
+  uint256[2] Y;
+}
+```
+
+### P1
+
+```solidity
+function P1() internal pure returns (struct Pairing.G1Point)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | struct Pairing.G1Point | the generator of G1 |
+
+### P2
+
+```solidity
+function P2() internal pure returns (struct Pairing.G2Point)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | struct Pairing.G2Point | the generator of G2 |
+
+### negate
+
+```solidity
+function negate(struct Pairing.G1Point p) internal pure returns (struct Pairing.G1Point r)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| r | struct Pairing.G1Point | the negation of p, i.e. p.addition(p.negate()) should be zero. |
+
+### addition
+
+```solidity
+function addition(struct Pairing.G1Point p1, struct Pairing.G1Point p2) internal view returns (struct Pairing.G1Point r)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| r | struct Pairing.G1Point | the sum of two points of G1 |
+
+### scalar_mul
+
+```solidity
+function scalar_mul(struct Pairing.G1Point p, uint256 s) internal view returns (struct Pairing.G1Point r)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| r | struct Pairing.G1Point | the product of a point on G1 and a scalar, i.e. p == p.scalar_mul(1) and p.addition(p) == p.scalar_mul(2) for all points p. |
+
+### pairing
+
+```solidity
+function pairing(struct Pairing.G1Point[] p1, struct Pairing.G2Point[] p2) internal view returns (bool)
+```
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | bool | the result of computing the pairing check e(p1[0], p2[0]) *  .... * e(p1[n], p2[n]) == 1 For example pairing([P1(), P1().negate()], [P2(), P2()]) should return true. |
+
+### pairingProd2
+
+```solidity
+function pairingProd2(struct Pairing.G1Point a1, struct Pairing.G2Point a2, struct Pairing.G1Point b1, struct Pairing.G2Point b2) internal view returns (bool)
+```
+
+Convenience method for a pairing check for two pairs.
+
+### pairingProd3
+
+```solidity
+function pairingProd3(struct Pairing.G1Point a1, struct Pairing.G2Point a2, struct Pairing.G1Point b1, struct Pairing.G2Point b2, struct Pairing.G1Point c1, struct Pairing.G2Point c2) internal view returns (bool)
+```
+
+Convenience method for a pairing check for three pairs.
+
+### pairingProd4
+
+```solidity
+function pairingProd4(struct Pairing.G1Point a1, struct Pairing.G2Point a2, struct Pairing.G1Point b1, struct Pairing.G2Point b2, struct Pairing.G1Point c1, struct Pairing.G2Point c2, struct Pairing.G1Point d1, struct Pairing.G2Point d2) internal view returns (bool)
+```
+
+Convenience method for a pairing check for four pairs.
+
+## Verifier
+
+### VerifyingKey
+
+```solidity
+struct VerifyingKey {
+  struct Pairing.G1Point alfa1;
+  struct Pairing.G2Point beta2;
+  struct Pairing.G2Point gamma2;
+  struct Pairing.G2Point delta2;
+  struct Pairing.G1Point[] IC;
+}
+```
+
+### Proof
+
+```solidity
+struct Proof {
+  struct Pairing.G1Point A;
+  struct Pairing.G2Point B;
+  struct Pairing.G1Point C;
+}
+```
+
+### verifyingKey
+
+```solidity
+function verifyingKey() internal pure returns (struct Verifier.VerifyingKey vk)
+```
+
+### verify
+
+```solidity
+function verify(uint256[] input, struct Verifier.Proof proof) internal view returns (uint256)
+```
+
+### verifyProof
+
+```solidity
+function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[3] input) public view returns (bool r)
 ```
 
 #### Return Values

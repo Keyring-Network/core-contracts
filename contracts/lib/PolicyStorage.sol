@@ -3,6 +3,7 @@ pragma solidity 0.8.14;
 
 import "./AddressSet.sol";
 import "../interfaces/IRuleRegistry.sol";
+import "../interfaces/IIdentityTree.sol";
 import "../interfaces/IKeyringCredentials.sol";
 
 /**
@@ -26,10 +27,12 @@ library PolicyStorage {
     /// @dev The App struct contains the essential PolicyManager state including an array of Policies. 
 
     struct App {
+        uint256 minimumPolicyDisablementPeriod;
         Policy[] policies;
         AddressSet.Set globalAttestorSet;
         mapping(address => string) attestorUris;
         AddressSet.Set globalWalletCheckSet;
+        mapping(uint32 => bool) policyDisabled;
     }
 
     /// @dev PolicyScalar contains the non-indexed values in a policy configuration.
@@ -41,6 +44,7 @@ library PolicyStorage {
         uint32 gracePeriod;
         uint16 acceptRoots;
         bool allowUserWhitelists;
+        uint256 disablementPeriod;
         bool locked;
     }
 
@@ -60,17 +64,29 @@ library PolicyStorage {
         AddressSet.Set pendingRemovalSet;
     }
 
-    /**
-     @dev Policy contains the active and scheduled changes and the deadline when the changes will
-    take effect.
-    */
+    /// @dev Policy contains the active and scheduled changes and the deadline when the changes will
+    /// take effect.
     
     struct Policy {
+        bool disabled;
         uint256 deadline;
         PolicyScalar scalarActive;
         PolicyScalar scalarPending;
         PolicyAttestors attestors;
         PolicyWalletChecks walletChecks;
+    }
+
+    /**
+     * @notice Updates the minimumPolicyDisablementPeriod property of the Policy struct.
+     * @param self A storage reference to the App storage
+     * @param minimumDisablementPeriod The new value for the minimumPolicyDisablementPeriod property.
+     */
+    function updateMinimumPolicyDisablementPeriod(
+        App storage self, 
+        uint256 minimumDisablementPeriod 
+    ) public 
+    {
+        self.minimumPolicyDisablementPeriod = minimumDisablementPeriod;
     }
 
     /**
@@ -185,6 +201,10 @@ library PolicyStorage {
         address ruleRegistry
     ) public returns (uint32 policyId) 
     {
+        // Check that the disablement period is greater than or equal to the minimum
+        if(policyScalar.disablementPeriod < self.minimumPolicyDisablementPeriod)
+            revert("Disablement period is too short");
+        
         uint256 i;
         self.policies.push();
         policyId = uint32(self.policies.length - 1);
@@ -347,6 +367,33 @@ library PolicyStorage {
     }
 
     /**
+     * @notice Disable a policy if all its active attestors have a latest birthday older than the deadline and there
+     * are no pending attestor additions.
+     * @dev This function iterates through the active attestors in the policy's attestor set, and checks if all
+     * attestors have a latest birthday older than the specified deadline. It also checks if there are no pending
+     * attestor additions. If both conditions are met, it disables the policy. Note that this function can be called
+     * by anyone as long as the conditions are met.
+     * @param policy The storage reference to the Policy struct.
+     * @param deadline The timestamp representing the latest birthday that is allowed for an active attestor.
+     */
+    function disablePolicy(Policy storage policy, uint256 deadline) public {
+        require(policy.attestors.pendingAdditionSet.count() == 0, 
+        "Cannot disable policy while attestor additions are pending");
+
+        uint256 attestorCount = policy.attestors.activeSet.count();
+        bool allRootsOlder = true;
+        for(uint256 i=0; i<attestorCount; i++) {
+            if(IIdentityTree(policy.attestors.activeSet.keyAtIndex(i)).latestBirthday() >= deadline) {
+                allRootsOlder = false;
+                break;
+            }
+        }
+        if(allRootsOlder) {
+            policy.disabled = true;
+        }
+    }
+
+    /**
      * @notice Processes staged changes if the current deadline has passed and updates the deadline. 
      * @dev The deadline must be at least as far in the future as the active policy gracePeriod. 
      * @param self A Policy object.
@@ -397,6 +444,7 @@ library PolicyStorage {
         writeAcceptRoots(policyObj, policyScalar.acceptRoots);
         writeAllowUserWhitelists(policyObj, policyScalar.allowUserWhitelists);
         writePolicyLock(policyObj, policyScalar.locked);
+        writeDisablementPeriod(self, policyId, policyScalar.disablementPeriod);
         setDeadline(self, policyId, deadline);
     }
 
@@ -490,6 +538,27 @@ library PolicyStorage {
     ) public
     {
         self.scalarPending.locked = setPolicyLocked;
+    }
+
+    /**
+     * @notice Writes a new disablement deadline to the pending Policy changes of a Policy.
+     * @dev If the provided disablement deadline is in the past, this function will revert. 
+     * @param self A PolicyStorage object.
+     * @param disablementPeriod The new disablement deadline to set, in seconds since the Unix epoch.
+     *   If set to 0, the policy can be disabled at any time.
+     *   If set to a non-zero value, the policy can only be disabled after that time.
+     */
+    function writeDisablementPeriod(
+        App storage self,
+        uint32 policyId,
+        uint256 disablementPeriod
+    ) public {
+        // Check that the new disablement period is greater than or equal to the minimum
+        if (disablementPeriod < self.minimumPolicyDisablementPeriod) {
+            revert("Disablement period is too short");
+        }
+        Policy storage policy = self.policies[policyId];
+        policy.scalarPending.disablementPeriod = disablementPeriod;
     }
 
     /**

@@ -27,6 +27,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     bytes32 public constant override ROLE_POLICY_CREATOR = keccak256("rpc");
     bytes32 public constant override ROLE_GLOBAL_ATTESTOR_ADMIN = keccak256("rgaa");
     bytes32 public constant override ROLE_GLOBAL_WALLETCHECK_ADMIN = keccak256("rgwca");
+    bytes32 public constant override ROLE_GLOBAL_VALIDATION_ADMIN = keccak256("val");
 
     /// @custom:oz-upgrades-unsafe-allow state-variable-immutable
     address public immutable override ruleRegistry;
@@ -71,6 +72,17 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     }
 
     /**
+     * @notice Keyring Governance has exclusive access to input validation parameters.
+     * @dev Reverts if the user doesn't have the global validation admin role.
+     */
+    modifier onlyValidationAdmin() {
+        _checkRole(ROLE_GLOBAL_VALIDATION_ADMIN, _msgSender(), "pm:va");
+        _;
+    }
+
+    
+
+    /**
      * @param trustedForwarder Contract address that is allowed to relay message signers.
      * @param ruleRegistryAddr The address of the deployed RuleRegistry contract.
      */
@@ -108,6 +120,7 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
             gracePeriod: 0,
             acceptRoots: 0,
             allowUserWhitelists: true,
+            disablementPeriod: policyStorage.minimumPolicyDisablementPeriod,
             locked: true
         });
         policyStorage.newPolicy(
@@ -338,6 +351,37 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     }
 
     /**
+     * @notice Update the disablement period of a policy. See disable Policy.
+     * @dev This function updates the disablement period of the policy specified by `policyId` to `disablementPeriod`.
+     * Only the policy admin can call this function.
+     * @param policyId The ID of the policy to update.
+     * @param disablementPeriod The new disablement period for the policy.
+     */
+    function updatePolicyDisablementPeriod(uint32 policyId, uint256 disablementPeriod) 
+        external
+        override
+        onlyPolicyAdmin(policyId) 
+    {
+        policyStorage.writeDisablementPeriod(policyId, disablementPeriod);
+        emit UpdatePolicyDisablementPeriod(_msgSender(), policyId, disablementPeriod);
+    }
+
+    /**
+     * @notice Disable a policy if all its active attestors have a latest birthday older than the calculated 
+     * deadline and there are no pending attestor additions.
+     * @dev This function retrieves the storage reference to the policy specified by `policyId`, and calculates 
+     * the earliest time when disabling the policy will be permitted. Any user can disable a policy provided
+     * that the policy meets the conditions for disabling.
+     * @param policyId The ID of the policy to be disabled.
+     */
+    function disablePolicy(uint32 policyId) public {
+        uint256 deadline; // TODO
+        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
+        policyObj.disablePolicy(deadline);
+        emit PolicyDisabled(_msgSender(), policyId);
+    }
+
+    /**
      * @notice Update the deadline for staged policy changes to take effect.
      * @dev Deadlines must always be >= the active policy grace period. 
      * @param policyId The policyId to update.
@@ -507,6 +551,18 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
         emit RemoveWalletCheck(_msgSender(), walletCheck);
     }
 
+    /**
+     * @dev Updates the minimumPolicyDisablementPeriod
+     * @param minimumDisablementPeriod The new value for the minimumPolicyDisablementPeriod property.
+     */
+    function updateMinimumPolicyDisablementPeriod(uint256 minimumDisablementPeriod) 
+        external
+        override
+        onlyValidationAdmin {
+        policyStorage.updateMinimumPolicyDisablementPeriod(minimumDisablementPeriod);
+        emit MinimumPolicyDisablementPeriodUpdated(minimumDisablementPeriod);
+    }
+
     /**********************************************************
      Inspection
      **********************************************************/
@@ -576,6 +632,22 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     }
 
     /**
+     * @notice Inspect the active scalar values of a specific policy.
+     * @dev Use static call to inspect current values.
+     * @param policyId The unique identifier of the policy.
+     * @return scalarActive The active scalar values of the policy.
+     */
+    function policyScalarActive(uint32 policyId) 
+        external 
+        override
+        returns (PolicyStorage.PolicyScalar memory scalarActive) 
+    {
+        PolicyStorage.Policy storage p = policyStorage.policyRawData(policyId);
+        policyStorage.processStaged(policyId);
+        scalarActive = p.scalarActive;
+    }
+
+    /**
      * @notice Generate the corresponding admin/owner role for a policyId
      * @param policyId The policyId
      * @return ownerRole The bytes32 owner role that corresponds to the policyId
@@ -585,101 +657,13 @@ contract PolicyManager is IPolicyManager, KeyringAccessControl, Initializable {
     }
 
     /**
-     * @param policyId The unique identifier of a Policy.
-     * @dev Use static calls to inspect current information.
-     * @return descriptionUtf8 Not used for any on-chain logic.
-     */
-    function policyDescription(uint32 policyId)
-        external
-        override
-        returns (string memory descriptionUtf8)
-    {
+     * @notice Inspect the policy disablement flag.
+     * @param policyId The policyId.
+     * @return isDisabled True if the policy is disabled.
+      */
+    function policyDisabled(uint32 policyId) external view returns (bool isDisabled) {
         PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyStorage.processStaged(policyId);
-        descriptionUtf8 = policyObj.scalarActive.descriptionUtf8;
-    }
-
-    /**
-     * @param policyId The unique identifier of a Policy.
-     * @dev Use static calls to inspect current information.
-     * @return ruleId Rule to enforce, defined in the RuleRegistry.
-     */
-    function policyRuleId(uint32 policyId) external override returns (bytes32 ruleId) {
-        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyStorage.processStaged(policyId);
-        ruleId = policyObj.scalarActive.ruleId;
-    }
-
-    /**
-     * @param policyId The unique identifier of a Policy.
-     * @dev Use static calls to inspect current information.
-     * @return ttl The maximum age of acceptable credentials.
-     */
-    function policyTtl(uint32 policyId) external override returns (uint128 ttl) {
-        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyStorage.processStaged(policyId);
-        ttl = policyObj.scalarActive.ttl;
-    }
-
-    /**
-     * @notice Inspect a policy grace period.
-     * @dev Use static calls to inspect current information.
-     * @return gracePeriod Seconds until policy changes take effect.
-     */
-    function policyGracePeriod(uint32 policyId) external override returns(uint128 gracePeriod) {
-        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyStorage.processStaged(policyId);
-        gracePeriod = policyObj.scalarActive.gracePeriod;
-    }
-
-    /**
-     * @notice Check the number of latest identity roots to accept, regardless of age.
-     * @param policyId The policy to inspect.
-     * @return acceptRoots The number of latest identity roots to accept unconditionally for the construction
-     of zero-knowledge proofs.
-     */
-    function policyAcceptRoots(uint32 policyId)
-        external
-        override
-        returns (uint16 acceptRoots)
-    {
-        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyStorage.processStaged(policyId);
-        acceptRoots = policyObj.scalarActive.acceptRoots;
-    }
-
-    /**
-     * @notice Check if the policy allows user whitelisting.
-     * @param policyId The policy to inspect. 
-     * @return isAllowed True if whitelists can be used to override compliance checks. 
-     */
-    function policyAllowUserWhitelists(uint32 policyId) external returns (bool isAllowed){
-        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyStorage.processStaged(policyId);
-        isAllowed = policyObj.scalarActive.allowUserWhitelists;
-    }
-
-    /**
-     * @notice Check if the policy is locked.
-     * @dev Use static calls to inspect current information.
-     * @return isLocked True if the policy cannot be changed
-     */
-    function policyLocked(uint32 policyId) external override returns (bool isLocked) {
-        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyStorage.processStaged(policyId);
-        isLocked = policyObj.scalarActive.locked;
-    }
-
-    /**
-     * @notice Inspect the schedule to implementing staged policy updates. 
-     * @dev Use static calls to inspect current information.
-     * @param policyId The policy to inspect.
-     * @return deadline The scheduled time to active the pending policy update. 
-     */
-    function policyDeadline(uint32 policyId) external override returns (uint256 deadline) {
-        PolicyStorage.Policy storage policyObj = policyStorage.policyRawData(policyId);
-        policyStorage.processStaged(policyId);
-        deadline = policyObj.deadline;
+        isDisabled = policyObj.disabled;
     }
 
     /**

@@ -12,13 +12,12 @@ import "../access/KeyringAccessControl.sol";
 
 /**
  * @notice KeyringGuard implementation that uses immutable configuration parameters and presents 
- a simplified modifier for use in derived contracts.
+ * a simplified modifier for use in derived contracts.
  */
 
 abstract contract KeyringGuard is IKeyringGuard, KeyringAccessControl {
-
     using AddressSet for AddressSet.Set;
-    
+
     uint8 private constant VERSION = 1;
     bytes32 private constant NULL_BYTES32 = bytes32(0);
     address internal constant NULL_ADDRESS = address(0);
@@ -33,7 +32,7 @@ abstract contract KeyringGuard is IKeyringGuard, KeyringAccessControl {
 
     AddressSet.Set globalWhitelistSet;
 
-    modifier onlyPolicyAdmin {
+    modifier onlyPolicyAdmin() {
         bytes32 role = bytes32(uint256(uint32(admissionPolicyId)));
         if (!IPolicyManager(policyManager).hasRole(role, _msgSender()))
             revert Unauthorized({
@@ -47,7 +46,7 @@ abstract contract KeyringGuard is IKeyringGuard, KeyringAccessControl {
         _;
     }
 
-     /**
+    /**
      @param trustedForwarder Contract address that is allowed to relay message signers.
      @param keyringCredentials_ The KeyringCredentials contract to rely on.
      @param policyManager_ The address of the deployed PolicyManager to rely on.
@@ -60,38 +59,21 @@ abstract contract KeyringGuard is IKeyringGuard, KeyringAccessControl {
         address policyManager_,
         address userPolicies_,
         uint32 admissionPolicyId_
-    ) 
-        KeyringAccessControl(trustedForwarder)
-    {
-        if (keyringCredentials_ == NULL_ADDRESS)
-            revert Unacceptable({
-                reason: "credentials cannot be empty"
-            });
-        if (policyManager_ == NULL_ADDRESS)
-            revert Unacceptable({
-                reason: "policyManager cannot be empty"
-            });
-        if(userPolicies_ == NULL_ADDRESS)
-            revert Unacceptable({
-                reason: "userPolicies cannot be empty"
-            });
+    ) KeyringAccessControl(trustedForwarder) {
+        if (keyringCredentials_ == NULL_ADDRESS) revert Unacceptable({ reason: "credentials cannot be empty" });
+        if (policyManager_ == NULL_ADDRESS) revert Unacceptable({ reason: "policyManager cannot be empty" });
+        if (userPolicies_ == NULL_ADDRESS) revert Unacceptable({ reason: "userPolicies cannot be empty" });
         if (!IPolicyManager(policyManager_).isPolicy(admissionPolicyId_))
-            revert Unacceptable({
-                reason: "admissionPolicyId not found"
-            });
+            revert Unacceptable({ reason: "admissionPolicyId not found" });
         keyringCredentials = keyringCredentials_;
         policyManager = policyManager_;
         userPolicies = userPolicies_;
         admissionPolicyId = admissionPolicyId_;
         (universeRule, emptyRule) = IRuleRegistry(IPolicyManager(policyManager_).ruleRegistry()).genesis();
         if (universeRule == NULL_BYTES32)
-            revert Unacceptable({
-                reason: "the universe rule is not defined in the PolicyManager's RuleRegistry"
-            });
+            revert Unacceptable({ reason: "the universe rule is not defined in the PolicyManager's RuleRegistry" });
         if (emptyRule == NULL_BYTES32)
-            revert Unacceptable({
-                reason: "the empty rule is not defined in the PolicyManager's RuleRegistry"
-            });
+            revert Unacceptable({ reason: "the empty rule is not defined in the PolicyManager's RuleRegistry" });
         emit KeyringGuardConfigured(
             keyringCredentials_,
             policyManager_,
@@ -107,8 +89,7 @@ abstract contract KeyringGuard is IKeyringGuard, KeyringAccessControl {
      * @param subject The address to whitelist or delist.
      */
     function whitelistAddress(address subject) external onlyPolicyAdmin {
-        if (globalWhitelistSet.exists(subject)) 
-            revert Unacceptable({ reason: "subject is already whitelisted" });
+        if (globalWhitelistSet.exists(subject)) revert Unacceptable({ reason: "subject is already whitelisted" });
         globalWhitelistSet.insert(subject, "internal error");
         emit WhitelistAddress(_msgSender());
     }
@@ -148,65 +129,99 @@ abstract contract KeyringGuard is IKeyringGuard, KeyringAccessControl {
      */
     function checkCache(address trader) public override returns (bool isIndeed) {
         uint32 userPolicyId = IUserPolicies(userPolicies).userPolicies(trader);
-        bytes32 userRuleId = IPolicyManager(policyManager).policyRuleId(userPolicyId);
-        bytes32 admissionPolicyRuleId = IPolicyManager(policyManager).policyRuleId(admissionPolicyId);
-        address[] memory walletChecks = IPolicyManager(policyManager).policyWalletChecks(admissionPolicyId);
 
-        uint256 expiryTime = IPolicyManager(policyManager).policyTtl(admissionPolicyId);
+        PolicyStorage.PolicyScalar memory userPolicyScalar = 
+            IPolicyManager(policyManager).policyScalarActive(userPolicyId);
 
-        for(uint256 i = 0; i < walletChecks.length; i++) {
-            uint256 checkAge = block.timestamp - IWalletCheck(walletChecks[i]).birthday(trader);
-            if(checkAge > expiryTime) return false;
-        }
+        PolicyStorage.PolicyScalar memory admissionPolicyScalar = 
+            IPolicyManager(policyManager).policyScalarActive(admissionPolicyId);
 
-        if (admissionPolicyRuleId == universeRule && userRuleId == universeRule) {
+        // bytes32 userRuleId = policyScalar.ruleId;
+        // bytes32 admissionPolicyRuleId = IPolicyManager(policyManager).policyRuleId(admissionPolicyId);
+        // uint256 expiryTime = IPolicyManager(policyManager).policyTtl(admissionPolicyId);
+
+        if (admissionPolicyScalar.ruleId == universeRule && userPolicyScalar.ruleId == universeRule) {
             isIndeed = true;
-        } else if (admissionPolicyRuleId == emptyRule || userRuleId == emptyRule) {
+        } else if (admissionPolicyScalar.ruleId == emptyRule || userPolicyScalar.ruleId == emptyRule) {
             isIndeed = false;
         } else {
             uint256 timestamp = IKeyringCredentials(keyringCredentials).getCredential(
-                VERSION, 
-                trader, 
-                admissionPolicyId);
+                VERSION,
+                trader,
+                admissionPolicyId
+            );
             uint256 cacheAge = block.timestamp - timestamp;
-            isIndeed = cacheAge <= expiryTime;
+            isIndeed = cacheAge <= admissionPolicyScalar.ttl;
         }
-    }  
+    }
 
     /**
-     @notice Check if parties are acceptable to each other, either through compliance with the active policy,
-     or because they are explicitly whitelisted by the trader. 
-     @param from The first of two parties to check. 
-     @param to The second of two parties to check. 
-     @return isAuthorised True if the parties have cached credentials signifying compliance attestations, or
-     if counterparties are explicitly whitelisted by the other. 
+     * @notice Check if the wallet check has passed for a given trader.
+     * @dev This function checks if the wallet is compliant with the admission policy by comparing
+     * the wallet check age with the policy's expiration time. Use static call to inspect. 
+     * @param trader The user address, usually a trading wallet, to check.
+     * @return isPassed True if the wallet check has passed for the given trader.
+     */
+    function isWalletCheckPassed(address trader) public override returns (bool isPassed) {
+
+        PolicyStorage.PolicyScalar memory admissionPolicyScalar = 
+            IPolicyManager(policyManager).policyScalarActive(admissionPolicyId);
+
+        uint256 expiryTime = admissionPolicyScalar.ttl;
+
+        address[] memory walletChecks = IPolicyManager(policyManager).policyWalletChecks(admissionPolicyId);
+
+        for (uint256 i = 0; i < walletChecks.length; i++) {
+            uint256 checkAge = block.timestamp - IWalletCheck(walletChecks[i]).birthday(trader);
+            if (checkAge > expiryTime) return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @notice Determines if a transaction between two parties is authorized, considering global whitelists,
+     * user-controlled counterparty whitelists, wallet checks, and disabled policies.
+     * @dev The function checks if both parties are either globally whitelisted, whitelisted by each other, have
+     * passed the wallet check according to the admission policy, or the policy is disabled. Use static call to
+     * inspect.
+     * @param from The address of the first party in the transaction.
+     * @param to The address of the second party in the transaction.
+     * @return isAuthorised True if both parties are authorized to transact with each other, considering the
+     * defined rules and the policy's disabled state.
      */
     function checkGuard(address from, address to) public override returns (bool isAuthorised) {
-        bool fromGlobalWhitelisted;
-        bool toGlobalWhitelisted;
-        bool fromAuthorised;
-        bool toAuthorised;
-        bool fromIsWhitelistedByTo;
-        bool toIsWhitelistedByFrom;
-        bool policyAllowUserWhitelists;
-
-        fromGlobalWhitelisted = globalWhitelistSet.exists(from);
-        toGlobalWhitelisted = globalWhitelistSet.exists(to);
-        policyAllowUserWhitelists = IPolicyManager(policyManager).policyAllowUserWhitelists(admissionPolicyId);
         
-        if (!fromGlobalWhitelisted && policyAllowUserWhitelists) {
-            fromIsWhitelistedByTo = IUserPolicies(userPolicies).isWhitelisted(to, from);
+        if(IPolicyManager(policyManager).policyDisabled(admissionPolicyId)) return true;
+
+        bool fromGlobalWhitelisted = globalWhitelistSet.exists(from);
+        bool toGlobalWhitelisted = globalWhitelistSet.exists(to);
+
+        if (fromGlobalWhitelisted && toGlobalWhitelisted) {
+            return true;
         }
-        if (!toGlobalWhitelisted && policyAllowUserWhitelists) {
+
+        PolicyStorage.PolicyScalar memory admissionPolicyScalar = 
+            IPolicyManager(policyManager).policyScalarActive(admissionPolicyId);
+
+        bool policyAllowUserWhitelists = admissionPolicyScalar.allowUserWhitelists;
+
+        bool fromIsWhitelistedByTo = false;
+        bool toIsWhitelistedByFrom = false;
+
+        if (policyAllowUserWhitelists) {
+            fromIsWhitelistedByTo = IUserPolicies(userPolicies).isWhitelisted(to, from);
             toIsWhitelistedByFrom = IUserPolicies(userPolicies).isWhitelisted(from, to);
         }
 
-        if (!fromIsWhitelistedByTo && !fromGlobalWhitelisted) fromAuthorised = checkCache(from);
-        if (!toIsWhitelistedByFrom && !toGlobalWhitelisted) toAuthorised = checkCache(to);
+        if (fromIsWhitelistedByTo && toIsWhitelistedByFrom) {
+            return true;
+        }
 
-        isAuthorised = (
-            fromIsWhitelistedByTo || fromAuthorised || fromGlobalWhitelisted) && (
-            toIsWhitelistedByFrom || toAuthorised || toGlobalWhitelisted
-        );
+        bool fromAuthorised = (fromGlobalWhitelisted || fromIsWhitelistedByTo) && isWalletCheckPassed(from);
+        bool toAuthorised = (toGlobalWhitelisted || toIsWhitelistedByFrom) && isWalletCheckPassed(to);
+
+        isAuthorised = fromAuthorised && toAuthorised;
     }
+
 }

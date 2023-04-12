@@ -119,8 +119,12 @@ describe("Compliant Token", function () {
       await identityTree.setMerkleRootBirthday(proofMerkleRoot3, now);
 
       // update credentials
-      await credentialsUpdater.connect(traderAsSigner2).updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
-      await credentialsUpdater.connect(traderAsSigner3).updateCredentials(identityTree.address, membershipProof3, authorisationProof3);
+      await credentialsUpdater
+        .connect(traderAsSigner2)
+        .updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
+      await credentialsUpdater
+        .connect(traderAsSigner3)
+        .updateCredentials(identityTree.address, membershipProof3, authorisationProof3);
 
       // whitelist trader
       const whitelistTime = await helpers.time.latest();
@@ -374,6 +378,17 @@ describe("Compliant Token", function () {
       expect(kycBalance.toString()).to.equal("50");
       expect(contractMockBalance).to.equal("50");
       expect(senderMockBalance.toString()).to.equal("9950");
+
+      // should allow non-compliant trader to depositFor/withdrawTo for himself, but not to a third
+      const amount = TOKEN_SUPPLY / 10;
+      await mockERC20.transfer(admin, amount);
+      await mockERC20.connect(adminWallet).approve(kycERC20.address, amount);
+      await expect(kycERC20.connect(adminWallet).depositFor(bob, amount)).to.be.revertedWith(
+        unacceptable("trader not authorized"),
+      );
+      await kycERC20.connect(adminWallet).depositFor(admin, amount);
+      await expect(kycERC20.withdrawTo(bob, amount)).to.be.revertedWith(unacceptable("trader not authorized"));
+      await kycERC20.connect(adminWallet).withdrawTo(admin, amount);
     });
 
     it("should not allow a transfer to a non-compliant wallet", async function () {
@@ -540,7 +555,9 @@ describe("Compliant Token", function () {
 
       // user updates credential for Policy A
       // NOTE proof incluceds Policy B as well as Policy A
-      await credentialsUpdater.connect(traderAsSigner2).updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
+      await credentialsUpdater
+        .connect(traderAsSigner2)
+        .updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
 
       await kycERC20.depositFor(trader2.address, 100);
       kycBalanceTrader2 = await kycERC20.balanceOf(trader2.address);
