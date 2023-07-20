@@ -5,12 +5,13 @@ on:
     branches:
       - staging
 env:
-  duplo_host: https://keyring.duplocloud.net
-  duplo_token: "${{ secrets.DUPLO_SECRET }}"
+  duplo_host: https://keyring-uat.duplocloud.net
+  duplo_token: "${{ secrets.DUPLO_SECRET_PROD }}"
   ECR_REPO_NAME: core-dev02 
   SERVICE_NAME: core                      
   TENANT_NAME: dev02
-  CONTRACT_BUCKET: duploservices-dev02-contracts-178195871625                            
+  CONTRACT_BUCKET: duploservices-dev02-contracts-178195871625  
+  AWS_ACCOUNT_NO: "178195871625"                          
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 # dummy commit 
@@ -29,6 +30,12 @@ jobs:
             echo "TENANT_NAME=stage01" >> $GITHUB_ENV
             echo "ECR_REPO_NAME=core-stage01" >> $GITHUB_ENV
             echo "CONTRACT_BUCKET=duploservices-stage01-contracts-178195871625" >> $GITHUB_ENV
+          fi
+          elif [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            echo "TENANT_NAME=prod01" >> $GITHUB_ENV
+            echo "ECR_REPO_NAME=core-prod01" >> $GITHUB_ENV
+            echo "CONTRACTS_BUCKET=duploservices-prod01-contracts-742406308994" >> $GITHUB_ENV
+            echo "AWS_ACCOUNT_NO=742406308994" >> $GITHUB_ENV
           fi
 
       # Set up for docker build
