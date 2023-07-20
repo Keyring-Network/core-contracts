@@ -3,7 +3,7 @@ on:
   # Triggers the workflow on push to matching branches
   push:
     branches:
-      - staging
+      - master
 env:
   duplo_host: https://keyring-uat.duplocloud.net
   duplo_token: "${{ secrets.DUPLO_SECRET_PROD }}"
