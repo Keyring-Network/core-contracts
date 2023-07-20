@@ -33,7 +33,7 @@ jobs:
           elif [ "${{ github.ref }}" = "refs/heads/master" ]; then
             echo "TENANT_NAME=prod01" >> $GITHUB_ENV
             echo "ECR_REPO_NAME=core-prod01" >> $GITHUB_ENV
-            echo "CONTRACTS_BUCKET=duploservices-prod01-contracts-742406308994" >> $GITHUB_ENV
+            echo "CONTRACT_BUCKET=duploservices-prod01-contracts-742406308994" >> $GITHUB_ENV
             echo "AWS_ACCOUNT_NO=742406308994" >> $GITHUB_ENV
           fi
 
