@@ -30,7 +30,6 @@ jobs:
             echo "TENANT_NAME=stage01" >> $GITHUB_ENV
             echo "ECR_REPO_NAME=core-stage01" >> $GITHUB_ENV
             echo "CONTRACT_BUCKET=duploservices-stage01-contracts-178195871625" >> $GITHUB_ENV
-          fi
           elif [ "${{ github.ref }}" = "refs/heads/master" ]; then
             echo "TENANT_NAME=prod01" >> $GITHUB_ENV
             echo "ECR_REPO_NAME=core-prod01" >> $GITHUB_ENV
