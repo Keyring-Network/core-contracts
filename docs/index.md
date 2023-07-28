@@ -7,6 +7,12 @@ This contract manages the role-based access control via _checkRole() with meanin
  PolicyManager, RuleRegistry, KeyringCredentials, IdentityTree, WalletCheck and 
  KeyringZkCredentialUpdater.
 
+### Unacceptable
+
+```solidity
+error Unacceptable(string reason)
+```
+
 ### Unauthorized
 
 ```solidity
@@ -24,6 +30,22 @@ constructor(address trustedForwarder) internal
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | trustedForwarder | address | Contract address that is allowed to relay message signers. |
+
+### supportsInterface
+
+```solidity
+function supportsInterface(bytes4) public view virtual returns (bool)
+```
+
+Disables incomplete ERC165 support inherited from oz/AccessControl.sol
+
+_Always reverts. Do not rely on ERC165 support to interact with this contract._
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | bool | bool Never returned. |
 
 ### _checkRole
 
@@ -73,6 +95,77 @@ _Although not currently used, this function forms part of ERC2771 so is included
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | [0] | bytes | data Data deemed to be the msg.data |
+
+## Consent
+
+### maximumConsentPeriod
+
+```solidity
+uint256 maximumConsentPeriod
+```
+
+### userConsentDeadlines
+
+```solidity
+mapping(address => uint256) userConsentDeadlines
+```
+
+_Mapping of Traders to their associated consent deadlines._
+
+### constructor
+
+```solidity
+constructor(address trustedForwarder, uint256 maximumConsentPeriod_) public
+```
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| trustedForwarder | address | The address of a trustedForwarder contract. |
+| maximumConsentPeriod_ | uint256 | The upper limit for user consent deadlines. |
+
+### grantDegradedServiceConsent
+
+```solidity
+function grantDegradedServiceConsent(uint256 revocationDeadline) external
+```
+
+A user may grant consent to service mitigation measures.
+
+_The deadline must be no further in the future than the maximumConsentDeadline._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| revocationDeadline | uint256 | The consent will automatically expire at the deadline. |
+
+### revokeMitigationConsent
+
+```solidity
+function revokeMitigationConsent() external
+```
+
+A user may revoke their consent to mitigation measures.
+
+### userConsentsToMitigation
+
+```solidity
+function userConsentsToMitigation(address user) public view returns (bool doesIndeed)
+```
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| user | address | The user to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| doesIndeed | bool | True if the user's consent deadline is in the future. |
 
 ## KeyringZkCredentialUpdater
 
@@ -126,8 +219,7 @@ _The attestor must be valid for all policy disclosures. For this to be possible,
      to the system globally before it was selected for a policy. The two zero-knowledge proof share parameters that 
      ensure that both proofs were derived from the same identity commitment. If the root age used to construct proofs
      if older than the policy time to live (ttl), the root will be considered acceptable with an age of zero, provided
-     that the number of root successors is less than or equal to the policy acceptRoots (accept most recent n roots).
-     Credential updates clear on-chain wallet checks and thus force an off-chain check and update._
+     that the number of root successors is less than or equal to the policy acceptRoots (accept most recent n roots)._
 
 #### Parameters
 
@@ -168,7 +260,7 @@ function pack12x20(uint32[12] input) public pure returns (uint256 packed)
 
 Packs uint32[12] into uint256 with 20-bit precision.
 
-_This function will disregard bits greater than 20 bits of magnitude._
+_uint32 Inputs are limited to 20 bits of magnitude._
 
 #### Parameters
 
@@ -202,6 +294,595 @@ Unpacks packed elements as 20-bit uint32[12].
 | ---- | ---- | ----------- |
 | unpacked | uint32[12] | Uint32[12], 20-bit precision. |
 
+## Degradable
+
+_A contract that allows services to specify how to mitigate service interuptions
+using policy-specific parameters._
+
+### ROLE_SERVICE_SUPERVISOR
+
+```solidity
+bytes32 ROLE_SERVICE_SUPERVISOR
+```
+
+### defaultDegradationPeriod
+
+```solidity
+uint256 defaultDegradationPeriod
+```
+
+### defaultFreshnessPeriod
+
+```solidity
+uint256 defaultFreshnessPeriod
+```
+
+### policyManager
+
+```solidity
+address policyManager
+```
+
+### lastUpdate
+
+```solidity
+uint256 lastUpdate
+```
+
+### subjectUpdates
+
+```solidity
+mapping(bytes32 => uint256) subjectUpdates
+```
+
+_Mapping of storage subjects to their associated update timestamps._
+
+### onlyPolicyAdminOrSupervisor
+
+```solidity
+modifier onlyPolicyAdminOrSupervisor(uint32 policyId)
+```
+
+_Modifier that checks if the caller has the policy admin or supervisor role._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The ID of the policy. |
+
+### constructor
+
+```solidity
+constructor(address trustedForwarder, address policyManager_, uint256 maximumConsentPeriod_) public
+```
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| trustedForwarder | address | Address of the trusted forwarder contract. |
+| policyManager_ | address | Address of the policy manager contract. |
+| maximumConsentPeriod_ | uint256 | Maximum consent duration a user will be allowed to grant. |
+
+### _recordUpdate
+
+```solidity
+function _recordUpdate(address subject, uint256 time) internal
+```
+
+Record the timestamp of the last update to the contract.
+
+_Must be called by derived contracts._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| subject | address | The subject to update. |
+| time | uint256 | The time to record. |
+
+### _recordUpdate
+
+```solidity
+function _recordUpdate(bytes32 subject, uint256 time) internal
+```
+
+Record the timestamp of the last update to the contract.
+
+_Must be called by derived contracts._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| subject | bytes32 | The subject to update. |
+| time | uint256 | The time to record. |
+
+### setPolicyParameters
+
+```solidity
+function setPolicyParameters(uint32 policyId, uint256 degradationPeriod_, uint256 degradationFreshness_) external
+```
+
+_Set the mitigation parameters for a policy._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The ID of the policy. |
+| degradationPeriod_ | uint256 | The time period after which the service is considered degraded. |
+| degradationFreshness_ | uint256 | Used by derived service contracts to include or exclude data that was recorded before the service fell into the degraded state. |
+
+### _checkKey
+
+```solidity
+function _checkKey(address observer, address subject, uint32 policyId) internal returns (bool pass)
+```
+
+Check the subjects's last recorded update and compare to policy ttl, with mitigation.
+
+_Fallback to mitigation measures if acceptable. Use staticCall to inspect._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| observer | address | The user who must consent to reliance on degraded services. |
+| subject | address | The subject to inspect. |
+| policyId | uint32 | PolicyId to consider for possible mitigation. |
+
+### _checkKey
+
+```solidity
+function _checkKey(address observer, bytes32 subject, uint32 policyId) internal returns (bool pass)
+```
+
+Check the subject's last recorded update and compare to policy ttl, with mitigation.
+
+_Fallback to mitigation measures if acceptable. Use staticCall to inspect._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| observer | address | The user who must consent to reliance on degraded services. |
+| subject | bytes32 | The subject to inspect. |
+| policyId | uint32 | PolicyId to consider for possible mitigation. |
+
+### canMitigate
+
+```solidity
+function canMitigate(address observer, bytes32 subject, uint32 policyId) public view virtual returns (bool canIndeed)
+```
+
+A Degradable service implments a compromised process.
+
+_Must consult user Consent and Policy parameters. Must return false unless degraded.
+Use staticCall to inspect._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| observer | address | The user who must consent to reliance on degraded services. |
+| subject | bytes32 | The topic to inspect. |
+| policyId | uint32 | The policyId for mitigation parameters. |
+
+### _canMitigate
+
+```solidity
+function _canMitigate(address observer, uint32 policyId, uint256 time, uint256 subjectUpdated) internal view returns (bool canIndeed)
+```
+
+A Degradable service implments a compromised process.
+
+_Must consult user Consent and Policy parameters. Must return false unless degraded._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| observer | address | The user who must consent to reliance on degraded services. |
+| policyId | uint32 | The policyId for mitigation parameters. |
+| time | uint256 | Derived contracts and callers provide current blocktime for comparison. |
+| subjectUpdated | uint256 | Derived contracts and callers provide last subject update. |
+
+### isDegraded
+
+```solidity
+function isDegraded(uint32 policyId) public view returns (bool isIndeed)
+```
+
+A service is degraded if there has been no update for longer than the degradation period.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policyId to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| isIndeed | bool | True if the service is considered degraded by the Policy. |
+
+### _isDegraded
+
+```solidity
+function _isDegraded(uint32 policyId, uint256 time) internal view returns (bool isIndeed)
+```
+
+A service is degraded if there has been no update for longer than the degradation period.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policyId to inspect. |
+| time | uint256 | Time to compare. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| isIndeed | bool | True if the service is considered degraded by the Policy. |
+
+### isMitigationQualified
+
+```solidity
+function isMitigationQualified(bytes32 subject, uint32 policyId) public view returns (bool qualifies)
+```
+
+Evaluate if existing services records can be used for mitigation measures.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| subject | bytes32 | Key to inspect. |
+| policyId | uint32 | Policy to inspect for mitigation parameters. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| qualifies | bool | True if the birthday is after the cutoff deadline for the service set by the Policy admin. |
+
+### _isMitigationQualified
+
+```solidity
+function _isMitigationQualified(uint256 lastSubjectUpdate, uint32 policyId) internal view returns (bool qualifies)
+```
+
+Evaluate if existing services records can be used for mitigation measures.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| lastSubjectUpdate | uint256 | Last recorded update for the subject. |
+| policyId | uint32 | Policy to inspect for mitigation parameters. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| qualifies | bool | True if the subject update time is after the mitigation cutoff  for the service set by the Policy admin. |
+
+### degradationPeriod
+
+```solidity
+function degradationPeriod(uint32 policyId) public view returns (uint256 inSeconds)
+```
+
+The degradation period is maximum interval between updates before the policy considers the
+service degraded.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policyId to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| inSeconds | uint256 | The degradation period for the policy. |
+
+### degradationFreshness
+
+```solidity
+function degradationFreshness(uint32 policyId) public view returns (uint256 inSeconds)
+```
+
+A service may implement a mitigation strategy to employ while the service is degraded.
+
+_Service mitigations can use this parameter._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policyId to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| inSeconds | uint256 | The freshness period for the policy. |
+
+### mitigationCutoff
+
+```solidity
+function mitigationCutoff(uint32 policyId) public view returns (uint256 cutoffTime)
+```
+
+Service degradation mitigation measures depend on the oldest acceptable update.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policyId to consult for a cutoff time. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| cutoffTime | uint256 | The oldest update that will be useable for mitigation measures. |
+
+## ExemptionsManager
+
+This contract manages the exemptions for the policy engine.
+It allows an exemptions admin to manage global exemptions and policy admins
+to manage policy-specific exemptions.
+
+_Inherits from IExemptionsManager, KeyringAccessControl, and Initializable._
+
+### ROLE_GLOBAL_EXEMPTIONS_ADMIN
+
+```solidity
+bytes32 ROLE_GLOBAL_EXEMPTIONS_ADMIN
+```
+
+### policyManager
+
+```solidity
+address policyManager
+```
+
+### exemptionDescriptions
+
+```solidity
+mapping(address => string) exemptionDescriptions
+```
+
+### onlyExemptionsAdmin
+
+```solidity
+modifier onlyExemptionsAdmin()
+```
+
+Keyring Governance has exclusive access to global exemptions.
+
+_Reverts if the user doesn't have the global validation admin role._
+
+### onlyPolicyAdmin
+
+```solidity
+modifier onlyPolicyAdmin(uint32 policyId)
+```
+
+Only the Policy Admin can manipulate policy-specific settings.
+
+_Reverts if the sender is not an admin for the specified policy._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policyId to check. |
+
+### constructor
+
+```solidity
+constructor(address trustedForwarder) public
+```
+
+### init
+
+```solidity
+function init(address policyManager_) external
+```
+
+Initializes the contract with the provided policyManager address.
+
+_Can only be called once, as it is an initializer function._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyManager_ | address | The address of the PolicyManager contract. |
+
+### admitGlobalExemption
+
+```solidity
+function admitGlobalExemption(address[] exemptAddresses, string description) external
+```
+
+Admits the specified addresses as global exemptions with a description.
+
+_Can only be called by the exemptions admin. Admission is irrevocable._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| exemptAddresses | address[] | An array of addresses to be admitted as global exemptions. |
+| description | string | A human-readable description of the exempt addresses. |
+
+### updateGlobalExemption
+
+```solidity
+function updateGlobalExemption(address exemptAddress, string description) external
+```
+
+Updates the description of an existing global exemption address.
+
+_Can only be called by the exemptions admin._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| exemptAddress | address | The exempt address whose description needs to be updated. |
+| description | string | The new human-readable description for the exempt address. |
+
+### _updateGlobalExemption
+
+```solidity
+function _updateGlobalExemption(address exemptAddress, string description) internal
+```
+
+### approvePolicyExemptions
+
+```solidity
+function approvePolicyExemptions(uint32 policyId, address[] exemptions) external
+```
+
+Approves the specified exemptions for a given policy.
+
+_Can only be called by a policy admin for the specified policyId. Only policies
+that are admitted globally are eligable for approval. Approval is irrevocable._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The ID of the policy for which exemptions are being approved. |
+| exemptions | address[] | An array of addresses to be approved as exemptions for the policy. |
+
+### globalExemptionsCount
+
+```solidity
+function globalExemptionsCount() external view returns (uint256 count)
+```
+
+Returns the count of global exemptions.
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| count | uint256 | The count of global exemptions. |
+
+### globalExemptionAtIndex
+
+```solidity
+function globalExemptionAtIndex(uint256 index) external view returns (address exemption)
+```
+
+Returns the global exemption address at the specified index.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| index | uint256 | The index of the exemption in the global exemptions list. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| exemption | address | The global exemption address at the specified index. |
+
+### isGlobalExemption
+
+```solidity
+function isGlobalExemption(address exemption) public view returns (bool isIndeed)
+```
+
+Checks if a given address is a global exemption.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| exemption | address | The address to be checked as a global exemption. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| isIndeed | bool | True if the address is a global exemption, otherwise false. |
+
+### policyExemptionsCount
+
+```solidity
+function policyExemptionsCount(uint32 policyId) external view returns (uint256 count)
+```
+
+Returns the count of policy-specific exemptions for a given policyId.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The ID of the policy for which exemptions count is required. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| count | uint256 | The count of exemptions for the given policyId. |
+
+### policyExemptionAtIndex
+
+```solidity
+function policyExemptionAtIndex(uint32 policyId, uint256 index) external view returns (address exemption)
+```
+
+Returns the policy-specific exemption address at the specified index for a given policyId.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The ID of the policy for which the exemption is required. |
+| index | uint256 | The index of the exemption in the policy exemptions list. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| exemption | address | The exemption address at the specified index. |
+
+### isPolicyExemption
+
+```solidity
+function isPolicyExemption(uint32 policyId, address exemption) external view returns (bool isIndeed)
+```
+
+Checks if a given address is an exemption for a specified policyId.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The ID of the policy for which the exemption check is required. |
+| exemption | address | The address to be checked as an exemption for the policy. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| isIndeed | bool | True if the address is an exemption for the policy, otherwise false. |
+
 ## IdentityTree
 
 This contract holds the history of identity tree merkle roots announced by the aggregator. 
@@ -213,12 +894,6 @@ This contract holds the history of identity tree merkle roots announced by the a
 
 ```solidity
 bytes32 ROLE_AGGREGATOR
-```
-
-### merkleRootBirthday
-
-```solidity
-mapping(bytes32 => uint256) merkleRootBirthday
 ```
 
 ### merkleRootSet
@@ -236,14 +911,16 @@ modifier onlyAggregator()
 ### constructor
 
 ```solidity
-constructor(address trustedForwarder) public
+constructor(address trustedForwarder_, address policyManager_, uint256 maximumConsentPeriod_) public
 ```
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| trustedForwarder | address | Contract address that is allowed to relay message signers. |
+| trustedForwarder_ | address | Contract address that is allowed to relay message signers. |
+| policyManager_ | address | The policy manager contract address. |
+| maximumConsentPeriod_ | uint256 | The maximum allowable user consent period. |
 
 ### setMerkleRootBirthday
 
@@ -261,6 +938,30 @@ _Explicit birthday declaration ensures that root age is not extended by mining d
 | ---- | ---- | ----------- |
 | merkleRoot | bytes32 | The merkleRoot to set. |
 | birthday | uint256 | The timestamp of the merkleRoot. 0 to invalidate the root. |
+
+### checkRoot
+
+```solidity
+function checkRoot(address observer, bytes32 merkleRoot, uint32 admissionPolicyId) external returns (bool passed)
+```
+
+Inspect the Identity Tree
+
+_Use static calls to inspect._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| observer | address | The observer for degradation mitigation consent. |
+| merkleRoot | bytes32 | The merkle root to inspect. |
+| admissionPolicyId | uint32 | The admission policy for the credential to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| passed | bool | True if a valid merkle root exists or if mitigation measures are applicable. |
 
 ### merkleRootCount
 
@@ -314,37 +1015,6 @@ Check for existence in history.
 | ---- | ---- | ----------- |
 | isIndeed | bool | True if the root has been recorded. |
 
-### merkleRootSuccessors
-
-```solidity
-function merkleRootSuccessors(bytes32 merkleRoot) external view returns (uint256 successors)
-```
-
-Returns the count of roots recorded after the root to inspect.
-
-_Returns 2 ^ 256 - 1 if merkle root is not recorded._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| merkleRoot | bytes32 | The root to inspect. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| successors | uint256 | The count of roots recorded after the root to inspect. |
-
-### latestBirthday
-
-```solidity
-function latestBirthday() public view returns (uint256 birthday)
-```
-
-Return the latest birthday recorded.
-     @return birthday The birthday of the latest root recorded.
-
 ### latestRoot
 
 ```solidity
@@ -365,12 +1035,6 @@ a simplified modifier for use in derived contracts.
 address NULL_ADDRESS
 ```
 
-### ROLE_GLOBAL_WHITELIST_ADMIN
-
-```solidity
-bytes32 ROLE_GLOBAL_WHITELIST_ADMIN
-```
-
 ### keyringCredentials
 
 ```solidity
@@ -387,6 +1051,12 @@ address policyManager
 
 ```solidity
 address userPolicies
+```
+
+### exemptionsManager
+
+```solidity
+address exemptionsManager
 ```
 
 ### admissionPolicyId
@@ -407,195 +1077,346 @@ bytes32 universeRule
 bytes32 emptyRule
 ```
 
-### globalWhitelistSet
+### checkKeyring
 
 ```solidity
-struct AddressSet.Set globalWhitelistSet
+modifier checkKeyring(address from, address to)
 ```
 
-### onlyPolicyAdmin
-
-```solidity
-modifier onlyPolicyAdmin()
-```
+_Modifier checks ZK credentials and trader wallets for sender and receiver._
 
 ### constructor
 
 ```solidity
-constructor(address trustedForwarder, address keyringCredentials_, address policyManager_, address userPolicies_, uint32 admissionPolicyId_) internal
+constructor(struct IKeyringGuard.KeyringConfig config, uint32 admissionPolicyId_, uint32 maximumConsentPeriod_) public
 ```
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| trustedForwarder | address | Contract address that is allowed to relay message signers.      @param keyringCredentials_ The KeyringCredentials contract to rely on.      @param policyManager_ The address of the deployed PolicyManager to rely on.      @param userPolicies_ The address of the deployed UserPolicies contract to rely on.       @param admissionPolicyId_ The unique identifier of a Policy against which user accounts will be compared. |
-| keyringCredentials_ | address |  |
-| policyManager_ | address |  |
-| userPolicies_ | address |  |
-| admissionPolicyId_ | uint32 |  |
+| config | struct IKeyringGuard.KeyringConfig | Keyring contract addresses. |
+| admissionPolicyId_ | uint32 | The unique identifier of a Policy against which user accounts will be compared. |
+| maximumConsentPeriod_ | uint32 | The upper limit for user consent deadlines. |
 
-### whitelistAddress
+### checkZKPIICache
 
 ```solidity
-function whitelistAddress(address subject) external
+function checkZKPIICache(address observer, address subject) public returns (bool passed)
 ```
 
-Policy admins can maintain a global list of whitelisted addresses, usually contracts.
+Checks keyringCache for cached PII credential.
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| subject | address | The address to whitelist or delist. |
-
-### whitelistAddressCount
-
-```solidity
-function whitelistAddressCount() external view returns (uint256 count)
-```
-
-Count the globally whitelisted addresses.
+| observer | address | The user who must consent to reliance on degraded services. |
+| subject | address | The subject to inspect. |
 
 #### Return Values
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| count | uint256 | The number of globally whitelisted addresses. |
+| passed | bool | True if cached credential is new enough, or if degraded service mitigation is possible and the user has provided consent. |
 
-### whitelistAddressAtIndex
+### checkTraderWallet
 
 ```solidity
-function whitelistAddressAtIndex(uint256 index) external view returns (address whitelisted)
+function checkTraderWallet(address observer, address subject) public returns (bool passed)
 ```
 
-Enumerate the globally whitelisted addresses.
+Check the trader wallet against all wallet checks in the policy configuration.
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| index | uint256 | The row to inspect. |
+| observer | address | The user who must consent to reliance on degraded services. |
+| subject | address | The subject to inspect. |
 
 #### Return Values
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| whitelisted | address | A whitelisted address. |
+| passed | bool | True if the wallet check is new enough, or if the degraded service mitigation is possible and the user has provided consent. |
 
-### isWhitelisted
+### isAuthorized
 
 ```solidity
-function isWhitelisted(address checkAddress) external view returns (bool isIndeed)
+function isAuthorized(address from, address to) public returns (bool passed)
 ```
 
-Check if an address is whitelisted globally.
+Check from and to addresses for compliance.
+
+_Both parties are compliant, where compliant means:
+ - they have a cached credential and if required, a wallet check 
+ - they are an approved counterparty of the other party
+ - they can rely on degraded service mitigation, and their counterparty consents
+ - the policy exempts them from compliance checks, usually reserved for contracts_
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| checkAddress | address | The address to inspect. |
+| from | address | First trader wallet to inspect. |
+| to | address | Second trader wallet to inspect. |
 
 #### Return Values
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| isIndeed | bool | True if the checkAddress is whitelisted. |
+| passed | bool | True, if both parties are compliant. |
 
-### checkCache
+## IConsent
+
+### GrantDegradedServiceConsent
 
 ```solidity
-function checkCache(address trader) public returns (bool isIndeed)
+event GrantDegradedServiceConsent(address user, uint256 revocationDeadline)
 ```
 
-Checks if the given trader has a stored, fresh credential for the admission policy in the
-     credential cache and the trader wallet is present on all policy wallet check lists. 
-     @dev Use static call to inspect.
-     @param trader The user address, normally a trading wallet, to check.
-     @param isIndeed True if the user as a fresh, cached credential.
-
-### isWalletCheckPassed
+### RevokeDegradedServiceConsent
 
 ```solidity
-function isWalletCheckPassed(address trader) public returns (bool isPassed)
+event RevokeDegradedServiceConsent(address user)
 ```
 
-Check if the wallet check has passed for a given trader.
-
-_This function checks if the wallet is compliant with the admission policy by comparing
-the wallet check age with the policy's expiration time. Use static call to inspect._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| trader | address | The user address, usually a trading wallet, to check. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| isPassed | bool | True if the wallet check has passed for the given trader. |
-
-### checkGuard
+### maximumConsentPeriod
 
 ```solidity
-function checkGuard(address from, address to) public returns (bool isAuthorised)
+function maximumConsentPeriod() external view returns (uint256)
 ```
 
-Determines if a transaction between two parties is authorized, considering global whitelists,
-user-controlled counterparty whitelists, wallet checks, and disabled policies.
-
-_The function checks if both parties are either globally whitelisted, whitelisted by each other, have
-passed the wallet check according to the admission policy, or the policy is disabled. Use static call to
-inspect._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| from | address | The address of the first party in the transaction. |
-| to | address | The address of the second party in the transaction. |
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| isAuthorised | bool | True if both parties are authorized to transact with each other, considering the defined rules and the policy's disabled state. |
-
-## IAuthorizationProofVerifier
-
-### verifyProof
+### userConsentDeadlines
 
 ```solidity
-function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[5] input) external view returns (bool)
+function userConsentDeadlines(address user) external view returns (uint256)
 ```
 
-## IIdentityConstructionProofVerifier
-
-### verifyProof
+### grantDegradedServiceConsent
 
 ```solidity
-function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[3] input) external view returns (bool r)
+function grantDegradedServiceConsent(uint256 revocationDeadline) external
 ```
 
-## IIdentityMembershipProofVerifier
-
-_Interface of Verifier contract._
-
-### verifyProof
+### revokeMitigationConsent
 
 ```solidity
-function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[4] input) external view
+function revokeMitigationConsent() external
+```
+
+### userConsentsToMitigation
+
+```solidity
+function userConsentsToMitigation(address user) external view returns (bool doesIndeed)
+```
+
+## IDegradable
+
+### SetPolicyParameters
+
+```solidity
+event SetPolicyParameters(address admin, uint32 policyId, uint256 degradationPeriod, uint256 degradationFreshness)
+```
+
+### MitigationParameters
+
+```solidity
+struct MitigationParameters {
+  uint256 degradationPeriod;
+  uint256 degradationFreshness;
+}
+```
+
+### ROLE_SERVICE_SUPERVISOR
+
+```solidity
+function ROLE_SERVICE_SUPERVISOR() external view returns (bytes32)
+```
+
+### defaultDegradationPeriod
+
+```solidity
+function defaultDegradationPeriod() external view returns (uint256)
+```
+
+### defaultFreshnessPeriod
+
+```solidity
+function defaultFreshnessPeriod() external view returns (uint256)
+```
+
+### policyManager
+
+```solidity
+function policyManager() external view returns (address)
+```
+
+### lastUpdate
+
+```solidity
+function lastUpdate() external view returns (uint256)
+```
+
+### subjectUpdates
+
+```solidity
+function subjectUpdates(bytes32 subject) external view returns (uint256 timestamp)
+```
+
+### setPolicyParameters
+
+```solidity
+function setPolicyParameters(uint32 policyId, uint256 degradationPeriod, uint256 degradationFreshness) external
+```
+
+### canMitigate
+
+```solidity
+function canMitigate(address observer, bytes32 subject, uint32 policyId) external view returns (bool canIndeed)
+```
+
+### isDegraded
+
+```solidity
+function isDegraded(uint32 policyId) external view returns (bool isIndeed)
+```
+
+### isMitigationQualified
+
+```solidity
+function isMitigationQualified(bytes32 subject, uint32 policyId) external view returns (bool qualifies)
+```
+
+### degradationPeriod
+
+```solidity
+function degradationPeriod(uint32 policyId) external view returns (uint256 inSeconds)
+```
+
+### degradationFreshness
+
+```solidity
+function degradationFreshness(uint32 policyId) external view returns (uint256 inSeconds)
+```
+
+### mitigationCutoff
+
+```solidity
+function mitigationCutoff(uint32 policyId) external view returns (uint256 cutoffTime)
+```
+
+## IExemptionsManager
+
+### ExemptionsManagerInitialized
+
+```solidity
+event ExemptionsManagerInitialized(address admin, address policyManager)
+```
+
+### AdmitGlobalExemption
+
+```solidity
+event AdmitGlobalExemption(address admin, address exemption, string description)
+```
+
+### UpdateGlobalExemption
+
+```solidity
+event UpdateGlobalExemption(address admin, address exemption, string description)
+```
+
+### ApprovePolicyExemptions
+
+```solidity
+event ApprovePolicyExemptions(address admin, uint32 policyId, address exemption)
+```
+
+### ROLE_GLOBAL_EXEMPTIONS_ADMIN
+
+```solidity
+function ROLE_GLOBAL_EXEMPTIONS_ADMIN() external view returns (bytes32)
+```
+
+### policyManager
+
+```solidity
+function policyManager() external view returns (address)
+```
+
+### exemptionDescriptions
+
+```solidity
+function exemptionDescriptions(address) external view returns (string)
+```
+
+### init
+
+```solidity
+function init(address policyManager_) external
+```
+
+### admitGlobalExemption
+
+```solidity
+function admitGlobalExemption(address[] exemptAddresses, string description) external
+```
+
+### updateGlobalExemption
+
+```solidity
+function updateGlobalExemption(address exemptAddress, string description) external
+```
+
+### approvePolicyExemptions
+
+```solidity
+function approvePolicyExemptions(uint32 policyId, address[] exemptions) external
+```
+
+### globalExemptionsCount
+
+```solidity
+function globalExemptionsCount() external view returns (uint256 count)
+```
+
+### globalExemptionAtIndex
+
+```solidity
+function globalExemptionAtIndex(uint256 index) external view returns (address exemption)
+```
+
+### isGlobalExemption
+
+```solidity
+function isGlobalExemption(address exemption) external view returns (bool isIndeed)
+```
+
+### policyExemptionsCount
+
+```solidity
+function policyExemptionsCount(uint32 policyId) external view returns (uint256 count)
+```
+
+### policyExemptionAtIndex
+
+```solidity
+function policyExemptionAtIndex(uint32 policyId, uint256 index) external view returns (address exemption)
+```
+
+### isPolicyExemption
+
+```solidity
+function isPolicyExemption(uint32 policyId, address exemption) external view returns (bool isIndeed)
 ```
 
 ## IIdentityTree
 
-### Unacceptable
+### Deployed
 
 ```solidity
-error Unacceptable(string reason)
+event Deployed(address admin, address trustedForwarder_, address policyManager_, uint256 maximumConsentPeriod)
 ```
 
 ### SetMerkleRootBirthday
@@ -604,22 +1425,31 @@ error Unacceptable(string reason)
 event SetMerkleRootBirthday(bytes32 merkleRoot, uint256 birthday)
 ```
 
+### PolicyMitigation
+
+```solidity
+struct PolicyMitigation {
+  uint256 mitigationFreshness;
+  uint256 degradationPeriod;
+}
+```
+
 ### ROLE_AGGREGATOR
 
 ```solidity
 function ROLE_AGGREGATOR() external view returns (bytes32)
 ```
 
-### merkleRootBirthday
-
-```solidity
-function merkleRootBirthday(bytes32 root) external view returns (uint256)
-```
-
 ### setMerkleRootBirthday
 
 ```solidity
 function setMerkleRootBirthday(bytes32 root, uint256 birthday) external
+```
+
+### checkRoot
+
+```solidity
+function checkRoot(address observer, bytes32 merkleRoot, uint32 admissionPolicyId) external returns (bool passed)
 ```
 
 ### merkleRootCount
@@ -640,18 +1470,6 @@ function merkleRootAtIndex(uint256 index) external view returns (bytes32 merkleR
 function isMerkleRoot(bytes32 merkleRoot) external view returns (bool isIndeed)
 ```
 
-### merkleRootSuccessors
-
-```solidity
-function merkleRootSuccessors(bytes32 merkleRoot) external view returns (uint256 successors)
-```
-
-### latestBirthday
-
-```solidity
-function latestBirthday() external view returns (uint256 birthday)
-```
-
 ### latestRoot
 
 ```solidity
@@ -660,16 +1478,10 @@ function latestRoot() external view returns (bytes32 root)
 
 ## IKeyringCredentials
 
-### Unacceptable
-
-```solidity
-error Unacceptable(string reason)
-```
-
 ### CredentialsDeployed
 
 ```solidity
-event CredentialsDeployed(address deployer, address trustedForwarder, address policyManager)
+event CredentialsDeployed(address deployer, address trustedForwarder, address policyManager, uint256 maximumConsentPeriod)
 ```
 
 ### CredentialsInitialized
@@ -696,32 +1508,39 @@ function ROLE_CREDENTIAL_UPDATER() external view returns (bytes32)
 function init() external
 ```
 
-### cache
-
-```solidity
-function cache(uint8 version, address trader, uint32 admissionPolicyId) external view returns (uint256)
-```
-
 ### setCredential
 
 ```solidity
 function setCredential(address trader, uint32 admissionPolicyId, uint256 timestamp) external
 ```
 
-### getCredential
+### checkCredential
 
 ```solidity
-function getCredential(uint8 version, address trader, uint32 admissionPolicyId) external view returns (uint256)
+function checkCredential(address observer, address subject, uint32 admissionPolicyId) external returns (bool passed)
+```
+
+### keyGen
+
+```solidity
+function keyGen(address trader, uint32 admissionPolicyId) external pure returns (bytes32 key)
 ```
 
 ## IKeyringGuard
 
 KeyringGuard implementation that uses immutables and presents a simplified modifier.
 
-### Unacceptable
+### KeyringConfig
 
 ```solidity
-error Unacceptable(string reason)
+struct KeyringConfig {
+  address trustedForwarder;
+  address collateralToken;
+  address keyringCredentials;
+  address policyManager;
+  address userPolicies;
+  address exemptionsManager;
+}
 ```
 
 ### KeyringGuardConfigured
@@ -730,55 +1549,33 @@ error Unacceptable(string reason)
 event KeyringGuardConfigured(address keyringCredentials, address policyManager, address userPolicies, uint32 admissionPolicyId, bytes32 universeRule, bytes32 emptyRule)
 ```
 
-### WhitelistAddress
+### checkZKPIICache
 
 ```solidity
-event WhitelistAddress(address admin)
+function checkZKPIICache(address observer, address subject) external returns (bool passed)
 ```
 
-### whitelistAddressCount
+### checkTraderWallet
 
 ```solidity
-function whitelistAddressCount() external view returns (uint256 count)
+function checkTraderWallet(address observer, address subject) external returns (bool passed)
 ```
 
-### whitelistAddressAtIndex
+### isAuthorized
 
 ```solidity
-function whitelistAddressAtIndex(uint256 index) external view returns (address whitelisted)
+function isAuthorized(address from, address to) external returns (bool passed)
 ```
 
-### isWhitelisted
+## IKeyringProofVerifier
+
+### verifyProof
 
 ```solidity
-function isWhitelisted(address checkAddress) external view returns (bool isIndeed)
-```
-
-### checkCache
-
-```solidity
-function checkCache(address trader) external returns (bool isIndeed)
-```
-
-### isWalletCheckPassed
-
-```solidity
-function isWalletCheckPassed(address trader) external returns (bool isPassed)
-```
-
-### checkGuard
-
-```solidity
-function checkGuard(address from, address to) external returns (bool isAuthorized)
+function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[] input) external view returns (bool isValid)
 ```
 
 ## IKeyringZkCredentialUpdater
-
-### Unacceptable
-
-```solidity
-error Unacceptable(string reason)
-```
 
 ### CredentialUpdaterDeployed
 
@@ -860,22 +1657,13 @@ error Unacceptable(string reason)
 event Deployed(address deployer, address identityConstructionProofVerifier, address membershipProofVerifier, address authorisationProofVerifier)
 ```
 
-### IDENTITY_MEMBERSHIP_PROOF_VERIFIER
+### Backdoor
 
 ```solidity
-function IDENTITY_MEMBERSHIP_PROOF_VERIFIER() external returns (address)
-```
-
-### IDENTITY_CONSTRUCTION_PROOF_VERIFIER
-
-```solidity
-function IDENTITY_CONSTRUCTION_PROOF_VERIFIER() external returns (address)
-```
-
-### AUTHORIZATION_PROOF_VERIFIER
-
-```solidity
-function AUTHORIZATION_PROOF_VERIFIER() external returns (address)
+struct Backdoor {
+  uint256[2] c1;
+  uint256[2] c2;
+}
 ```
 
 ### Groth16Proof
@@ -893,9 +1681,7 @@ struct Groth16Proof {
 ```solidity
 struct IdentityConstructionProof {
   struct IKeyringZkVerifier.Groth16Proof proof;
-  uint256 identity;
-  uint256 policyCommitment;
-  uint256 maxAddresses;
+  uint256[71] inputs;
 }
 ```
 
@@ -916,11 +1702,31 @@ struct IdentityMembershipProof {
 ```solidity
 struct IdentityAuthorisationProof {
   struct IKeyringZkVerifier.Groth16Proof proof;
+  struct IKeyringZkVerifier.Backdoor backdoor;
   uint256 externalNullifier;
   uint256 nullifierHash;
   uint256[2] policyDisclosures;
   uint256 tradingAddress;
+  uint256[2] regimeKey;
 }
+```
+
+### IDENTITY_MEMBERSHIP_PROOF_VERIFIER
+
+```solidity
+function IDENTITY_MEMBERSHIP_PROOF_VERIFIER() external returns (address)
+```
+
+### IDENTITY_CONSTRUCTION_PROOF_VERIFIER
+
+```solidity
+function IDENTITY_CONSTRUCTION_PROOF_VERIFIER() external returns (address)
+```
+
+### AUTHORIZATION_PROOF_VERIFIER
+
+```solidity
+function AUTHORIZATION_PROOF_VERIFIER() external returns (address)
 ```
 
 ### checkClaim
@@ -966,12 +1772,6 @@ function withdrawTo(address account, uint256 amount) external returns (bool)
 
 ## IPolicyManager
 
-### Unacceptable
-
-```solidity
-error Unacceptable(string reason)
-```
-
 ### PolicyManagerDeployed
 
 ```solidity
@@ -988,6 +1788,12 @@ event PolicyManagerInitialized(address admin)
 
 ```solidity
 event CreatePolicy(address owner, uint32 policyId, struct PolicyStorage.PolicyScalar policyScalar, address[] attestors, address[] walletChecks, bytes32 policyOwnerRole, bytes32 policyUserAdminRole)
+```
+
+### DisablePolicy
+
+```solidity
+event DisablePolicy(address user, uint32 policyId)
 ```
 
 ### UpdatePolicyScalar
@@ -1020,28 +1826,22 @@ event UpdatePolicyTtl(address owner, uint32 policyId, uint128 ttl, uint256 deadl
 event UpdatePolicyGracePeriod(address owner, uint32 policyId, uint128 gracePeriod, uint256 deadline)
 ```
 
-### UpdatePolicyAcceptRoots
-
-```solidity
-event UpdatePolicyAcceptRoots(address owner, uint32 policyId, uint16 acceptRoots, uint256 deadline)
-```
-
 ### UpdatePolicyLock
 
 ```solidity
 event UpdatePolicyLock(address owner, uint32 policyId, bool locked, uint256 deadline)
 ```
 
-### UpdatePolicyAllowUserWhitelists
+### UpdatePolicyAllowApprovedCounterparties
 
 ```solidity
-event UpdatePolicyAllowUserWhitelists(address owner, uint32 policyId, bool allowUserWhitelists, uint256 deadline)
+event UpdatePolicyAllowApprovedCounterparties(address owner, uint32 policyId, bool allowApprovedCounterparties, uint256 deadline)
 ```
 
 ### UpdatePolicyDisablementPeriod
 
 ```solidity
-event UpdatePolicyDisablementPeriod(address admin, uint32 policyId, uint256 disablementPeriod)
+event UpdatePolicyDisablementPeriod(address admin, uint32 policyId, uint256 disablementPeriod, uint256 deadline)
 ```
 
 ### PolicyDisabled
@@ -1080,6 +1880,18 @@ event AddPolicyWalletChecks(address owner, uint32 policyId, address[] walletChec
 event RemovePolicyWalletChecks(address owner, uint32 policyId, address[] walletChecks, uint256 deadline)
 ```
 
+### AddPolicyBackdoor
+
+```solidity
+event AddPolicyBackdoor(address owner, uint32 policyId, bytes32 backdoorId, uint256 deadline)
+```
+
+### RemovePolicyBackdoor
+
+```solidity
+event RemovePolicyBackdoor(address owner, uint32 policyId, bytes32 backdoorId, uint256 deadline)
+```
+
 ### AdmitAttestor
 
 ```solidity
@@ -1108,6 +1920,12 @@ event AdmitWalletCheck(address admin, address walletCheck)
 
 ```solidity
 event RemoveWalletCheck(address admin, address walletCheck)
+```
+
+### AdmitBackdoor
+
+```solidity
+event AdmitBackdoor(address admin, bytes32 id, uint256[2] pubKey)
 ```
 
 ### MinimumPolicyDisablementPeriodUpdated
@@ -1140,6 +1958,12 @@ function ROLE_GLOBAL_WALLETCHECK_ADMIN() external view returns (bytes32)
 function ROLE_GLOBAL_VALIDATION_ADMIN() external view returns (bytes32)
 ```
 
+### ROLE_GLOBAL_BACKDOOR_ADMIN
+
+```solidity
+function ROLE_GLOBAL_BACKDOOR_ADMIN() external view returns (bytes32)
+```
+
 ### ruleRegistry
 
 ```solidity
@@ -1156,6 +1980,12 @@ function init() external
 
 ```solidity
 function createPolicy(struct PolicyStorage.PolicyScalar policyScalar, address[] attestors, address[] walletChecks) external returns (uint32 policyId, bytes32 policyOwnerRoleId, bytes32 policyUserAdminRoleId)
+```
+
+### disablePolicy
+
+```solidity
+function disablePolicy(uint32 policyId) external
 ```
 
 ### updatePolicyScalar
@@ -1188,16 +2018,10 @@ function updatePolicyTtl(uint32 policyId, uint32 ttl, uint256 deadline) external
 function updatePolicyGracePeriod(uint32 policyId, uint32 gracePeriod, uint256 deadline) external
 ```
 
-### updatePolicyAcceptRoots
+### updatePolicyAllowApprovedCounterparties
 
 ```solidity
-function updatePolicyAcceptRoots(uint32 policyId, uint16 acceptRoots, uint256 deadline) external
-```
-
-### updatePolicyAllowUserWhitelists
-
-```solidity
-function updatePolicyAllowUserWhitelists(uint32 policyId, bool allowUserWhitelists, uint256 deadline) external
+function updatePolicyAllowApprovedCounterparties(uint32 policyId, bool allowApprovedCounterparties, uint256 deadline) external
 ```
 
 ### updatePolicyLock
@@ -1209,13 +2033,7 @@ function updatePolicyLock(uint32 policyId, bool locked, uint256 deadline) extern
 ### updatePolicyDisablementPeriod
 
 ```solidity
-function updatePolicyDisablementPeriod(uint32 policyId, uint256 disablementPeriod) external
-```
-
-### disablePolicy
-
-```solidity
-function disablePolicy(uint32 policyId) external
+function updatePolicyDisablementPeriod(uint32 policyId, uint256 disablementPeriod, uint256 deadline) external
 ```
 
 ### setDeadline
@@ -1248,6 +2066,18 @@ function addPolicyWalletChecks(uint32 policyId, address[] walletChecks, uint256 
 function removePolicyWalletChecks(uint32 policyId, address[] walletChecks, uint256 deadline) external
 ```
 
+### addPolicyBackdoor
+
+```solidity
+function addPolicyBackdoor(uint32 policyId, bytes32 backdoorId, uint256 deadline) external
+```
+
+### removePolicyBackdoor
+
+```solidity
+function removePolicyBackdoor(uint32 policyId, bytes32 backdoorId, uint256 deadline) external
+```
+
 ### admitAttestor
 
 ```solidity
@@ -1278,28 +2108,16 @@ function admitWalletCheck(address walletCheck) external
 function removeWalletCheck(address walletCheck) external
 ```
 
+### admitBackdoor
+
+```solidity
+function admitBackdoor(uint256[2] pubKey) external
+```
+
 ### updateMinimumPolicyDisablementPeriod
 
 ```solidity
 function updateMinimumPolicyDisablementPeriod(uint256 minimumDisablementPeriod) external
-```
-
-### policy
-
-```solidity
-function policy(uint32 policyId) external returns (struct PolicyStorage.PolicyScalar scalar, address[] attestors, address[] walletChecks, uint256 deadline)
-```
-
-### policyRawData
-
-```solidity
-function policyRawData(uint32 policyId) external view returns (uint256 deadline, struct PolicyStorage.PolicyScalar scalarActive, struct PolicyStorage.PolicyScalar scalarPending, address[] attestorsActive, address[] attestorsPendingAdditions, address[] attestorsPendingRemovals, address[] walletChecksActive, address[] walletChecksPendingAdditions, address[] walletChecksPendingRemovals)
-```
-
-### policyScalarActive
-
-```solidity
-function policyScalarActive(uint32 policyId) external returns (struct PolicyStorage.PolicyScalar scalarActive)
 ```
 
 ### policyOwnerRole
@@ -1308,10 +2126,52 @@ function policyScalarActive(uint32 policyId) external returns (struct PolicyStor
 function policyOwnerRole(uint32 policyId) external pure returns (bytes32 ownerRole)
 ```
 
+### policy
+
+```solidity
+function policy(uint32 policyId) external returns (struct PolicyStorage.PolicyScalar scalar, address[] attestors, address[] walletChecks, bytes32[] backdoorRegimes, uint256 deadline)
+```
+
+### policyRawData
+
+```solidity
+function policyRawData(uint32 policyId) external view returns (uint256 deadline, struct PolicyStorage.PolicyScalar scalarActive, struct PolicyStorage.PolicyScalar scalarPending, address[] attestorsActive, address[] attestorsPendingAdditions, address[] attestorsPendingRemovals, address[] walletChecksActive, address[] walletChecksPendingAdditions, address[] walletChecksPendingRemovals, bytes32[] backdoorsActive, bytes32[] backdoorsPendingAdditions, bytes32[] backdoorsPendingRemovals)
+```
+
+### policyScalarActive
+
+```solidity
+function policyScalarActive(uint32 policyId) external returns (struct PolicyStorage.PolicyScalar scalarActive)
+```
+
+### policyRuleId
+
+```solidity
+function policyRuleId(uint32 policyId) external returns (bytes32 ruleId)
+```
+
+### policyTtl
+
+```solidity
+function policyTtl(uint32 policyId) external returns (uint32 ttl)
+```
+
+### policyAllowApprovedCounterparties
+
+```solidity
+function policyAllowApprovedCounterparties(uint32 policyId) external returns (bool isAllowed)
+```
+
 ### policyDisabled
 
 ```solidity
 function policyDisabled(uint32 policyId) external view returns (bool isDisabled)
+```
+
+### policyCanBeDisabled
+
+```solidity
+function policyCanBeDisabled(uint32 policyId) external returns (bool canIndeed)
 ```
 
 ### policyAttestorCount
@@ -1362,6 +2222,30 @@ function policyWalletChecks(uint32 policyId) external returns (address[] walletC
 function isPolicyWalletCheck(uint32 policyId, address walletCheck) external returns (bool isIndeed)
 ```
 
+### policyBackdoorCount
+
+```solidity
+function policyBackdoorCount(uint32 policyId) external returns (uint256 count)
+```
+
+### policyBackdoorAtIndex
+
+```solidity
+function policyBackdoorAtIndex(uint32 policyId, uint256 index) external returns (bytes32 backdoorId)
+```
+
+### policyBackdoors
+
+```solidity
+function policyBackdoors(uint32 policyId) external returns (bytes32[] backdoors)
+```
+
+### isPolicyBackdoor
+
+```solidity
+function isPolicyBackdoor(uint32 policyId, bytes32 backdoorId) external returns (bool isIndeed)
+```
+
 ### policyCount
 
 ```solidity
@@ -1410,6 +2294,30 @@ function globalWalletCheckAtIndex(uint256 index) external view returns (address 
 function isGlobalWalletCheck(address walletCheck) external view returns (bool isIndeed)
 ```
 
+### globalBackdoorCount
+
+```solidity
+function globalBackdoorCount() external view returns (uint256 count)
+```
+
+### globalBackdoorAtIndex
+
+```solidity
+function globalBackdoorAtIndex(uint256 index) external view returns (bytes32 backdoorId)
+```
+
+### isGlobalBackdoor
+
+```solidity
+function isGlobalBackdoor(bytes32 backdoorId) external view returns (bool isIndeed)
+```
+
+### backdoorPubKey
+
+```solidity
+function backdoorPubKey(bytes32 backdoorId) external view returns (uint256[2] pubKey)
+```
+
 ### attestorUri
 
 ```solidity
@@ -1420,6 +2328,12 @@ function attestorUri(address attestor) external view returns (string)
 
 ```solidity
 function hasRole(bytes32 role, address user) external view returns (bool)
+```
+
+### minimumPolicyDisablementPeriod
+
+```solidity
+function minimumPolicyDisablementPeriod() external view returns (uint256 period)
 ```
 
 ## IRuleRegistry
@@ -1445,12 +2359,6 @@ struct Rule {
   enum IRuleRegistry.Operator operator;
   bool toxic;
 }
-```
-
-### Unacceptable
-
-```solidity
-error Unacceptable(string reason)
 ```
 
 ### RuleRegistryDeployed
@@ -1575,12 +2483,6 @@ function generateRuleId(string description, enum IRuleRegistry.Operator operator
 
 ## IUserPolicies
 
-### Unacceptable
-
-```solidity
-error Unacceptable(string reason)
-```
-
 ### Deployed
 
 ```solidity
@@ -1593,16 +2495,16 @@ event Deployed(address trustedForwarder, address policyManager)
 event SetUserPolicy(address trader, uint32 policyId)
 ```
 
-### AddTraderWhitelisted
+### AddApprovedCounterparty
 
 ```solidity
-event AddTraderWhitelisted(address, address whitelisted)
+event AddApprovedCounterparty(address, address approved)
 ```
 
-### RemoveTraderWhitelisted
+### RemoveApprovedCounterparty
 
 ```solidity
-event RemoveTraderWhitelisted(address, address whitelisted)
+event RemoveApprovedCounterparty(address, address approved)
 ```
 
 ### userPolicies
@@ -1617,72 +2519,96 @@ function userPolicies(address trader) external view returns (uint32)
 function setUserPolicy(uint32 policyId) external
 ```
 
-### addWhitelistedTrader
+### addApprovedCounterparty
 
 ```solidity
-function addWhitelistedTrader(address whitelisted) external
+function addApprovedCounterparty(address approved) external
 ```
 
-### removeWhitelistedTrader
+### addApprovedCounterparties
 
 ```solidity
-function removeWhitelistedTrader(address whitelisted) external
+function addApprovedCounterparties(address[] approved) external
 ```
 
-### whitelistedTraderCount
+### removeApprovedCounterparty
 
 ```solidity
-function whitelistedTraderCount(address trader) external view returns (uint256 count)
+function removeApprovedCounterparty(address approved) external
 ```
 
-### whitelistedTraderAtIndex
+### removeApprovedCounterparties
 
 ```solidity
-function whitelistedTraderAtIndex(address trader, uint256 index) external view returns (address whitelisted)
+function removeApprovedCounterparties(address[] approved) external
 ```
 
-### isWhitelisted
+### approvedCounterpartyCount
 
 ```solidity
-function isWhitelisted(address trader, address counterparty) external view returns (bool isIndeed)
+function approvedCounterpartyCount(address trader) external view returns (uint256 count)
+```
+
+### approvedCounterpartyAtIndex
+
+```solidity
+function approvedCounterpartyAtIndex(address trader, uint256 index) external view returns (address approved)
+```
+
+### isApproved
+
+```solidity
+function isApproved(address trader, address counterparty) external view returns (bool isIndeed)
 ```
 
 ## IWalletCheck
 
-### Unacceptable
-
-```solidity
-error Unacceptable(string reason)
-```
-
 ### Deployed
 
 ```solidity
-event Deployed(address admin, address trustedForwarder)
+event Deployed(address admin, address trustedForwarder, address policyManager, uint256 maximumConsentPeriod, string uri)
 ```
 
-### SetWalletWhitelist
+### UpdateUri
 
 ```solidity
-event SetWalletWhitelist(address admin, address wallet, bool isWhitelisted)
+event UpdateUri(address admin, string uri)
 ```
 
-### ROLE_WALLETCHECK_ADMIN
+### SetWalletCheck
 
 ```solidity
-function ROLE_WALLETCHECK_ADMIN() external view returns (bytes32)
+event SetWalletCheck(address admin, address wallet, bool isWhitelisted)
 ```
 
-### birthday
+### ROLE_WALLETCHECK_LIST_ADMIN
 
 ```solidity
-function birthday(address wallet) external view returns (uint256 timestamp)
+function ROLE_WALLETCHECK_LIST_ADMIN() external view returns (bytes32)
 ```
 
-### setWalletWhitelist
+### ROLE_WALLETCHECK_META_ADMIN
 
 ```solidity
-function setWalletWhitelist(address wallet, bool whitelisted, uint256 timestamp) external
+function ROLE_WALLETCHECK_META_ADMIN() external view returns (bytes32)
+```
+
+### updateUri
+
+```solidity
+function updateUri(string uri_) external
+```
+
+### setWalletCheck
+
+```solidity
+function setWalletCheck(address wallet, bool whitelisted, uint256 timestamp) external
+```
+
+### checkWallet
+
+```solidity
+function checkWallet(address observer, address wallet, uint32 admissionPolicyId) external returns (bool passed)
 ```
 
 ## KeyringCredentials
@@ -1699,21 +2625,6 @@ Holds the time-limited credential cache, organized by user and admission policy.
 bytes32 ROLE_CREDENTIAL_UPDATER
 ```
 
-### policyManager
-
-```solidity
-address policyManager
-```
-
-### cache
-
-```solidity
-mapping(uint8 => mapping(address => mapping(uint32 => uint256))) cache
-```
-
-_The credentials are indexed by (version => trader => admissionPolicyId) => updateTime
-     where the version is always 1._
-
 ### onlyUpdater
 
 ```solidity
@@ -1725,7 +2636,7 @@ Revert if the message sender doesn't have the Credentials updater role.
 ### constructor
 
 ```solidity
-constructor(address trustedForwarder, address policyManager_) public
+constructor(address trustedForwarder, address policyManager_, uint256 maximumConsentPeriod_) public
 ```
 
 #### Parameters
@@ -1733,7 +2644,8 @@ constructor(address trustedForwarder, address policyManager_) public
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | trustedForwarder | address | Contract address that is allowed to relay message signers. |
-| policyManager_ | address |  |
+| policyManager_ | address | The deployed policyManager contract address. |
+| maximumConsentPeriod_ | uint256 | The time limit for user consent to mitigation procedures. |
 
 ### init
 
@@ -1742,8 +2654,8 @@ function init() external
 ```
 
 This upgradeable contract must be initialized.
-     @dev The initializer function MUST be called directly after deployment 
-     because anyone can call it but overall only once.
+ @dev The initializer function MUST be called directly after deployment 
+because anyone can call it but overall only once.
 
 ### setCredential
 
@@ -1752,23 +2664,59 @@ function setCredential(address trader, uint32 admissionPolicyId, uint256 timesta
 ```
 
 This function is called by a trusted and permitted contract such as the 
-     KeyringZkCredentialUpdater. There is no prohibition on multiple proving schemes 
-     at the cache level since this contract requires only that the caller has permission.
-     @param trader The user address for the Credential update.
-     @param admissionPolicyId The unique identifier of a Policy.
-     @param timestamp The timestamp established by the credential updater.
+KeyringZkCredentialUpdater. There is no prohibition on multiple proving schemes 
+at the cache level since this contract requires only that the caller has permission.
 
-### getCredential
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| trader | address | The user address for the Credential update. |
+| admissionPolicyId | uint32 | The unique identifier of a Policy. |
+| timestamp | uint256 | The timestamp established by the credential updater. |
+
+### checkCredential
 
 ```solidity
-function getCredential(uint8 version, address trader, uint32 admissionPolicyId) external view returns (uint256 timestamp)
+function checkCredential(address observer, address trader, uint32 admissionPolicyId) external returns (bool passed)
 ```
 
 Inspect the credential cache.
-     @param version Cache organization version.
-     @param trader The user to inspect.
-     @param admissionPolicyId The admission policy for the credential to inspect.
-     @return timestamp The timestamp established when the credential was recorded. 0 if no credential.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| observer | address | The observer for degradation mitigation consent. |
+| trader | address | The user address for the Credential update. |
+| admissionPolicyId | uint32 | The admission policy for the credential to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| passed | bool | True if a valid cached credential exists or if mitigation measures are applicable. |
+
+### keyGen
+
+```solidity
+function keyGen(address trader, uint32 admissionPolicyId) public pure returns (bytes32 key)
+```
+
+Generate a cache key for a trader and policyId.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| trader | address | The trader for the credential cache. |
+| admissionPolicyId | uint32 | The policyId. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| key | bytes32 | The credential cache key. |
 
 ## KeyringZkVerifier
 
@@ -1824,6 +2772,16 @@ function checkIdentityConstructionProof(struct IKeyringZkVerifier.IdentityConstr
 Check correct construction of an identity commitment.
      @param constructionProof Proof of correct construction of the identity commitment as defined in 
      IKeyringZkVerifier.
+     @dev input order:
+            NOTE - input order
+            [
+                constructionProof.policyCommitment,
+                constructionProof.maxAddresses,
+                constructionProof.regimeKey,
+                constructionProof.identityPK,
+                constructionProof.identityCommitment,
+                constructionProof.cs
+            ]
      @return verified True if the construction proof is valid.
 
 ### checkIdentityMembershipProof
@@ -1983,10 +2941,10 @@ struct Set {
 }
 ```
 
-### SetConsistency
+### Bytes32SetConsistency
 
 ```solidity
-error SetConsistency(string module, string method, string reason, string context)
+error Bytes32SetConsistency(string module, string method, string reason, string context)
 ```
 
 ### insert
@@ -2005,6 +2963,24 @@ _Duplicate keys are not permitted._
 | ---- | ---- | ----------- |
 | self | struct Bytes32Set.Set | A Set struct |
 | key | bytes32 | A value in the Set. |
+| context | string | A message string about interpretation of the issue. Normally the calling function. |
+
+### remove
+
+```solidity
+function remove(struct Bytes32Set.Set self, bytes32 key, string context) internal
+```
+
+Remove a key from the store.
+
+_The key to remove must exist._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct Bytes32Set.Set | A Set struct |
+| key | bytes32 | An address to remove from the Set. |
 | context | string | A message string about interpretation of the issue. Normally the calling function. |
 
 ### count
@@ -2071,6 +3047,12 @@ Retrieve an bytes32 by its position in the Set. Use for enumeration.
 
 ## Pack12x20
 
+### OutOfRange
+
+```solidity
+error OutOfRange(uint32 input)
+```
+
 ### FIELD_SIZE
 
 ```solidity
@@ -2090,7 +3072,7 @@ function pack(uint32[12] input) internal pure returns (uint256 packed)
 ```
 
 Pack 12 20-bit integers into a 240-bit object.
-     @dev uint32 Inputs are truncated above 20 bits of magnitude.
+     @dev uint32 Inputs are limited to 20 bits of magnitude.
      @param input Array of 20-bit integers to pack cast as an array of uint32.
 
 ### unpack
@@ -2111,6 +3093,12 @@ PolicyStorage attends to state management concerns for the PolicyManager. It est
  PolicyManager is responsible for orchestration of the functions implemented here as well as access
  control.
 
+### MAX_DISABLEMENT_PERIOD
+
+```solidity
+uint256 MAX_DISABLEMENT_PERIOD
+```
+
 ### Unacceptable
 
 ```solidity
@@ -2123,10 +3111,11 @@ error Unacceptable(string reason)
 struct App {
   uint256 minimumPolicyDisablementPeriod;
   struct PolicyStorage.Policy[] policies;
+  struct AddressSet.Set globalWalletCheckSet;
   struct AddressSet.Set globalAttestorSet;
   mapping(address => string) attestorUris;
-  struct AddressSet.Set globalWalletCheckSet;
-  mapping(uint32 => bool) policyDisabled;
+  struct Bytes32Set.Set backdoorSet;
+  mapping(bytes32 => uint256[2]) backdoorPubKey;
 }
 ```
 
@@ -2138,8 +3127,7 @@ struct PolicyScalar {
   string descriptionUtf8;
   uint32 ttl;
   uint32 gracePeriod;
-  uint16 acceptRoots;
-  bool allowUserWhitelists;
+  bool allowApprovedCounterparties;
   uint256 disablementPeriod;
   bool locked;
 }
@@ -2165,6 +3153,16 @@ struct PolicyWalletChecks {
 }
 ```
 
+### PolicyBackdoors
+
+```solidity
+struct PolicyBackdoors {
+  struct Bytes32Set.Set activeSet;
+  struct Bytes32Set.Set pendingAdditionSet;
+  struct Bytes32Set.Set pendingRemovalSet;
+}
+```
+
 ### Policy
 
 ```solidity
@@ -2175,8 +3173,44 @@ struct Policy {
   struct PolicyStorage.PolicyScalar scalarPending;
   struct PolicyStorage.PolicyAttestors attestors;
   struct PolicyStorage.PolicyWalletChecks walletChecks;
+  struct PolicyStorage.PolicyBackdoors backdoors;
 }
 ```
+
+### disablePolicy
+
+```solidity
+function disablePolicy(struct PolicyStorage.Policy policyObj) public
+```
+
+A policy can be disabled if the policy is deemed failed.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyObj | struct PolicyStorage.Policy | The policy to disable. |
+
+### policyHasFailed
+
+```solidity
+function policyHasFailed(struct PolicyStorage.Policy policyObj) public view returns (bool hasIndeed)
+```
+
+A policy is deemed failed if all attestors or any wallet check is inactive
+over the policyDisablement period.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyObj | struct PolicyStorage.Policy | The policy to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| hasIndeed | bool | True if all attestors have failed or any wallet check has failed,       where "failure" is no updates over the policyDisablement period. |
 
 ### updateMinimumPolicyDisablementPeriod
 
@@ -2278,6 +3312,23 @@ _Does not affect policies that utilize the wallet check._
 | self | struct PolicyStorage.App | PolicyManager App state. |
 | walletCheck | address | The address of a Wallet Check to admit into the global whitelist. |
 
+### insertGlobalBackdoor
+
+```solidity
+function insertGlobalBackdoor(struct PolicyStorage.App self, uint256[2] pubKey) public returns (bytes32 id)
+```
+
+The backdoor admin can add a backdoor.
+
+_pubKey must be unique._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.App | PolicyManager App state. |
+| pubKey | uint256[2] | The public key for backdoor encryption. |
+
 ### newPolicy
 
 ```solidity
@@ -2286,7 +3337,7 @@ function newPolicy(struct PolicyStorage.App self, struct PolicyStorage.PolicySca
 
 Creates a new policy that is owned by the creator.
 
-_Maximum unique policies is 2 ^ 20._
+_Maximum unique policies is 2 ^ 20. Must be at least 1 attestor._
 
 #### Parameters
 
@@ -2330,10 +3381,10 @@ _Staged changes with deadlines in the past are presented as pending._
 ### processStaged
 
 ```solidity
-function processStaged(struct PolicyStorage.App self, uint32 policyId) public
+function processStaged(struct PolicyStorage.Policy policyObj) public
 ```
 
-Updates policy storage if the deadline is in the past.
+Processes staged changes to the policy state if the deadline is in the past.
 
 _Always call this before inspecting the the active policy state. ._
 
@@ -2341,29 +3392,28 @@ _Always call this before inspecting the the active policy state. ._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| self | struct PolicyStorage.App | A Policy object. |
-| policyId | uint32 |  |
+| policyObj | struct PolicyStorage.Policy | A Policy object. |
 
 ### checkLock
 
 ```solidity
-function checkLock(struct PolicyStorage.Policy policy) public view
+function checkLock(struct PolicyStorage.Policy policyObj) public view
 ```
 
-Enforces policy locks.
+Prevents changes to locked and disabled Policies.
 
-_Reverts if the active policy lock is set to true._
+_Reverts if the active policy lock is set to true or the Policy is disabled._
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| policy | struct PolicyStorage.Policy | A Policy object. |
+| policyObj | struct PolicyStorage.Policy | A Policy object. |
 
 ### isLocked
 
 ```solidity
-function isLocked(struct PolicyStorage.Policy policy) public view returns (bool isIndeed)
+function isLocked(struct PolicyStorage.Policy policyObj) public view returns (bool isIndeed)
 ```
 
 Inspect the active policy lock.
@@ -2372,7 +3422,7 @@ Inspect the active policy lock.
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| policy | struct PolicyStorage.Policy | A Policy object. |
+| policyObj | struct PolicyStorage.Policy | A Policy object. |
 
 #### Return Values
 
@@ -2380,31 +3430,10 @@ Inspect the active policy lock.
 | ---- | ---- | ----------- |
 | isIndeed | bool | True if the active policy locked parameter is set to true. True value if PolicyStorage      is locked, otherwise False. |
 
-### disablePolicy
-
-```solidity
-function disablePolicy(struct PolicyStorage.Policy policy, uint256 deadline) public
-```
-
-Disable a policy if all its active attestors have a latest birthday older than the deadline and there
-are no pending attestor additions.
-
-_This function iterates through the active attestors in the policy's attestor set, and checks if all
-attestors have a latest birthday older than the specified deadline. It also checks if there are no pending
-attestor additions. If both conditions are met, it disables the policy. Note that this function can be called
-by anyone as long as the conditions are met._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| policy | struct PolicyStorage.Policy | The storage reference to the Policy struct. |
-| deadline | uint256 | The timestamp representing the latest birthday that is allowed for an active attestor. |
-
 ### setDeadline
 
 ```solidity
-function setDeadline(struct PolicyStorage.App self, uint32 policyId, uint256 deadline) public
+function setDeadline(struct PolicyStorage.Policy policyObj, uint256 deadline) public
 ```
 
 Processes staged changes if the current deadline has passed and updates the deadline.
@@ -2415,8 +3444,7 @@ _The deadline must be at least as far in the future as the active policy gracePe
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| self | struct PolicyStorage.App | A Policy object. |
-| policyId | uint32 |  |
+| policyObj | struct PolicyStorage.Policy | A Policy object. |
 | deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
 
 ### writePolicyScalar
@@ -2500,20 +3528,20 @@ _Deadlines must always be >= the active policy grace period._
 | self | struct PolicyStorage.Policy | A Policy object. |
 | gracePeriod | uint32 | The minimum acceptable deadline. |
 
-### writeAllowUserWhitelists
+### writeAllowApprovedCounterparties
 
 ```solidity
-function writeAllowUserWhitelists(struct PolicyStorage.Policy self, bool allowUserWhitelists) public
+function writeAllowApprovedCounterparties(struct PolicyStorage.Policy self, bool allowApprovedCounterparties) public
 ```
 
-Writes a new allowUserWhitelists state in the pending Policy changes in a Policy.
+Writes a new allowApprovedCounterparties state in the pending Policy changes in a Policy.
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | self | struct PolicyStorage.Policy | A Policy object. |
-| allowUserWhitelists | bool | True if whitelists are allowed, otherwise false. |
+| allowApprovedCounterparties | bool | True if whitelists are allowed, otherwise false. |
 
 ### writePolicyLock
 
@@ -2548,27 +3576,10 @@ _If the provided disablement deadline is in the past, this function will revert.
 | policyId | uint32 |  |
 | disablementPeriod | uint256 | The new disablement deadline to set, in seconds since the Unix epoch.   If set to 0, the policy can be disabled at any time.   If set to a non-zero value, the policy can only be disabled after that time. |
 
-### writeAcceptRoots
-
-```solidity
-function writeAcceptRoots(struct PolicyStorage.Policy self, uint16 acceptRoots) public
-```
-
-Writes a new value for acceptRoots in the pending Policy changes of a Policy.
-
-_The KeyringZkUpdater will accept the n most recent roots, where n is specified here._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| self | struct PolicyStorage.Policy | A Policy object. |
-| acceptRoots | uint16 | The depth of most recent roots to always accept. |
-
 ### writeAttestorAdditions
 
 ```solidity
-function writeAttestorAdditions(struct PolicyStorage.App self, struct PolicyStorage.Policy policy, address[] attestors) public
+function writeAttestorAdditions(struct PolicyStorage.App self, struct PolicyStorage.Policy policyObj, address[] attestors) public
 ```
 
 Writes attestors to pending Policy attestor additions.
@@ -2578,7 +3589,7 @@ Writes attestors to pending Policy attestor additions.
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | self | struct PolicyStorage.App | PolicyManager App state. |
-| policy | struct PolicyStorage.Policy | A Policy object. |
+| policyObj | struct PolicyStorage.Policy | A Policy object. |
 | attestors | address[] | The address of one or more Attestors to add to the Policy. |
 
 ### writeAttestorRemovals
@@ -2599,7 +3610,7 @@ Writes attestors to pending Policy attestor removals.
 ### writeWalletCheckAdditions
 
 ```solidity
-function writeWalletCheckAdditions(struct PolicyStorage.App self, struct PolicyStorage.Policy policy, address[] walletChecks) public
+function writeWalletCheckAdditions(struct PolicyStorage.App self, struct PolicyStorage.Policy policyObj, address[] walletChecks) public
 ```
 
 Writes wallet checks to a Policy's pending wallet check additions.
@@ -2609,7 +3620,7 @@ Writes wallet checks to a Policy's pending wallet check additions.
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | self | struct PolicyStorage.App | PolicyManager App state. |
-| policy | struct PolicyStorage.Policy | A PolicyStorage object. |
+| policyObj | struct PolicyStorage.Policy | A PolicyStorage object. |
 | walletChecks | address[] | The address of one or more Wallet Checks to add to the Policy. |
 
 ### writeWalletCheckRemovals
@@ -2626,6 +3637,74 @@ Writes wallet checks to a Policy's pending wallet check removals.
 | ---- | ---- | ----------- |
 | self | struct PolicyStorage.Policy | A Policy object. |
 | walletChecks | address[] | The address of one or more Wallet Checks to add to the Policy. |
+
+### writeBackdoorAddition
+
+```solidity
+function writeBackdoorAddition(struct PolicyStorage.App self, struct PolicyStorage.Policy policyObj, bytes32 backdoorId) public
+```
+
+Add a backdoor to a policy.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.App | The application state. |
+| policyObj | struct PolicyStorage.Policy | A Policy object. |
+| backdoorId | bytes32 | The ID of a backdoor. |
+
+### writeBackdoorRemoval
+
+```solidity
+function writeBackdoorRemoval(struct PolicyStorage.Policy self, bytes32 backdoorId) public
+```
+
+Writes a wallet check to a Policy's pending wallet check removals.
+
+_Unschedules addition if the wallet check is present in the Policy's pending wallet check additions._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.Policy | A Policy object. |
+| backdoorId | bytes32 | The address of a Wallet Check to remove from the Policy. |
+
+### _checkBackdoorConfiguration
+
+```solidity
+function _checkBackdoorConfiguration(struct PolicyStorage.Policy self) internal view
+```
+
+Checks the net count of backdoors.
+
+_Current zkVerifier supports only one backdoor per policy._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.Policy | A policy object. |
+
+### policy
+
+```solidity
+function policy(struct PolicyStorage.App self, uint32 policyId) public returns (struct PolicyStorage.Policy policyObj)
+```
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| self | struct PolicyStorage.App | Application state. |
+| policyId | uint32 | The unique identifier of a Policy. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyObj | struct PolicyStorage.Policy | Policy object with staged updates processed. |
 
 ## MockERC20
 
@@ -2962,6 +4041,12 @@ bytes32 ROLE_GLOBAL_ATTESTOR_ADMIN
 bytes32 ROLE_GLOBAL_WALLETCHECK_ADMIN
 ```
 
+### ROLE_GLOBAL_BACKDOOR_ADMIN
+
+```solidity
+bytes32 ROLE_GLOBAL_BACKDOOR_ADMIN
+```
+
 ### ROLE_GLOBAL_VALIDATION_ADMIN
 
 ```solidity
@@ -3026,6 +4111,16 @@ Keyring Governance has exclusive access to the global whitelist of Wallet Checks
 
 _Reverts if the user doesn't have the global wallet check admin role._
 
+### onlyBackdoorAdmin
+
+```solidity
+modifier onlyBackdoorAdmin()
+```
+
+Keyring governance has exclusive access to the global whitelist of backdoor.
+
+_Reverts if the user doesn't have the global backdoor admin role._
+
 ### onlyValidationAdmin
 
 ```solidity
@@ -3083,6 +4178,20 @@ A policy creater can create a policy and is granted the admin and user admin rol
 | policyId | uint32 | The unique identifier of a new Policy. |
 | policyOwnerRoleId | bytes32 |  |
 | policyUserAdminRoleId | bytes32 |  |
+
+### disablePolicy
+
+```solidity
+function disablePolicy(uint32 policyId) external
+```
+
+Any user can disable a policy if the policy is deemed failed.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policy to disable. |
 
 ### updatePolicyScalar
 
@@ -3174,30 +4283,10 @@ _Deadlines must always be >= the active policy grace period._
 | gracePeriod | uint32 | The minimum acceptable deadline. |
 | deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
 
-### updatePolicyAcceptRoots
+### updatePolicyAllowApprovedCounterparties
 
 ```solidity
-function updatePolicyAcceptRoots(uint32 policyId, uint16 acceptRoots, uint256 deadline) external
-```
-
-Policy admins can force acceptance of the last n identity tree roots. This facility
-     provides protection for traders in the event that circumstances prevent the publication of 
-     new identity tree roots.
-
-_Deadlines must always be >= the active policy grace period._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| policyId | uint32 | The policy to update. |
-| acceptRoots | uint16 | The depth of most recent roots to always accept. |
-| deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
-
-### updatePolicyAllowUserWhitelists
-
-```solidity
-function updatePolicyAllowUserWhitelists(uint32 policyId, bool allowUserWhitelists, uint256 deadline) external
+function updatePolicyAllowApprovedCounterparties(uint32 policyId, bool allowApprovedCounterparties, uint256 deadline) external
 ```
 
 Policy owners can allow users to set whitelists of counterparties to exempt from
@@ -3208,7 +4297,7 @@ Policy owners can allow users to set whitelists of counterparties to exempt from
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | policyId | uint32 | The policy to update. |
-| allowUserWhitelists | bool | True if whitelists are allowed, otherwise false. |
+| allowApprovedCounterparties | bool | True if whitelists are allowed, otherwise false. |
 | deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
 
 ### updatePolicyLock
@@ -3232,7 +4321,7 @@ _Deadlines must always be >= the active policy grace period._
 ### updatePolicyDisablementPeriod
 
 ```solidity
-function updatePolicyDisablementPeriod(uint32 policyId, uint256 disablementPeriod) external
+function updatePolicyDisablementPeriod(uint32 policyId, uint256 disablementPeriod, uint256 deadline) external
 ```
 
 Update the disablement period of a policy. See disable Policy.
@@ -3246,25 +4335,7 @@ Only the policy admin can call this function._
 | ---- | ---- | ----------- |
 | policyId | uint32 | The ID of the policy to update. |
 | disablementPeriod | uint256 | The new disablement period for the policy. |
-
-### disablePolicy
-
-```solidity
-function disablePolicy(uint32 policyId) public
-```
-
-Disable a policy if all its active attestors have a latest birthday older than the calculated 
-deadline and there are no pending attestor additions.
-
-_This function retrieves the storage reference to the policy specified by `policyId`, and calculates 
-the earliest time when disabling the policy will be permitted. Any user can disable a policy provided
-that the policy meets the conditions for disabling._
-
-#### Parameters
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| policyId | uint32 | The ID of the policy to be disabled. |
+| deadline | uint256 |  |
 
 ### setDeadline
 
@@ -3359,6 +4430,38 @@ _Deadlines must always be >= the active policy grace period. The wallet checks m
 | walletChecks | address[] | The address of one or more Attestors to remove from the Policy. |
 | deadline | uint256 | The timestamp when the staged changes will take effect. Overrides previous deadline. |
 
+### addPolicyBackdoor
+
+```solidity
+function addPolicyBackdoor(uint32 policyId, bytes32 backdoorId, uint256 deadline) external
+```
+
+The policy admin can add a backdoor.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policy to update. |
+| backdoorId | bytes32 | The UID of the backdoor to add. |
+| deadline | uint256 |  |
+
+### removePolicyBackdoor
+
+```solidity
+function removePolicyBackdoor(uint32 policyId, bytes32 backdoorId, uint256 deadline) external
+```
+
+The policy admin can remove a backdoor.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policy to update. |
+| backdoorId | bytes32 | The UID of the backdoor to remove. |
+| deadline | uint256 |  |
+
 ### admitAttestor
 
 ```solidity
@@ -3435,6 +4538,22 @@ _Does not automatically remove Wallet Checks from affected Policies._
 | ---- | ---- | ----------- |
 | walletCheck | address | The address of a Wallet Check contract in the global whitelist. |
 
+### admitBackdoor
+
+```solidity
+function admitBackdoor(uint256[2] pubKey) external
+```
+
+The backdoor admin can admit a backdoor.
+
+_Key must be unique. Removing these keys is unsupported._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| pubKey | uint256[2] | The public key to admit. |
+
 ### updateMinimumPolicyDisablementPeriod
 
 ```solidity
@@ -3449,10 +4568,32 @@ _Updates the minimumPolicyDisablementPeriod_
 | ---- | ---- | ----------- |
 | minimumDisablementPeriod | uint256 | The new value for the minimumPolicyDisablementPeriod property. |
 
+### policyOwnerRole
+
+```solidity
+function policyOwnerRole(uint32 policyId) public pure returns (bytes32 ownerRole)
+```
+
+Generate the corresponding admin/owner role for a policyId.
+
+_Use static calls to inspect current information._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policyId |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| ownerRole | bytes32 | The bytes32 owner role that corresponds to the policyId |
+
 ### policy
 
 ```solidity
-function policy(uint32 policyId) public returns (struct PolicyStorage.PolicyScalar config, address[] attestors, address[] walletChecks, uint256 deadline)
+function policy(uint32 policyId) public returns (struct PolicyStorage.PolicyScalar config, address[] attestors, address[] walletChecks, bytes32[] backdoors, uint256 deadline)
 ```
 
 _Use static calls to inspect current information._
@@ -3470,12 +4611,13 @@ _Use static calls to inspect current information._
 | config | struct PolicyStorage.PolicyScalar | The scalar values that form part of the policy definition. |
 | attestors | address[] | The authorized attestors for the policy. |
 | walletChecks | address[] | The policy trader wallet checks that will be performed on a just-in-time basis. |
+| backdoors | bytes32[] | The backdoor regimes applicable to the policy. |
 | deadline | uint256 | The timestamp when staged changes will take effect. |
 
 ### policyRawData
 
 ```solidity
-function policyRawData(uint32 policyId) external view returns (uint256 deadline, struct PolicyStorage.PolicyScalar scalarActive, struct PolicyStorage.PolicyScalar scalarPending, address[] attestorsActive, address[] attestorsPendingAdditions, address[] attestorsPendingRemovals, address[] walletChecksActive, address[] walletChecksPendingAdditions, address[] walletChecksPendingRemovals)
+function policyRawData(uint32 policyId) external view returns (uint256 deadline, struct PolicyStorage.PolicyScalar scalarActive, struct PolicyStorage.PolicyScalar scalarPending, address[] attestorsActive, address[] attestorsPendingAdditions, address[] attestorsPendingRemovals, address[] walletChecksActive, address[] walletChecksPendingAdditions, address[] walletChecksPendingRemovals, bytes32[] backdoorsActive, bytes32[] backdoorsPendingAdditions, bytes32[] backdoorsPendingRemovals)
 ```
 
 Reveals the internal state of the policy object without processing staged changes.
@@ -3494,7 +4636,7 @@ _A non-zero deadline in the past indicates that staged updates are already in ef
 function policyScalarActive(uint32 policyId) external returns (struct PolicyStorage.PolicyScalar scalarActive)
 ```
 
-Inspect the active scalar values of a specific policy.
+Inspect the active policy scalar values.
 
 _Use static call to inspect current values._
 
@@ -3508,27 +4650,73 @@ _Use static call to inspect current values._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| scalarActive | struct PolicyStorage.PolicyScalar | The active scalar values of the policy. |
+| scalarActive | struct PolicyStorage.PolicyScalar | The active scalar values for the policy. |
 
-### policyOwnerRole
+### policyRuleId
 
 ```solidity
-function policyOwnerRole(uint32 policyId) public pure returns (bytes32 ownerRole)
+function policyRuleId(uint32 policyId) external returns (bytes32 ruleId)
 ```
 
-Generate the corresponding admin/owner role for a policyId
+Inspect the policy ruleId.
+
+_Use static call to inspect current values._
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| policyId | uint32 | The policyId |
+| policyId | uint32 | The unique identifier of the policy. |
 
 #### Return Values
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| ownerRole | bytes32 | The bytes32 owner role that corresponds to the policyId |
+| ruleId | bytes32 | The active scalar values of the policy. |
+
+### policyTtl
+
+```solidity
+function policyTtl(uint32 policyId) external returns (uint32 ttl)
+```
+
+Inspect the policy ttl.
+
+_Use static call to inspect current values._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The unique identifier of the policy. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| ttl | uint32 | The active ttl of the policy. |
+
+### policyAllowApprovedCounterparties
+
+```solidity
+function policyAllowApprovedCounterparties(uint32 policyId) external returns (bool isAllowed)
+```
+
+Check if the policy allows counterparty approvals.
+
+_Use static call to inspect current values._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The unique identifier of the policy. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| isAllowed | bool | True if the active policy configuration allows counterparty approvals. |
 
 ### policyDisabled
 
@@ -3537,6 +4725,8 @@ function policyDisabled(uint32 policyId) external view returns (bool isDisabled)
 ```
 
 Inspect the policy disablement flag.
+
+_Use static calls to inspect current information._
 
 #### Parameters
 
@@ -3550,11 +4740,36 @@ Inspect the policy disablement flag.
 | ---- | ---- | ----------- |
 | isDisabled | bool | True if the policy is disabled. |
 
+### policyCanBeDisabled
+
+```solidity
+function policyCanBeDisabled(uint32 policyId) external returns (bool canIndeed)
+```
+
+A policy is deemed failed if all attestors or any wallet check has been
+     degraded for a period exceeding the policyDisablementPeriod.
+
+_Use static calls to inspect._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policy to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| canIndeed | bool | True if the policy can be disabled. |
+
 ### policyAttestorCount
 
 ```solidity
 function policyAttestorCount(uint32 policyId) public returns (uint256 count)
 ```
+
+Count the active policy attestors.
 
 _Use static calls to inspect current information._
 
@@ -3575,6 +4790,8 @@ _Use static calls to inspect current information._
 ```solidity
 function policyAttestorAtIndex(uint32 policyId, uint256 index) external returns (address attestor)
 ```
+
+Inspect the active policy attestor at the index.
 
 _Use static calls to inspect current information._
 
@@ -3597,6 +4814,8 @@ _Use static calls to inspect current information._
 function policyAttestors(uint32 policyId) external returns (address[] attestors)
 ```
 
+Inspect the full list of active policy attestors.
+
 _Use static calls to inspect current information._
 
 #### Parameters
@@ -3616,6 +4835,8 @@ _Use static calls to inspect current information._
 ```solidity
 function isPolicyAttestor(uint32 policyId, address attestor) external returns (bool isIndeed)
 ```
+
+Check if an attestor is active for the policy.
 
 _Use static calls to inspect current information._
 
@@ -3638,6 +4859,8 @@ _Use static calls to inspect current information._
 function policyWalletCheckCount(uint32 policyId) public returns (uint256 count)
 ```
 
+Count the active wallet checks for the policy.
+
 _Use static calls to inspect current information._
 
 #### Parameters
@@ -3650,13 +4873,15 @@ _Use static calls to inspect current information._
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| count | uint256 | The count of wallet checks for the Policy. |
+| count | uint256 | The count of active wallet checks for the Policy. |
 
 ### policyWalletCheckAtIndex
 
 ```solidity
 function policyWalletCheckAtIndex(uint32 policyId, uint256 index) external returns (address walletCheck)
 ```
+
+Inspect the active wallet check at the index.
 
 _Use static calls to inspect current information._
 
@@ -3679,6 +4904,8 @@ _Use static calls to inspect current information._
 function policyWalletChecks(uint32 policyId) external returns (address[] walletChecks)
 ```
 
+Inspect the full list of active wallet checks for the policy.
+
 _Use static calls to inspect current information._
 
 #### Parameters
@@ -3699,6 +4926,8 @@ _Use static calls to inspect current information._
 function isPolicyWalletCheck(uint32 policyId, address walletCheck) external returns (bool isIndeed)
 ```
 
+Check if a wallet check is active for the policy.
+
 _Use static calls to inspect current information._
 
 #### Parameters
@@ -3714,13 +4943,103 @@ _Use static calls to inspect current information._
 | ---- | ---- | ----------- |
 | isIndeed | bool | True if wallet check applies to the Policy, otherwise false. |
 
+### policyBackdoorCount
+
+```solidity
+function policyBackdoorCount(uint32 policyId) external returns (uint256 count)
+```
+
+Count backdoors in a policy
+
+_Use static calls to inspect current information._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policy to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| count | uint256 | The count of backdoors in the policy. |
+
+### policyBackdoorAtIndex
+
+```solidity
+function policyBackdoorAtIndex(uint32 policyId, uint256 index) external returns (bytes32 backdoorId)
+```
+
+Iterate the backdoors in a policy.
+
+_Use static calls to inspect current information._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policy to inspect. |
+| index | uint256 | The index to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| backdoorId | bytes32 | The backdoor id at the index in the policy. |
+
+### policyBackdoors
+
+```solidity
+function policyBackdoors(uint32 policyId) external returns (bytes32[] backdoors)
+```
+
+Inspect the full list of backdoors in a policy.
+
+_Use static calls to inspect current information._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policy to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| backdoors | bytes32[] | The full list of backdoors in effect for the policy. |
+
+### isPolicyBackdoor
+
+```solidity
+function isPolicyBackdoor(uint32 policyId, bytes32 backdoorId) external returns (bool isIndeed)
+```
+
+Check if a backdoor is in a policy.
+
+_Use static calls to inspect current information._
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| policyId | uint32 | The policy to inspect. |
+| backdoorId | bytes32 | The backdoor id to check for. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| isIndeed | bool | True if the backdoor id is present in the policy. |
+
 ### policyCount
 
 ```solidity
 function policyCount() public view returns (uint256 count)
 ```
 
-_Does not check existance._
+Count the policies in the system.
 
 #### Return Values
 
@@ -3733,6 +5052,8 @@ _Does not check existance._
 ```solidity
 function isPolicy(uint32 policyId) public view returns (bool isIndeed)
 ```
+
+Check if a policyId exists in the system.
 
 #### Parameters
 
@@ -3752,6 +5073,8 @@ function isPolicy(uint32 policyId) public view returns (bool isIndeed)
 function globalAttestorCount() external view returns (uint256 count)
 ```
 
+Count the global attestors admitted into the system.
+
 #### Return Values
 
 | Name | Type | Description |
@@ -3763,6 +5086,8 @@ function globalAttestorCount() external view returns (uint256 count)
 ```solidity
 function globalAttestorAtIndex(uint256 index) external view returns (address attestor)
 ```
+
+Inspect the global attestor at the index.
 
 #### Parameters
 
@@ -3782,6 +5107,8 @@ function globalAttestorAtIndex(uint256 index) external view returns (address att
 function isGlobalAttestor(address attestor) public view returns (bool isIndeed)
 ```
 
+Check if an address is admitted to the global attestors list.
+
 #### Parameters
 
 | Name | Type | Description |
@@ -3800,6 +5127,8 @@ function isGlobalAttestor(address attestor) public view returns (bool isIndeed)
 function globalWalletCheckCount() external view returns (uint256 count)
 ```
 
+Count wallet checks admitted to the global list.
+
 #### Return Values
 
 | Name | Type | Description |
@@ -3811,6 +5140,8 @@ function globalWalletCheckCount() external view returns (uint256 count)
 ```solidity
 function globalWalletCheckAtIndex(uint256 index) external view returns (address walletCheck)
 ```
+
+Inspect the global wallet check at the index.
 
 #### Parameters
 
@@ -3830,6 +5161,8 @@ function globalWalletCheckAtIndex(uint256 index) external view returns (address 
 function isGlobalWalletCheck(address walletCheck) external view returns (bool isIndeed)
 ```
 
+Check if an address is admitted to the global wallet check list.
+
 #### Parameters
 
 | Name | Type | Description |
@@ -3842,11 +5175,87 @@ function isGlobalWalletCheck(address walletCheck) external view returns (bool is
 | ---- | ---- | ----------- |
 | isIndeed | bool | True if the wallet check exists in the global whitelist, otherwise false. |
 
+### globalBackdoorCount
+
+```solidity
+function globalBackdoorCount() external view returns (uint256 count)
+```
+
+Count backdoors that have been admitted into the system.
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| count | uint256 | The number of backdoors in the system. |
+
+### globalBackdoorAtIndex
+
+```solidity
+function globalBackdoorAtIndex(uint256 index) external view returns (bytes32 backdoorId)
+```
+
+Iterate global backdoors.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| index | uint256 | The global backdoor index to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| backdoorId | bytes32 | The backdoorId at the index in the list of admitted backdoors. |
+
+### isGlobalBackdoor
+
+```solidity
+function isGlobalBackdoor(bytes32 backdoorId) external view returns (bool isIndeed)
+```
+
+Check if a backdoorId exists in the global list of admitted backdoors.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| backdoorId | bytes32 | The backdoorId to check. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| isIndeed | bool | True if the backdoorId exists in the list of globally admitted backdoors. |
+
+### backdoorPubKey
+
+```solidity
+function backdoorPubKey(bytes32 backdoorId) external view returns (uint256[2] pubKey)
+```
+
+Inspect backdoorPubKey associated with the backdoorId.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| backdoorId | bytes32 | The backdoorId to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| pubKey | uint256[2] | The backdoor public key. |
+
 ### attestorUri
 
 ```solidity
 function attestorUri(address attestor) external view returns (string uri)
 ```
+
+Inspect the Uri for an attestor on the global attestor list.
 
 #### Parameters
 
@@ -3880,6 +5289,22 @@ Inspect user roles.
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | doesIndeed | bool | True if the user has the role. |
+
+### minimumPolicyDisablementPeriod
+
+```solidity
+function minimumPolicyDisablementPeriod() external view returns (uint256 period)
+```
+
+Inspect the minimum policy disablement period.
+
+_The minimum policy disablement period is the minimum time that must pass before a policy can be disabled._
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| period | uint256 | The minimum policy disablement period. |
 
 ## RuleRegistry
 
@@ -4203,30 +5628,21 @@ This contract illustrates how an immutable KeyringGuard can be wrapped around co
  (e.g. DAI Token). Specify the token to wrap and the new name/symbol of the wrapped token - then good to go!
  Tokens can only be transferred to an address that maintains compliance with the configured policy.
 
-### checkAuthorisations
-
-```solidity
-modifier checkAuthorisations(address from, address to)
-```
-
 ### constructor
 
 ```solidity
-constructor(address trustedForwarder, address collateralToken, address keyringCredentials, address policyManager, address userPolicies, uint32 policyId, string name_, string symbol_) public
+constructor(struct IKeyringGuard.KeyringConfig config, uint32 policyId_, uint32 maximumConsentPeriod_, string name_, string symbol_) public
 ```
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| trustedForwarder | address | Contract address that is allowed to relay message signers.      @param collateralToken The contract address of the token that is to be wrapped      @param keyringCredentials The address for the deployed KeyringCredentials contract.      @param policyManager The address for the deployed PolicyManager contract.      @param userPolicies The address for the deployed UserPolicies contract.      @param policyId The unique identifier of a Policy.      @param name_ The name of the new wrapped token. Passed to ERC20.constructor to set the ERC20.name      @param symbol_ The symbol for the new wrapped token. Passed to ERC20.constructor to set the ERC20.symbol |
-| collateralToken | address |  |
-| keyringCredentials | address |  |
-| policyManager | address |  |
-| userPolicies | address |  |
-| policyId | uint32 |  |
-| name_ | string |  |
-| symbol_ | string |  |
+| config | struct IKeyringGuard.KeyringConfig | Keyring contract addresses. See IKycERC20. |
+| policyId_ | uint32 | The unique identifier of a Policy. |
+| maximumConsentPeriod_ | uint32 | The upper limit for user consent deadlines. |
+| name_ | string | The name of the new wrapped token. Passed to ERC20.constructor to set the ERC20.name |
+| symbol_ | string | The symbol for the new wrapped token. Passed to ERC20.constructor to set the ERC20.symbol |
 
 ### decimals
 
@@ -4235,7 +5651,12 @@ function decimals() public view returns (uint8)
 ```
 
 Returns decimals based on the underlying token decimals
-     @return uint8 decimals integer
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | uint8 | uint8 decimals integer |
 
 ### depositFor
 
@@ -4274,9 +5695,19 @@ function transfer(address to, uint256 amount) public returns (bool)
 ```
 
 Wraps the inherited ERC20.transfer function with the keyringCompliance guard.
-     @param to The recipient of amount 
-     @param amount The amount to transfer.
-     @return bool True if successfully executed.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| to | address | The recipient of amount |
+| amount | uint256 | The amount to transfer. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | bool | bool True if successfully executed. |
 
 ### transferFrom
 
@@ -4285,10 +5716,20 @@ function transferFrom(address from, address to, uint256 amount) public returns (
 ```
 
 Wraps the inherited ERC20.transferFrom function with the keyringCompliance guard.
-     @param from The sender of amount 
-     @param to The recipient of amount 
-     @param amount The amount to be deducted from the to's allowance.
-     @return bool True if successfully executed.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| from | address | The sender of amount |
+| to | address | The recipient of amount |
+| amount | uint256 | The amount to be deducted from the to's allowance. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | bool | bool True if successfully executed. |
 
 ### _msgSender
 
@@ -4311,7 +5752,7 @@ function _msgData() internal view virtual returns (bytes)
 ```
 
 Returns msg.data if not from a trusted forwarder, or truncated msg.data if the signer was 
-     appended to msg.data
+appended to msg.data
 
 _Although not currently used, this function forms part of ERC2771 so is included for completeness._
 
@@ -4324,9 +5765,9 @@ _Although not currently used, this function forms part of ERC2771 so is included
 ## UserPolicies
 
 Users select one policy. Attestors are required to confirm compatibility of the user policy with
- the admission policy to check before issuing attestations. Traders may also define whitelists which are
- counterparties they will trade with even if compliance cannot be confirmed by an attestor. Whitelists
- only apply where admission policy owners have set the admission policy allowUserWhitelists flag to true.
+ the admission policy to check before issuing attestations. Traders may also define approves which are
+ counterparties they will trade with even if compliance cannot be confirmed by an attestor. Approves
+ only apply where admission policy owners have set the admission policy allowUserApproves flag to true.
 
 ### policyManager
 
@@ -4362,121 +5803,186 @@ function setUserPolicy(uint32 policyId) external
 Users, normally auth wallets, set a policy to be checked by attestors.
      @param policyId The policy id to enable for the auth wallet.
 
-### addWhitelistedTrader
+### addApprovedCounterparty
 
 ```solidity
-function addWhitelistedTrader(address whitelisted) external
+function addApprovedCounterparty(address approved) public
 ```
 
-Trader wallets may appoint whitelisted addresses to trade with without the protection
+Trader wallets may appoint approved addresses to trade with without the protection
      of Keyring compliance checks. 
-     @param whitelisted A counterparty address to trade with unconditionally. Must not be whitelisted.
+     @param approved A counterparty address to trade with unconditionally. Must not be approved.
 
-### removeWhitelistedTrader
+### addApprovedCounterparties
 
 ```solidity
-function removeWhitelistedTrader(address whitelisted) external
+function addApprovedCounterparties(address[] approved) external
 ```
 
-Trader wallets may appoint whitelisted addresses to trade with without the protection
+Trader wallets may appoint approved addresses to trade with without the protection
+     of Keyring compliance checks. 
+     @param approved Counterparty addresses to trade with unconditionally. Must not be approved.
+
+### removeApprovedCounterparty
+
+```solidity
+function removeApprovedCounterparty(address approved) public
+```
+
+Trader wallets may appoint approved addresses to trade with without the protection
      of Keyring compliance checks.
-     @param whitelisted A counterparty to re-enable compliance checks. Must be whitelisted..
+     @param approved A counterparty to re-enable compliance checks. Must be approved.
 
-### whitelistedTraderCount
+### removeApprovedCounterparties
 
 ```solidity
-function whitelistedTraderCount(address trader) external view returns (uint256 count)
+function removeApprovedCounterparties(address[] approved) external
 ```
 
-Count the addresses on a trader whitelist.
+Trader wallets may appoint approved addresses to trade with without the protection
+     of Keyring compliance checks. 
+     @param approved Counterparty addresseses to re-enable compliance checks. Must be approved.
+
+### approvedCounterpartyCount
+
+```solidity
+function approvedCounterpartyCount(address trader) external view returns (uint256 count)
+```
+
+Count the addresses on a trader approve.
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| trader | address | The trader whitelist to inspect. |
+| trader | address | The trader approve to inspect. |
 
 #### Return Values
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| count | uint256 | The number of addresses on a trader whitelist. |
+| count | uint256 | The number of addresses on a trader approve. |
 
-### whitelistedTraderAtIndex
+### approvedCounterpartyAtIndex
 
 ```solidity
-function whitelistedTraderAtIndex(address trader, uint256 index) external view returns (address whitelisted)
+function approvedCounterpartyAtIndex(address trader, uint256 index) external view returns (address approved)
 ```
 
-Iterate the addresses on a trader whitelist.
+Iterate the addresses on a trader approve.
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| trader | address | The trader whitelist to inspect. |
+| trader | address | The trader approve to inspect. |
 | index | uint256 | The row to inspect. |
 
 #### Return Values
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| whitelisted | address | The address in the trader whitelist at the index row. |
+| approved | address | The address in the trader approve at the index row. |
 
-### isWhitelisted
+### isApproved
 
 ```solidity
-function isWhitelisted(address trader, address counterparty) external view returns (bool isIndeed)
+function isApproved(address trader, address counterparty) external view returns (bool isIndeed)
 ```
 
-check if a counterparty is whitelisted by a trader.
+check if a counterparty is approved by a trader.
 
 #### Parameters
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| trader | address | The trader whitelist to inspect. |
-| counterparty | address | The address to search for on the trader whitelist. |
+| trader | address | The trader approve to inspect. |
+| counterparty | address | The address to search for on the trader approve. |
 
 #### Return Values
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| isIndeed | bool | True if the counterparty is present on the trader whitelist. |
+| isIndeed | bool | True if the counterparty is present on the trader approve. |
 
 ## WalletCheck
 
-### ROLE_WALLETCHECK_ADMIN
+Wallet checks are on-chain whitelists that can contain information gathered by
+off-chain processes. Policies can specify which wallet checks must be checked on a just-in-time
+basis. This contract establishes the interface that all wallet check contracts must implement. 
+Future wallet check instances may employ additional logic. There is a distinct instance of a 
+wallet check for each on-chain check.
+
+### ROLE_WALLETCHECK_LIST_ADMIN
 
 ```solidity
-bytes32 ROLE_WALLETCHECK_ADMIN
+bytes32 ROLE_WALLETCHECK_LIST_ADMIN
 ```
 
-### birthday
+### ROLE_WALLETCHECK_META_ADMIN
 
 ```solidity
-mapping(address => uint256) birthday
+bytes32 ROLE_WALLETCHECK_META_ADMIN
 ```
 
-### onlyWalletCheckAdmin
+### uri
 
 ```solidity
-modifier onlyWalletCheckAdmin()
+string uri
 ```
+
+### onlyWalletCheckListAdmin
+
+```solidity
+modifier onlyWalletCheckListAdmin()
+```
+
+_Modifier to restrict access to functions to wallet check list admins only._
+
+### onlyWalletCheckMetaAdmin
+
+```solidity
+modifier onlyWalletCheckMetaAdmin()
+```
+
+_Modifier to restrict access to functions to wallet check meta admins only._
 
 ### constructor
 
 ```solidity
-constructor(address trustedForwarder) public
+constructor(address trustedForwarder_, address policyManager_, uint256 maximumConsentPeriod_, string uri_) public
 ```
 
-### setWalletWhitelist
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| trustedForwarder_ | address | Contract address that is allowed to relay message signers. |
+| policyManager_ | address | The policy manager contract address. |
+| maximumConsentPeriod_ | uint256 | The maximum allowable user consent period. |
+| uri_ | string | The uri of the wallet check list. |
+
+### updateUri
 
 ```solidity
-function setWalletWhitelist(address wallet, bool whitelisted, uint256 timestamp) external
+function updateUri(string uri_) public
 ```
 
-Set the whitelisted boolean for a specific trading wallet to true or false.
+The wallet check admin can set the uri of the list maintained in this contract.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| uri_ | string | The new uri. |
+
+### setWalletCheck
+
+```solidity
+function setWalletCheck(address wallet, bool whitelisted, uint256 timestamp) external
+```
+
+Record a wallet check.
 
 #### Parameters
 
@@ -4484,14 +5990,82 @@ Set the whitelisted boolean for a specific trading wallet to true or false.
 | ---- | ---- | ----------- |
 | wallet | address | The subject wallet. |
 | whitelisted | bool | True if the wallet has passed the checks represented by this contract. |
-| timestamp | uint256 | The effective time of the wallet check. |
+| timestamp | uint256 | The effective time of the wallet check. Not used if whitelisted is false. |
 
-## Pairing
+### checkWallet
+
+```solidity
+function checkWallet(address observer, address wallet, uint32 admissionPolicyId) external returns (bool passed)
+```
+
+Inspect the Wallet Check.
+
+#### Parameters
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| observer | address | The observer for degradation mitigation consent. |
+| wallet | address | The wallet to inspect. |
+| admissionPolicyId | uint32 | The admission policy for the wallet to inspect. |
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| passed | bool | True if a wallet check exists or if mitigation measures are applicable. |
+
+## AuthorizationVerifier
+
+### verifyingKey
+
+```solidity
+function verifyingKey() internal pure returns (struct KeyringPairing.VerifyingKey vk)
+```
+
+## ConstructionVerifier
+
+### verifyingKey
+
+```solidity
+function verifyingKey() internal pure returns (struct KeyringPairing.VerifyingKey vk)
+```
+
+## MembershipVerifier20
+
+### verifyingKey
+
+```solidity
+function verifyingKey() internal pure returns (struct KeyringPairing.VerifyingKey vk)
+```
+
+## KeyringPairing
 
 ### InvalidProof
 
 ```solidity
 error InvalidProof()
+```
+
+### VerifyingKey
+
+```solidity
+struct VerifyingKey {
+  struct KeyringPairing.G1Point alfa1;
+  struct KeyringPairing.G2Point beta2;
+  struct KeyringPairing.G2Point gamma2;
+  struct KeyringPairing.G2Point delta2;
+  struct KeyringPairing.G1Point[] ic;
+}
+```
+
+### Proof
+
+```solidity
+struct Proof {
+  struct KeyringPairing.G1Point a;
+  struct KeyringPairing.G2Point b;
+  struct KeyringPairing.G1Point c;
+}
 ```
 
 ### BASE_MODULUS
@@ -4510,8 +6084,8 @@ uint256 SCALAR_MODULUS
 
 ```solidity
 struct G1Point {
-  uint256 X;
-  uint256 Y;
+  uint256 x;
+  uint256 y;
 }
 ```
 
@@ -4519,118 +6093,99 @@ struct G1Point {
 
 ```solidity
 struct G2Point {
-  uint256[2] X;
-  uint256[2] Y;
+  uint256[2] x;
+  uint256[2] y;
 }
 ```
-
-### P1
-
-```solidity
-function P1() internal pure returns (struct Pairing.G1Point)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | struct Pairing.G1Point | the generator of G1 |
-
-### P2
-
-```solidity
-function P2() internal pure returns (struct Pairing.G2Point)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | struct Pairing.G2Point | the generator of G2 |
 
 ### negate
 
 ```solidity
-function negate(struct Pairing.G1Point p) internal pure returns (struct Pairing.G1Point r)
+function negate(struct KeyringPairing.G1Point p) internal pure returns (struct KeyringPairing.G1Point r)
 ```
 
 #### Return Values
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| r | struct Pairing.G1Point | the negation of p, i.e. p.addition(p.negate()) should be zero. |
+| r | struct KeyringPairing.G1Point | The negation of p, i.e. p.addition(p.negate()) should be zero. |
 
 ### addition
 
 ```solidity
-function addition(struct Pairing.G1Point p1, struct Pairing.G1Point p2) internal view returns (struct Pairing.G1Point r)
+function addition(struct KeyringPairing.G1Point p1_, struct KeyringPairing.G1Point p2_) internal view returns (struct KeyringPairing.G1Point r)
 ```
 
 #### Return Values
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| r | struct Pairing.G1Point | the sum of two points of G1 |
+| r | struct KeyringPairing.G1Point | The sum of two points of G1 |
 
-### scalar_mul
+### scalarMul
 
 ```solidity
-function scalar_mul(struct Pairing.G1Point p, uint256 s) internal view returns (struct Pairing.G1Point r)
+function scalarMul(struct KeyringPairing.G1Point p, uint256 s) internal view returns (struct KeyringPairing.G1Point r)
 ```
+
+_p == p.scalar_mul(1) and p.addition(p) == p.scalar_mul(2) for all points p._
 
 #### Return Values
 
 | Name | Type | Description |
 | ---- | ---- | ----------- |
-| r | struct Pairing.G1Point | the product of a point on G1 and a scalar, i.e. p == p.scalar_mul(1) and p.addition(p) == p.scalar_mul(2) for all points p. |
+| r | struct KeyringPairing.G1Point | The product of a point on G1 and a scalar, i.e. |
 
-### pairingCheck
-
-```solidity
-function pairingCheck(struct Pairing.G1Point[] p1, struct Pairing.G2Point[] p2) internal view
-```
-
-Asserts the pairing check
-e(p1[0], p2[0]) *  .... * e(p1[n], p2[n]) == 1
-For example pairing([P1(), P1().negate()], [P2(), P2()]) should succeed
-
-## Verifier20
-
-### VerifyingKey
+### pairing
 
 ```solidity
-struct VerifyingKey {
-  struct Pairing.G1Point alfa1;
-  struct Pairing.G2Point beta2;
-  struct Pairing.G2Point gamma2;
-  struct Pairing.G2Point delta2;
-  struct Pairing.G1Point[] IC;
-}
+function pairing(struct KeyringPairing.G1Point[] p1, struct KeyringPairing.G2Point[] p2) internal view returns (bool isValid)
 ```
 
-### Proof
+Pairing check.
 
-```solidity
-struct Proof {
-  struct Pairing.G1Point A;
-  struct Pairing.G2Point B;
-  struct Pairing.G1Point C;
-}
-```
+_e(p1[0], p2[0]) *  .... * e(p1[n], p2[n]) == 1
+For example pairing([P1(), P1().negate()], [P2(), P2()]) should_
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| isValid | bool | True if the proof passes the pairing check. |
+
+## KeyringProofVerifier
 
 ### verifyingKey
 
 ```solidity
-function verifyingKey() internal pure returns (struct Verifier20.VerifyingKey vk)
+function verifyingKey() internal pure virtual returns (struct KeyringPairing.VerifyingKey vk)
 ```
+
+### verify
+
+```solidity
+function verify(uint256[] input, struct KeyringPairing.Proof proof) internal view returns (bool)
+```
+
+_Verifies a Semaphore proof._
+
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| [0] | bool | isValid True if the proof is valid. |
 
 ### verifyProof
 
 ```solidity
-function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[4] input) public view
+function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[] input) public view returns (bool isValid)
 ```
 
-_Verifies a Semaphore proof. Reverts with InvalidProof if the proof is invalid._
+#### Return Values
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| isValid | bool | True if proof is valid |
 
 ## NoImplementation
 
@@ -4676,332 +6231,4 @@ function verify(struct NoImplementation.ForwardRequest, bytes) public pure retur
 ```solidity
 function execute(struct NoImplementation.ForwardRequest, bytes) public payable returns (bool, bytes)
 ```
-
-## Pairing
-
-### G1Point
-
-```solidity
-struct G1Point {
-  uint256 X;
-  uint256 Y;
-}
-```
-
-### G2Point
-
-```solidity
-struct G2Point {
-  uint256[2] X;
-  uint256[2] Y;
-}
-```
-
-### P1
-
-```solidity
-function P1() internal pure returns (struct Pairing.G1Point)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | struct Pairing.G1Point | the generator of G1 |
-
-### P2
-
-```solidity
-function P2() internal pure returns (struct Pairing.G2Point)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | struct Pairing.G2Point | the generator of G2 |
-
-### negate
-
-```solidity
-function negate(struct Pairing.G1Point p) internal pure returns (struct Pairing.G1Point r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | struct Pairing.G1Point | the negation of p, i.e. p.addition(p.negate()) should be zero. |
-
-### addition
-
-```solidity
-function addition(struct Pairing.G1Point p1, struct Pairing.G1Point p2) internal view returns (struct Pairing.G1Point r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | struct Pairing.G1Point | the sum of two points of G1 |
-
-### scalar_mul
-
-```solidity
-function scalar_mul(struct Pairing.G1Point p, uint256 s) internal view returns (struct Pairing.G1Point r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | struct Pairing.G1Point | the product of a point on G1 and a scalar, i.e. p == p.scalar_mul(1) and p.addition(p) == p.scalar_mul(2) for all points p. |
-
-### pairing
-
-```solidity
-function pairing(struct Pairing.G1Point[] p1, struct Pairing.G2Point[] p2) internal view returns (bool)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | bool | the result of computing the pairing check e(p1[0], p2[0]) *  .... * e(p1[n], p2[n]) == 1 For example pairing([P1(), P1().negate()], [P2(), P2()]) should return true. |
-
-### pairingProd2
-
-```solidity
-function pairingProd2(struct Pairing.G1Point a1, struct Pairing.G2Point a2, struct Pairing.G1Point b1, struct Pairing.G2Point b2) internal view returns (bool)
-```
-
-Convenience method for a pairing check for two pairs.
-
-### pairingProd3
-
-```solidity
-function pairingProd3(struct Pairing.G1Point a1, struct Pairing.G2Point a2, struct Pairing.G1Point b1, struct Pairing.G2Point b2, struct Pairing.G1Point c1, struct Pairing.G2Point c2) internal view returns (bool)
-```
-
-Convenience method for a pairing check for three pairs.
-
-### pairingProd4
-
-```solidity
-function pairingProd4(struct Pairing.G1Point a1, struct Pairing.G2Point a2, struct Pairing.G1Point b1, struct Pairing.G2Point b2, struct Pairing.G1Point c1, struct Pairing.G2Point c2, struct Pairing.G1Point d1, struct Pairing.G2Point d2) internal view returns (bool)
-```
-
-Convenience method for a pairing check for four pairs.
-
-## Verifier
-
-### VerifyingKey
-
-```solidity
-struct VerifyingKey {
-  struct Pairing.G1Point alfa1;
-  struct Pairing.G2Point beta2;
-  struct Pairing.G2Point gamma2;
-  struct Pairing.G2Point delta2;
-  struct Pairing.G1Point[] IC;
-}
-```
-
-### Proof
-
-```solidity
-struct Proof {
-  struct Pairing.G1Point A;
-  struct Pairing.G2Point B;
-  struct Pairing.G1Point C;
-}
-```
-
-### verifyingKey
-
-```solidity
-function verifyingKey() internal pure returns (struct Verifier.VerifyingKey vk)
-```
-
-### verify
-
-```solidity
-function verify(uint256[] input, struct Verifier.Proof proof) internal view returns (uint256)
-```
-
-### verifyProof
-
-```solidity
-function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[5] input) public view returns (bool r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | bool | bool true if proof is valid |
-
-## Pairing
-
-### G1Point
-
-```solidity
-struct G1Point {
-  uint256 X;
-  uint256 Y;
-}
-```
-
-### G2Point
-
-```solidity
-struct G2Point {
-  uint256[2] X;
-  uint256[2] Y;
-}
-```
-
-### P1
-
-```solidity
-function P1() internal pure returns (struct Pairing.G1Point)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | struct Pairing.G1Point | the generator of G1 |
-
-### P2
-
-```solidity
-function P2() internal pure returns (struct Pairing.G2Point)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | struct Pairing.G2Point | the generator of G2 |
-
-### negate
-
-```solidity
-function negate(struct Pairing.G1Point p) internal pure returns (struct Pairing.G1Point r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | struct Pairing.G1Point | the negation of p, i.e. p.addition(p.negate()) should be zero. |
-
-### addition
-
-```solidity
-function addition(struct Pairing.G1Point p1, struct Pairing.G1Point p2) internal view returns (struct Pairing.G1Point r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | struct Pairing.G1Point | the sum of two points of G1 |
-
-### scalar_mul
-
-```solidity
-function scalar_mul(struct Pairing.G1Point p, uint256 s) internal view returns (struct Pairing.G1Point r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | struct Pairing.G1Point | the product of a point on G1 and a scalar, i.e. p == p.scalar_mul(1) and p.addition(p) == p.scalar_mul(2) for all points p. |
-
-### pairing
-
-```solidity
-function pairing(struct Pairing.G1Point[] p1, struct Pairing.G2Point[] p2) internal view returns (bool)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| [0] | bool | the result of computing the pairing check e(p1[0], p2[0]) *  .... * e(p1[n], p2[n]) == 1 For example pairing([P1(), P1().negate()], [P2(), P2()]) should return true. |
-
-### pairingProd2
-
-```solidity
-function pairingProd2(struct Pairing.G1Point a1, struct Pairing.G2Point a2, struct Pairing.G1Point b1, struct Pairing.G2Point b2) internal view returns (bool)
-```
-
-Convenience method for a pairing check for two pairs.
-
-### pairingProd3
-
-```solidity
-function pairingProd3(struct Pairing.G1Point a1, struct Pairing.G2Point a2, struct Pairing.G1Point b1, struct Pairing.G2Point b2, struct Pairing.G1Point c1, struct Pairing.G2Point c2) internal view returns (bool)
-```
-
-Convenience method for a pairing check for three pairs.
-
-### pairingProd4
-
-```solidity
-function pairingProd4(struct Pairing.G1Point a1, struct Pairing.G2Point a2, struct Pairing.G1Point b1, struct Pairing.G2Point b2, struct Pairing.G1Point c1, struct Pairing.G2Point c2, struct Pairing.G1Point d1, struct Pairing.G2Point d2) internal view returns (bool)
-```
-
-Convenience method for a pairing check for four pairs.
-
-## Verifier
-
-### VerifyingKey
-
-```solidity
-struct VerifyingKey {
-  struct Pairing.G1Point alfa1;
-  struct Pairing.G2Point beta2;
-  struct Pairing.G2Point gamma2;
-  struct Pairing.G2Point delta2;
-  struct Pairing.G1Point[] IC;
-}
-```
-
-### Proof
-
-```solidity
-struct Proof {
-  struct Pairing.G1Point A;
-  struct Pairing.G2Point B;
-  struct Pairing.G1Point C;
-}
-```
-
-### verifyingKey
-
-```solidity
-function verifyingKey() internal pure returns (struct Verifier.VerifyingKey vk)
-```
-
-### verify
-
-```solidity
-function verify(uint256[] input, struct Verifier.Proof proof) internal view returns (uint256)
-```
-
-### verifyProof
-
-```solidity
-function verifyProof(uint256[2] a, uint256[2][2] b, uint256[2] c, uint256[3] input) public view returns (bool r)
-```
-
-#### Return Values
-
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| r | bool | bool true if proof is valid |
 

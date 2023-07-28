@@ -13,17 +13,24 @@ import "solidity-docgen";
 import { HardhatUserConfig } from "hardhat/config";
 import { resolve } from "path";
 import { config as dotenvConfig } from "dotenv";
+import { chainIds, namedAccounts } from "./test/constants";
 
 import "./tasks/accounts";
-import { chainIds, namedAccounts } from "./constants";
-
 import "./tasks/deploy";
+import "./tasks/deploy-tokens";
+import "./tasks/owner";
 import "./tasks/demodata";
+import "./tasks/deploy-demodata-owner";
+import "./tasks/gas";
+import "./tasks/hasRoles";
+import "./tasks/exemptions";
+import "./tasks/rolesOwners";
 
 dotenvConfig({ path: resolve(__dirname, "./.env") });
 
-const INFURA_API_KEY: string | undefined = process.env.INFURA_API_KEY;
-const GOERLI_PRIVATE_KEY: string | undefined = process.env.GOERLI_PRIVATE_KEY;
+const INFURA_API_KEY = process.env.INFURA_API_KEY;
+const GOERLI_PRIVATE_KEY = process.env.GOERLI_DEPLOYER_PRIVATE_KEY || "";
+const MAINNET_PRIVATE_KEY = process.env.MAINNET_DEPLOYER_PRIVATE_KEY || "";
 
 const config: HardhatUserConfig = {
   abiExporter: {
@@ -37,16 +44,24 @@ const config: HardhatUserConfig = {
     hardhat: {
       chainId: chainIds.hardhat,
       allowUnlimitedContractSize: false,
+      deploy: ["deploy/index.ts"],
     },
-    ...( // only adds if the key is defined
-      INFURA_API_KEY && GOERLI_PRIVATE_KEY && {
+    ...(INFURA_API_KEY &&
+      GOERLI_PRIVATE_KEY && {
         goerli: {
           chainId: chainIds.goerli,
           url: "https://goerli.infura.io/v3/" + INFURA_API_KEY,
-          accounts: [`${GOERLI_PRIVATE_KEY}`],
-        }
-      }
-    )
+          accounts: [GOERLI_PRIVATE_KEY],
+        },
+      }),
+    ...(INFURA_API_KEY &&
+      MAINNET_PRIVATE_KEY && {
+        mainnet: {
+          chainId: chainIds.mainnet,
+          url: "https://mainnet.infura.io/v3/" + INFURA_API_KEY,
+          accounts: [MAINNET_PRIVATE_KEY],
+        },
+      }),
   },
   namedAccounts: {
     ...namedAccounts,

@@ -1,6 +1,5 @@
-import { BigNumber, BigNumberish, Signer, Wallet } from "ethers";
+import { Signer, Wallet } from "ethers";
 import { createFixtureLoader } from "ethereum-waffle";
-import { ethers as Ethers } from "ethers";
 import { getNamedAccounts, ethers, waffle } from "hardhat";
 import { expect } from "chai";
 import * as helpers from "@nomicfoundation/hardhat-network-helpers";
@@ -14,28 +13,24 @@ import type {
   WalletCheck,
   IdentityTree,
   IKeyringZkVerifier,
+  AuthorizationVerifier,
+  ConstructionVerifier,
+  MembershipVerifier20,
+  IdentityTree__factory,
 } from "../../src/types";
 import {
+  authorisationProof0,
+  constructionProof0,
+  MAXIMUM_CONSENT_PERIOD,
+  membershipProof0,
+  membershipProof1,
   namedAccounts,
-  authorisationProof,
-  constructionProof,
-  membershipProof,
-  proofMerkleRoot,
-  membershipProof2,
-  authorisationProof2,
-  proofMerkleRoot2,
-  trader2,
-  ROLE_AGGREGATOR,
-  proofMerkleRoot3,
   NULL_BYTES32,
-  trader3,
-  membershipProof3,
-} from "../../constants";
-import {
-  AuthorizationProofVerifier,
-  IdentityConstructionProofVerifier,
-  IdentityMembershipProofVerifier,
-} from "../../src/typesHardcoded";
+  ROLE_AGGREGATOR,
+  THIRTY_DAYS_IN_SECONDS,
+  trader0,
+  trader1,
+} from "../constants";
 
 /* -------------------------------------------------------------------------- */
 /* Test to ensure that Zero Knowledge related contracts are working properly  */
@@ -54,9 +49,9 @@ describe("Zero-knowledge", function () {
   let keyringZkVerifier: KeyringZkVerifier;
   let walletCheck: WalletCheck;
   let identityTree: IdentityTree;
-  let authorizationProofVerifier: AuthorizationProofVerifier;
-  let identityMembershipProofVerifier: IdentityMembershipProofVerifier;
-  let identityConstructionProofVerifier: IdentityConstructionProofVerifier;
+  let identityConstructionProofVerifier: ConstructionVerifier;
+  let authorizationProofVerifier: AuthorizationVerifier;
+  let identityMembershipProofVerifier: MembershipVerifier20;
 
   // fixture loader
   let loadFixture: ReturnType<typeof createFixtureLoader>;
@@ -66,24 +61,20 @@ describe("Zero-knowledge", function () {
 
   // accounts in this test
   let admin: string;
-  let bob: string;
-  let traderAsSigner2: Signer;
-  let traderAsSigner3: Signer;
+  let traderAsSigner0: Signer;
   let attacker: string;
   let attackerAsSigner: Signer;
 
   before(async () => {
-    const { admin: adminAddress, bob: bobAddress, attacker: attackerAddress } = await getNamedAccounts();
+    const { admin: adminAddress, attacker: attackerAddress } = await getNamedAccounts();
     admin = adminAddress;
-    bob = bobAddress;
     // `attacker` connect's with contract and try to sign invalid
     attacker = attackerAddress;
     attackerAsSigner = ethers.provider.getSigner(attacker);
     // set up trader wallets with 2000 ETH each
-    traderAsSigner2 = new Wallet(trader2.priv, provider);
-    traderAsSigner3 = new Wallet(trader3.priv, provider);
-    await adminWallet.sendTransaction({ to: trader2.address, value: ethers.utils.parseEther("2000") });
-    await adminWallet.sendTransaction({ to: trader3.address, value: ethers.utils.parseEther("2000") });
+    traderAsSigner0 = new Wallet(trader0.priv, provider);
+    await adminWallet.sendTransaction({ to: trader0.address, value: ethers.utils.parseEther("2000") });
+    await adminWallet.sendTransaction({ to: trader1.address, value: ethers.utils.parseEther("2000") });
     // pre-configure contracts (see /test/shared/fixtures.ts)
     loadFixture = createFixtureLoader([adminWallet], provider);
   });
@@ -128,11 +119,13 @@ describe("Zero-knowledge", function () {
       );
 
       await identityTree.setMerkleRootBirthday(merkleRoot, birthday);
+      const admissionPolicyId = 1;
+      expect(await identityTree.callStatic.checkRoot(admin, merkleRoot, admissionPolicyId)).to.be.true;
       merkleRootCount = await identityTree.merkleRootCount();
       expect(merkleRootCount.toNumber()).to.equal(1);
       expect(await identityTree.isMerkleRoot(merkleRoot)).to.equal(true);
       expect(await identityTree.merkleRootAtIndex(merkleRootCount.toNumber() - 1)).to.equal(merkleRoot);
-      expect((await identityTree.merkleRootSuccessors(merkleRoot)).toNumber()).to.equal(0);
+      // expect((await identityTree.merkleRootSuccessors(merkleRoot)).toNumber()).to.equal(0);
     });
 
     it("should not allow to set invalid merkle roots", async function () {
@@ -153,19 +146,6 @@ describe("Zero-knowledge", function () {
       await expect(identityTree.setMerkleRootBirthday(merkleRoot, invalidBirthday)).to.be.revertedWith(
         unacceptable("birthday precedes previously recorded birthday"),
       );
-    });
-
-    it("should calculate merkle root successors correct", async function () {
-      let birthday = (await helpers.time.latest()) - 1000;
-      const merkleRoot1 = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("some merkle root"));
-
-      await identityTree.setMerkleRootBirthday(merkleRoot1, birthday);
-
-      const merkleRoot2 = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("some merkle root 2"));
-      birthday += 500;
-      await identityTree.setMerkleRootBirthday(merkleRoot2, birthday);
-
-      expect((await identityTree.merkleRootSuccessors(merkleRoot1)).toNumber()).to.equal(1);
     });
 
     it("should not allow access merkle roots out of bounds", async function () {
@@ -192,100 +172,164 @@ describe("Zero-knowledge", function () {
     });
   });
 
+  describe("AuthorisationVerifier", function () {
+    it("should return true for valid proofs", async function () {
+      const inputs = flatten_struct(Object.assign({}, authorisationProof0, { proof: undefined })).slice(1) as string[];
+
+      const result = await authorizationProofVerifier.verifyProof(
+        authorisationProof0.proof.a,
+        authorisationProof0.proof.b,
+        authorisationProof0.proof.c,
+        inputs,
+      );
+      expect(result, "authorisationVerifier.verifyProof").to.be.equal(true);
+    });
+
+    it("should return false for invalid proofs", async function () {
+      const inputs = flatten_struct(Object.assign({}, authorisationProof0, { proof: undefined })).slice(1) as string[];
+      inputs[1] = "0x".padEnd(64, "0");
+
+      const result = await authorizationProofVerifier.verifyProof(
+        authorisationProof0.proof.a,
+        authorisationProof0.proof.b,
+        authorisationProof0.proof.c,
+        inputs,
+      );
+      expect(result, "authorisationVerifier.verifyProof").to.be.equal(false);
+    });
+  });
+
+  describe("MembershipVerifier", function () {
+    it("should return true for valid proofs", async function () {
+      const inputs = flatten_struct(Object.assign({}, membershipProof0, { proof: undefined })).slice(1) as string[];
+
+      const result = await identityMembershipProofVerifier.verifyProof(
+        membershipProof0.proof.a,
+        membershipProof0.proof.b,
+        membershipProof0.proof.c,
+        inputs,
+      );
+      expect(result, "membershipVerifier.verifyProof").to.be.equal(true);
+    });
+
+    it("should return false for invalid proofs", async function () {
+      const inputs = flatten_struct(Object.assign({}, membershipProof0, { proof: undefined })).slice(1) as string[];
+      inputs[0] = "0x".padEnd(64, "0");
+
+      const result = await identityMembershipProofVerifier.verifyProof(
+        membershipProof0.proof.a,
+        membershipProof0.proof.b,
+        membershipProof0.proof.c,
+        inputs,
+      );
+      expect(result, "membershipVerifier.verifyProof").to.be.equal(false);
+    });
+  });
+
+  describe("ConstructionVerifier", function () {
+    it("should return true for valid proofs", async function () {
+      const inputs = flatten_struct(Object.assign({}, constructionProof0, { proof: undefined })).slice(1) as string[];
+
+      let result = await identityConstructionProofVerifier.verifyProof(
+        constructionProof0.proof.a,
+        constructionProof0.proof.b,
+        constructionProof0.proof.c,
+        inputs,
+      );
+      expect(result, "constructionVerifier.verifyProof").to.be.equal(true);
+
+      result = await keyringZkVerifier.checkIdentityConstructionProof({
+        proof: {
+          a: constructionProof0.proof.a,
+          b: constructionProof0.proof.b,
+          c: constructionProof0.proof.c,
+        },
+        inputs,
+      });
+      expect(result, "constructionVerifier.verifyProof").to.be.equal(true);
+    });
+
+    it("should return false for invalid proofs", async function () {
+      const inputs = flatten_struct(Object.assign({}, constructionProof0, { proof: undefined })).slice(1) as string[];
+      inputs[0] = "0x".padEnd(64, "0");
+
+      const result = await identityConstructionProofVerifier.verifyProof(
+        constructionProof0.proof.a,
+        constructionProof0.proof.b,
+        constructionProof0.proof.c,
+        inputs,
+      );
+      expect(result, "constructionVerifier.verifyProof").to.be.equal(false);
+    });
+  });
+
   /* ----------------------------- KeyringZkVerifier --------------------------- */
+
   describe("KeyringZkVerifier", function () {
     it("should return true for valid proofs", async function () {
       const birthday = await helpers.time.latest();
-      await identityTree.setMerkleRootBirthday(proofMerkleRoot, birthday);
+      await identityTree.setMerkleRootBirthday(membershipProof0.root as string, birthday);
 
-      /* --------------------------- Authorisation Proof -------------------------- */
-      let result = await authorizationProofVerifier.verifyProof(
-        authorisationProof.proof.a,
-        authorisationProof.proof.b,
-        authorisationProof.proof.c,
-        [
-          authorisationProof.externalNullifier,
-          authorisationProof.nullifierHash,
-          authorisationProof.policyDisclosures[0],
-          authorisationProof.policyDisclosures[1],
-          authorisationProof.tradingAddress,
-        ],
-      );
-      expect(result).to.be.equal(true);
-
-      result = await keyringZkVerifier.checkIdentityAuthorisationProof(authorisationProof);
-      expect(result).to.be.equal(true);
-      expect(await verifyMembershipProof(identityMembershipProofVerifier, membershipProof)).to.be.equal(true);
-      result = await keyringZkVerifier.checkIdentityMembershipProof(membershipProof);
-      expect(result).to.be.equal(true);
-
-      /* --------------------------- Construction Proof --------------------------- */
-      result = await identityConstructionProofVerifier.verifyProof(
-        constructionProof.proof.a,
-        constructionProof.proof.b,
-        constructionProof.proof.c,
-        [constructionProof.identity, constructionProof.policyCommitment, constructionProof.maxAddresses],
-      );
-      expect(result).to.be.equal(true);
-
-      result = await keyringZkVerifier.checkIdentityConstructionProof(constructionProof);
-      expect(result).to.be.equal(true);
-
-      // now check both proofs (membership + authorisation)
-      result = await keyringZkVerifier.checkClaim(membershipProof, authorisationProof);
-      expect(result).to.be.equal(true);
+      const result = await keyringZkVerifier.checkClaim(membershipProof0, authorisationProof0);
+      expect(result, "keyringZkVerifier.checkClaim").to.be.equal(true);
     });
 
     it("should return false for invalid proofs ", async function () {
       const invalidExternalNullifier = "0x0000000000000000000000000000000000000000000000000000000000000002";
       const invalidMembershipProof: IKeyringZkVerifier.IdentityMembershipProofStruct = {
-        ...membershipProof,
+        ...membershipProof0,
         externalNullifier: invalidExternalNullifier,
       };
-      expect(await keyringZkVerifier.checkClaim(invalidMembershipProof, authorisationProof)).to.be.equal(false);
+      expect(
+        await keyringZkVerifier.checkClaim(invalidMembershipProof, authorisationProof0),
+        "invalidExternalNullifier",
+      ).to.be.equal(false);
 
       const invalidNullifierHash = "0x157f1066190cb6fcf0d89ef6ef75c015121ad90ec1a9ceffcbab088d7ec743a1";
       const invalidMembershipProof2 = {
-        ...membershipProof,
+        ...membershipProof0,
         nullifierHash: invalidNullifierHash,
       };
-      expect(await keyringZkVerifier.checkClaim(invalidMembershipProof2, authorisationProof)).to.be.equal(false);
+      expect(
+        await keyringZkVerifier.checkClaim(invalidMembershipProof2, authorisationProof0),
+        "invalidNullifierHash",
+      ).to.be.equal(false);
 
       const invalidSignalHash = "0x0020463d390a03b6e100c5b7cef5a5ac0808b8afc4643ddbdaf1057c610f2ea2";
       const invalidMembershipProof3 = {
-        ...membershipProof,
+        ...membershipProof0,
         signalHash: invalidSignalHash,
       };
-      expect(await keyringZkVerifier.checkClaim(invalidMembershipProof3, authorisationProof)).to.be.equal(false);
+      expect(
+        await keyringZkVerifier.checkClaim(invalidMembershipProof3, authorisationProof0),
+        "invalidSignalHash",
+      ).to.be.equal(false);
 
       const invalidRoot = "0x1fad8de558447cd0fce868283cee58c9cba2d2a2bb2d210100c29eb5e20b9687";
       const invalidMembershipProof4 = {
-        ...membershipProof,
+        ...membershipProof0,
         root: invalidRoot,
       };
-      expect(await keyringZkVerifier.checkClaim(invalidMembershipProof4, authorisationProof)).to.be.equal(false);
+      expect(
+        await keyringZkVerifier.checkClaim(invalidMembershipProof4, authorisationProof0),
+        "invalidRoot",
+      ).to.be.equal(false);
 
-      const invalidProof = membershipProof2.proof;
+      const invalidProof = membershipProof1.proof;
       const invalidMembershipProof5 = {
-        ...membershipProof,
+        ...membershipProof0,
         proof: invalidProof,
       };
-      expect(await keyringZkVerifier.checkClaim(invalidMembershipProof5, authorisationProof)).to.be.equal(false);
+      expect(await keyringZkVerifier.checkClaim(invalidMembershipProof5, authorisationProof0)).to.be.equal(false);
 
       const invalidAuthorisationProof: IKeyringZkVerifier.IdentityAuthorisationProofStruct = {
-        ...authorisationProof,
-        tradingAddress: bob,
+        ...authorisationProof0,
+        tradingAddress: "0x000000000000000000000000b91cf31af85a91c6a4ad507f73f083513f7dcb05",
       };
-      expect(await keyringZkVerifier.checkClaim(membershipProof, invalidAuthorisationProof)).to.be.equal(false);
-
-      const proofMaxAddresses = Ethers.BigNumber.from(constructionProof.maxAddresses);
-
-      const invalidPolicyCommitment = "0x28a907f8ab71f2626449579031ed7d886cd6a9f64d3472832c9faba87eb1a06c";
-      const invalidConstructionProof: IKeyringZkVerifier.IdentityConstructionProofStruct = {
-        ...constructionProof,
-        policyCommitment: invalidPolicyCommitment,
-      };
-      expect(await keyringZkVerifier.checkIdentityConstructionProof(invalidConstructionProof)).to.be.equal(false);
+      expect(
+        await keyringZkVerifier.checkClaim(membershipProof0, invalidAuthorisationProof),
+        "invalidAddress",
+      ).to.be.equal(false);
     });
   });
 
@@ -294,7 +338,7 @@ describe("Zero-knowledge", function () {
   describe("KeyringZkCredentialUpdater", function () {
     it("should only allow the trader itself to update their trader credentials", async function () {
       const now = await helpers.time.latest();
-      await identityTree.setMerkleRootBirthday(proofMerkleRoot2, now);
+      await identityTree.setMerkleRootBirthday(membershipProof0.root as string, now);
 
       // create 20 policies
       const numberOfPolices = 20;
@@ -303,7 +347,7 @@ describe("Zero-knowledge", function () {
       }
 
       await expect(
-        credentialsUpdater.updateCredentials(identityTree.address, membershipProof2, authorisationProof2),
+        credentialsUpdater.updateCredentials(identityTree.address, membershipProof0, authorisationProof0),
       ).to.be.revertedWith(unacceptable("only trader can update trader credentials"));
     });
 
@@ -322,7 +366,7 @@ describe("Zero-knowledge", function () {
 
     it("should allow update credentials with valid proofs of a trader", async function () {
       const now = await helpers.time.latest();
-      await identityTree.setMerkleRootBirthday(proofMerkleRoot2, now);
+      await identityTree.setMerkleRootBirthday(membershipProof0.root as string, now);
 
       // create 20 policies
       const numberOfPolices = 20;
@@ -331,17 +375,17 @@ describe("Zero-knowledge", function () {
       }
 
       await credentialsUpdater
-        .connect(traderAsSigner2)
-        .updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
+        .connect(traderAsSigner0)
+        .updateCredentials(identityTree.address, membershipProof0, authorisationProof0);
 
       // check if credentials are set properly
-      const version = 1;
-      const unpacked1 = await credentialsUpdater.unpack12x20(authorisationProof2.policyDisclosures[0]);
-      const unpacked2 = await credentialsUpdater.unpack12x20(authorisationProof2.policyDisclosures[1]);
+      const unpacked1 = await credentialsUpdater.unpack12x20(authorisationProof0.policyDisclosures[0]);
+      const unpacked2 = await credentialsUpdater.unpack12x20(authorisationProof0.policyDisclosures[1]);
       // policies: [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 0,  0,  0,  0,  0,  0,  0,  0 ]
       const policies = [...unpacked1, ...unpacked2];
       for (let i = 0; i < policies.length; i++) {
-        const timestamp = await credentials.getCredential(version, trader2.address, policies[i]);
+        const key = await credentials.keyGen(trader0.address, policies[i]);
+        const timestamp = await credentials.subjectUpdates(key);
         // NOTE it should NOT be possible to create a cached credential for admission policies with ID zero
         policies[i] === 0 ? expect(timestamp.toNumber()).to.be.equal(0) : expect(timestamp.toNumber()).to.be.equal(now);
       }
@@ -349,30 +393,36 @@ describe("Zero-knowledge", function () {
 
     it("should not allow update credentials with invalid proofs of a trader", async function () {
       const invalidAuthorisationProof: IKeyringZkVerifier.IdentityAuthorisationProofStruct = {
-        ...authorisationProof2,
-        proof: membershipProof3.proof,
+        ...authorisationProof0,
+        proof: membershipProof1.proof,
       };
+
+      expect(
+        await keyringZkVerifier.checkClaim(membershipProof0, invalidAuthorisationProof),
+        "invalidAddress",
+      ).to.be.equal(false);
+
       await expect(
         credentialsUpdater
-          .connect(traderAsSigner2)
-          .updateCredentials(identityTree.address, membershipProof2, invalidAuthorisationProof),
+          .connect(traderAsSigner0)
+          .updateCredentials(identityTree.address, membershipProof0, invalidAuthorisationProof),
       ).to.revertedWith(unacceptable("Proof unacceptable"));
     });
 
     it("should not allow invalid policies or invalid trees (policy attestors)", async function () {
       await expect(
-        credentialsUpdater.connect(traderAsSigner2).updateCredentials(attacker, membershipProof2, authorisationProof2),
+        credentialsUpdater.connect(traderAsSigner0).updateCredentials(attacker, membershipProof0, authorisationProof0),
       ).to.revertedWith(unacceptable("attestor unacceptable"));
 
       await expect(
         credentialsUpdater
-          .connect(traderAsSigner2)
-          .updateCredentials(identityTree.address, membershipProof2, authorisationProof2),
+          .connect(traderAsSigner0)
+          .updateCredentials(identityTree.address, membershipProof0, authorisationProof0),
       ).to.revertedWith(unacceptable("policy or attestor unacceptable"));
 
       // add merkle root
       const now = await helpers.time.latest();
-      await identityTree.setMerkleRootBirthday(proofMerkleRoot2, now);
+      await identityTree.setMerkleRootBirthday(membershipProof0.root as string, now);
 
       // create 20 policies
       const numberOfPolices = 20;
@@ -381,122 +431,42 @@ describe("Zero-knowledge", function () {
       }
 
       // deploy another identity tree which is not allowed to be used by the policy
-      const identityTreeFactory = await ethers.getContractFactory("IdentityTree");
+      const identityTreeFactory = (await ethers.getContractFactory("IdentityTree")) as IdentityTree__factory;
       const forwarder = "0x0000000000000000000000000000000000000001";
-      const identityTree2 = await identityTreeFactory.deploy(forwarder);
+      const identityTree2 = await identityTreeFactory.deploy(forwarder, policyManager.address, MAXIMUM_CONSENT_PERIOD);
       await policyManager.admitAttestor(identityTree2.address, "attestor2");
 
       await expect(
         credentialsUpdater
-          .connect(traderAsSigner2)
-          .updateCredentials(identityTree2.address, membershipProof2, authorisationProof2),
+          .connect(traderAsSigner0)
+          .updateCredentials(identityTree2.address, membershipProof0, authorisationProof0),
       ).to.revertedWith(unacceptable("policy or attestor unacceptable"));
 
       await credentialsUpdater
-        .connect(traderAsSigner2)
-        .updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
-    });
-
-    it("should allow extend validity of credentials to forever in case of attestor failure", async function () {
-      // user with valid proofs and get valid credentials even if the timestamp comming from the latest root are stale
-      // if acceptRoot property is set on the policy by the policy admin
-
-      const now = await helpers.time.latest();
-      await identityTree.setMerkleRootBirthday(proofMerkleRoot2, now);
-
-      const policyScalarEvenNumbers = {
-        ...policyScalar,
-        acceptRoots: 0,
-      };
-
-      // current policy count 2, create policyId 2 to 21
-      const numberOfPolices = 20;
-      for (let i = 0; i < numberOfPolices; i++) {
-        const index = i + 2; // policyId starts from 2
-        if (index % 2 === 0) {
-          // create even policies
-          await policyManager.createPolicy(policyScalarEvenNumbers, [identityTree.address], [walletCheck.address]);
-        } else {
-          // create odd policies
-          await policyManager.createPolicy(policyScalar, [identityTree.address], [walletCheck.address]);
-        }
-      }
-
-      await credentialsUpdater
-        .connect(traderAsSigner2)
-        .updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
-
-      // check if credentials are set properly
-      const version = 1;
-      const unpacked1 = await credentialsUpdater.unpack12x20(authorisationProof2.policyDisclosures[0]);
-      const unpacked2 = await credentialsUpdater.unpack12x20(authorisationProof2.policyDisclosures[1]);
-      // e.g. policies: [ 1,  2,  3,  4,  5,  6,  7,  8, 9, 10, 11, 12, 13, 14, 15, 16, 0,  0,  0,  0,  0,  0,  0,  0 ]
-      const policies = [...unpacked1, ...unpacked2];
-      // check for valid credentials
-      for (let i = 0; i < policies.length; i++) {
-        const timestamp = await credentials.getCredential(version, trader2.address, policies[i]);
-        if (policies[i] === 0) {
-          expect(timestamp.toNumber()).to.be.equal(0);
-        } else {
-          expect(timestamp.toNumber()).to.be.equal(now);
-          expect(await isCompliant(timestamp, policyScalar.ttl)).to.be.true;
-        }
-      }
-
-      const staleTime = BigNumber.from(policyScalar.ttl).add(100);
-      await helpers.time.increase(staleTime);
-
-      // check for stale credentials
-      for (let i = 0; i < policies.length; i++) {
-        const timestamp = await credentials.getCredential(version, trader2.address, policies[i]);
-        if (policies[i] === 0) {
-          expect(timestamp.toNumber()).to.be.equal(0);
-        } else {
-          expect(timestamp.toNumber()).to.be.equal(now);
-          expect(await isCompliant(timestamp, policyScalar.ttl)).to.be.false;
-        }
-      }
-
-      // update credentials with old merkle root
-      await credentialsUpdater
-        .connect(traderAsSigner2)
-        .updateCredentials(identityTree.address, membershipProof2, authorisationProof2);
-
-      // check for updated credentials without new merkle root
-      for (let i = 0; i < policies.length; i++) {
-        if (policies[i] === 0 || policies[i] === 1) continue;
-        // set the merkleRootSuccessors to 1, after 10 policies
-        if (i === 10) await identityTree.setMerkleRootBirthday(proofMerkleRoot3, now);
-        const timestamp = await credentials.getCredential(version, trader2.address, policies[i]);
-        const acceptRoots = await policyManager.callStatic.policyAcceptRoots(policies[i]);
-        if (policies[i] % 2 === 0) {
-          // even policies greater from 2 should be invalid (acceptRoots: 0)
-          expect(await isCompliant(timestamp, policyScalar.ttl)).to.be.false;
-          expect(acceptRoots).to.be.equal(0);
-        } else {
-          // odd policies greater from 2 should be valid (acceptRoots: 1)
-          expect(await isCompliant(timestamp, policyScalar.ttl)).to.be.true;
-          expect(acceptRoots).to.be.equal(1);
-        }
-      }
+        .connect(traderAsSigner0)
+        .updateCredentials(identityTree.address, membershipProof0, authorisationProof0);
     });
   });
 
   /* --------------------------- KeyringCredentials --------------------------- */
+
   describe("KeyringCredentials", function () {
     it("should not allow set credentials with invalid timestamp", async function () {
       const future = (await helpers.time.latest()) + 1000;
       await credentials.grantRole(await credentials.ROLE_CREDENTIAL_UPDATER(), admin);
       await expect(credentials.setCredential(admin, 0, future)).to.revertedWith(
-        unacceptable("timestamp must be in the past"),
+        unacceptable("time must be in the past"),
       );
 
       const validTimestamp = await helpers.time.latest();
-      await credentials.setCredential(admin, 0, validTimestamp);
-      expect(await credentials.getCredential(1, admin, 0)).to.be.equal(validTimestamp);
+      const admissionPolicyId = 1;
+      await credentials.setCredential(admin, admissionPolicyId, validTimestamp);
+      const key = await credentials.keyGen(admin, admissionPolicyId);
+      const timestamp = await credentials.subjectUpdates(key);
+      expect(timestamp).to.be.equal(validTimestamp);
       const invalidTimestamp = validTimestamp - 1000;
-      await expect(credentials.setCredential(admin, 0, invalidTimestamp)).to.revertedWith(
-        unacceptable("timestamp is older than existing credential"),
+      await expect(credentials.setCredential(admin, admissionPolicyId, invalidTimestamp)).to.revertedWith(
+        unacceptable("time is older than existing update"),
       );
     });
     it("should not allow unauthorized entities to set credentials", async function () {
@@ -522,6 +492,146 @@ describe("Zero-knowledge", function () {
       );
     });
   });
+
+  /* ------------------------------ Backdoor -------------------------------- */
+
+  describe("Backdoor", function () {
+    it("should allow the backdoor admin to admit a backdoor globally and a policy admin to admit and remove a backdoor locally", async function () {
+      const admissionPolicyId = 1;
+
+      const role = await policyManager.ROLE_GLOBAL_BACKDOOR_ADMIN();
+      expect(await policyManager.hasRole(role, admin)).to.be.true;
+      expect(await policyManager.hasRole(role, attacker)).to.be.false;
+
+      await expect(
+        policyManager.connect(attackerAsSigner).admitBackdoor(authorisationProof0.regimeKey),
+      ).to.revertedWith("sender does not have the required role");
+
+      expect(await policyManager.callStatic.globalBackdoorCount()).to.be.equal("0");
+      expect(await policyManager.callStatic.policyBackdoorCount(admissionPolicyId)).to.be.equal("0");
+
+      await policyManager.admitBackdoor(authorisationProof0.regimeKey);
+
+      expect(await policyManager.callStatic.globalBackdoorCount()).to.be.equal("1");
+      expect(await policyManager.callStatic.policyBackdoorCount(admissionPolicyId)).to.be.equal("0");
+
+      const backdoorId = await policyManager.callStatic.globalBackdoorAtIndex(0);
+      expect(await policyManager.callStatic.isGlobalBackdoor(backdoorId)).to.be.true;
+      const backdoorPubKey = await policyManager.callStatic.backdoorPubKey(backdoorId);
+      expect(backdoorPubKey[0]).to.be.equal(authorisationProof0.regimeKey[0]);
+      expect(backdoorPubKey[1]).to.be.equal(authorisationProof0.regimeKey[1]);
+
+      let now = await helpers.time.latest();
+      let deadline = now + THIRTY_DAYS_IN_SECONDS + 100;
+      await policyManager.addPolicyBackdoor(admissionPolicyId, backdoorId, deadline);
+      await applyPolicyChanges(policyManager, admissionPolicyId);
+
+      expect(await policyManager.callStatic.policyBackdoorCount(admissionPolicyId)).to.be.equal("1");
+      expect(await policyManager.callStatic.isPolicyBackdoor(admissionPolicyId, backdoorId)).to.be.true;
+
+      expect(await policyManager.callStatic.policyBackdoorAtIndex(admissionPolicyId, 0)).to.be.equal(backdoorId);
+
+      const policyBackdoors = await policyManager.callStatic.policyBackdoors(admissionPolicyId);
+      expect(policyBackdoors[0]).to.be.equal(backdoorId);
+
+      const bogusBackdoorId = "0xb510d6a4349e234dfabbcd6011c946148c07ba27d0f6dd4021901e76c0ca050d";
+      await expect(policyManager.addPolicyBackdoor(admissionPolicyId, bogusBackdoorId, 0)).to.be.revertedWith(
+        unacceptable("unknown backdoor"),
+      );
+
+      await policyManager.removePolicyBackdoor(admissionPolicyId, backdoorId, 0);
+      await policyManager.addPolicyBackdoor(admissionPolicyId, backdoorId, 0);
+
+      await expect(policyManager.addPolicyBackdoor(admissionPolicyId, backdoorId, 0)).to.be.revertedWith(
+        unacceptable("backdoor exists in policy"),
+      );
+
+      now = await helpers.time.latest();
+      deadline = now + THIRTY_DAYS_IN_SECONDS + 100;
+      await policyManager.removePolicyBackdoor(admissionPolicyId, backdoorId, deadline);
+      await expect(policyManager.removePolicyBackdoor(admissionPolicyId, backdoorId, 0)).to.be.revertedWith(
+        unacceptable("backdoor removal already scheduled"),
+      );
+      await applyPolicyChanges(policyManager, admissionPolicyId);
+
+      await expect(policyManager.removePolicyBackdoor(admissionPolicyId, backdoorId, 0)).to.be.revertedWith(
+        unacceptable("backdoor is not in policy"),
+      );
+
+      await policyManager.addPolicyBackdoor(admissionPolicyId, backdoorId, 0);
+      await expect(policyManager.addPolicyBackdoor(admissionPolicyId, backdoorId, 0)).to.be.revertedWith(
+        unacceptable("backdoor addition already scheduled"),
+      );
+
+      await policyManager.removePolicyBackdoor(admissionPolicyId, backdoorId, 0);
+    });
+
+    it("should work according to the requirements", async function () {
+      let now = await helpers.time.latest();
+      await identityTree.setMerkleRootBirthday(membershipProof0.root as string, now);
+
+      // create 20 policies
+      const numberOfPolices = 20;
+      for (let i = 0; i < numberOfPolices; i++) {
+        await policyManager.createPolicy(policyScalar, [identityTree.address], [walletCheck.address]);
+      }
+
+      await credentialsUpdater
+        .connect(traderAsSigner0)
+        .updateCredentials(identityTree.address, membershipProof0, authorisationProof0);
+
+      // admit two backdoors
+      await policyManager.admitBackdoor(authorisationProof0.regimeKey);
+      const regimeKey2 = [
+        "0x04b14ba625d2179ae09013f084b5abccd99614cf0299be43d66c2b20fccd3aef",
+        "0x21885b40bc68312206623380b9ff13d30a45225c61a30661bf5dee51882e9bb9",
+      ];
+      await policyManager.admitBackdoor(regimeKey2 as any);
+      const backdoorId1 = await policyManager.callStatic.globalBackdoorAtIndex(0);
+      const backdoorId2 = await policyManager.callStatic.globalBackdoorAtIndex(1);
+
+      let deadline = now + THIRTY_DAYS_IN_SECONDS + 100;
+      const admissionPolicyId = 1;
+      const anotherPolicyId = 2;
+      await policyManager.addPolicyBackdoor(admissionPolicyId, backdoorId1, deadline);
+      await policyManager.addPolicyBackdoor(anotherPolicyId, backdoorId2, deadline);
+      await applyPolicyChanges(policyManager, admissionPolicyId);
+
+      await expect(
+        credentialsUpdater
+          .connect(traderAsSigner0)
+          .updateCredentials(identityTree.address, membershipProof0, authorisationProof0),
+      ).to.revertedWith(unacceptable("all policies in the proof must rely on the same backdoor or no backdoor"));
+
+      now = await helpers.time.latest();
+      deadline = now + THIRTY_DAYS_IN_SECONDS + 100;
+      await policyManager.removePolicyBackdoor(anotherPolicyId, backdoorId2, deadline);
+      await policyManager.addPolicyBackdoor(anotherPolicyId, backdoorId1, deadline);
+      await applyPolicyChanges(policyManager, anotherPolicyId);
+      await credentialsUpdater
+        .connect(traderAsSigner0)
+        .updateCredentials(identityTree.address, membershipProof0, authorisationProof0);
+
+      now = await helpers.time.latest();
+      deadline = now + THIRTY_DAYS_IN_SECONDS + 100;
+      await expect(policyManager.addPolicyBackdoor(admissionPolicyId, backdoorId2, deadline)).to.revertedWith(
+        unacceptable("too many backdoors requested"),
+      );
+
+      now = await helpers.time.latest();
+      deadline = now + THIRTY_DAYS_IN_SECONDS + 100;
+      await policyManager.removePolicyBackdoor(admissionPolicyId, backdoorId1, deadline);
+      await policyManager.addPolicyBackdoor(admissionPolicyId, backdoorId2, deadline);
+      await policyManager.removePolicyBackdoor(anotherPolicyId, backdoorId1, deadline);
+      await applyPolicyChanges(policyManager, admissionPolicyId);
+
+      await expect(
+        credentialsUpdater
+          .connect(traderAsSigner0)
+          .updateCredentials(identityTree.address, membershipProof0, authorisationProof0),
+      ).to.revertedWith(unacceptable("Proof does not contain required backdoor regimeKey"));
+    });
+  });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -543,29 +653,20 @@ const unauthorized = (
   return `Unauthorized("${sender}", "${module}", "${method}", "${role}", "${reason}", "${context}")`;
 };
 
-/* ---------------------------- Membership Proof ---------------------------- */
-// verifyProof does not return anything. Helper function returns false if verifyProof reverts
-
-const verifyMembershipProof = async (
-  identityMembershipProofVerifier: IdentityMembershipProofVerifier,
-  struct: IKeyringZkVerifier.IdentityMembershipProofStruct,
-) => {
-  try {
-    await identityMembershipProofVerifier.verifyProof(struct.proof.a, struct.proof.b, struct.proof.c, [
-      struct.root,
-      struct.nullifierHash,
-      struct.signalHash,
-      struct.externalNullifier,
-    ]);
-    return true;
-  } catch {
-    return false;
+function flatten_struct(struct: { [key: string]: any }): string[] {
+  let result: string[] = [];
+  for (const key in struct) {
+    if (typeof struct[key] === "object") {
+      result = result.concat(flatten_struct(struct[key]));
+    } else {
+      result.push(struct[key]);
+    }
   }
-};
+  return result;
+}
 
-const isCompliant = async (timestamp: BigNumberish, ttl: BigNumberish) => {
-  const now = BigNumber.from(await helpers.time.latest());
-  const cacheAge = now.sub(timestamp);
-  const isIndeed = cacheAge.lte(ttl);
-  return isIndeed;
+const applyPolicyChanges = async (policyManager: PolicyManager, policyId: number) => {
+  const policyObj = await policyManager.callStatic.policy(policyId);
+  await helpers.time.increaseTo(policyObj.deadline.toNumber());
+  await policyManager.policy(policyId);
 };

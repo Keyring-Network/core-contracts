@@ -17,8 +17,10 @@
 **/src/types
 **/artifacts
 **/bin
-**/.openzeppelin
-**/deploymentInfo
+**/deploymentInfo/hardhat
+**/deploymentInfo/localhost
+.openzeppelin/goerli.json
+.openzeppelin/unknown-1337.json
 
 # files
 .DS_Store

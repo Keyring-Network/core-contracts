@@ -1,125 +1,116 @@
-import type { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
-import { ethers } from "hardhat";
 import { task } from "hardhat/config";
-import { TaskArguments } from "hardhat/types";
-import { PolicyStorage } from "../src/types/PolicyManager";
-import { baseRules, ONE_DAY_IN_SECONDS, Operator, proofMerkleRoot, THIRTY_DAYS_IN_SECONDS } from "../constants";
-import { RuleRegistry, PolicyManager } from "../src/types";
-
-const fsp = require("fs").promises;
-const fs = require("fs");
-
-const contractsDir = __dirname + "/../deploymentInfo";
-
-export interface Signers {
-  admin: SignerWithAddress;
-}
+import { RuleRegistry, PolicyManager, IdentityTree, WalletCheck } from "../src/types";
+import { executeRoleTransactions, getDeploymentInfo } from "../deploy/helpers";
+import { ATTESTOR_URI, BASE_RULES, RBD_REGIME_PUBLIC_KEYS, RULE_OPERATORS } from "../deploy/constants";
+import { RoleOperation } from "../deploy/types";
 
 interface ContractAddresses {
   ruleRegistry: string;
   policyManager: string;
+  identityTree: string;
+  walletCheck: string;
 }
 
-task("demodata").setAction(async function (taskArguments: TaskArguments, { ethers }) {
-  let signers = {} as Signers;
-  const walletSigners: SignerWithAddress[] = await ethers.getSigners();
-  signers.admin = walletSigners[0];
+/**
+ * This task is used to populate the contracts with demo data.
+ * @notice This task is only meant to be used in a test environment.
+ * @notice This task is meant to be used after the `deploy` and before `owner` task.
+ * @example npx hardhat demodata
+ */
+task("demodata", "Populate contracts with demo data").setAction(async function (_, hre) {
+  const { ethers, network } = hre;
+  const [DEPLOYER] = await ethers.getSigners();
 
-  const deploymentInfo = await getDeploymentInfo();
+  const deploymentInfo = await getDeploymentInfo(network.name);
 
   const addresses: ContractAddresses = {
     ruleRegistry: deploymentInfo.contracts.RuleRegistry.address,
     policyManager: deploymentInfo.contracts.PolicyManager.address,
+    identityTree: deploymentInfo.contracts.IdentityTree.address,
+    walletCheck: deploymentInfo.contracts.WalletCheck.address,
   };
 
   const ruleRegistry = (await ethers.getContractAt("RuleRegistry", addresses.ruleRegistry)) as RuleRegistry;
   const policyManager = (await ethers.getContractAt("PolicyManager", addresses.policyManager)) as PolicyManager;
+  const identityTree = (await ethers.getContractAt("IdentityTree", addresses.identityTree)) as IdentityTree;
+  const walletCheck = (await ethers.getContractAt("WalletCheck", addresses.walletCheck)) as WalletCheck;
+
+  /* ------------------------------- Grant Roles ------------------------------ */
+  console.log("Granting temporary roles...");
+
+  const temporaryRoles = {
+    PolicyManager: [
+      "ROLE_GLOBAL_ATTESTOR_ADMIN",
+      "ROLE_GLOBAL_WALLETCHECK_ADMIN",
+      "ROLE_POLICY_CREATOR",
+      "ROLE_GLOBAL_BACKDOOR_ADMIN",
+    ],
+  };
+  await executeRoleTransactions(hre, DEPLOYER.address, temporaryRoles, RoleOperation.Grant);
+  // await waitForAllTransactions(grantRoleTransactions);
+  console.log("Roles granted!");
+
+  /* --------------------- Admit Attestor and WalletCheck --------------------- */
+
+  console.log("admitting attestor and walletcheck...");
+
+  const tx1 = await policyManager.admitAttestor(identityTree.address, ATTESTOR_URI);
+  const tx2 = await policyManager.admitWalletCheck(walletCheck.address);
+  await tx1.wait();
+  await tx2.wait();
+
+  console.log("contract Attestor and Walletcheck configuration confirmed");
 
   /* ------------------------------ Create Rules ------------------------------ */
-
   console.log("Creating rules...");
-  // creating six rules, three base rules and three expression rules (complement, union, intersection)
-  // start by creating three base rules and retrieve ruleId's
-  const tx1 = await ruleRegistry.createRule(...baseRules.PP_GB);
-  await tx1.wait();
-  const tx2 = await ruleRegistry.createRule(...baseRules.PP_US);
-  await tx2.wait();
-  const tx3 = await ruleRegistry.createRule(...baseRules.PEP);
-  await tx3.wait();
-  const RULE_ID_PP_GB = await ruleRegistry.ruleAtIndex(2);
-  const RULE_ID_PP_US = await ruleRegistry.ruleAtIndex(3);
-  const RULE_ID_PEP = await ruleRegistry.ruleAtIndex(4);
 
-  // sorting ruleId's in acending order as required
-  let sortedRules = sortAscendingOrder([RULE_ID_PP_GB, RULE_ID_PP_US]);
+  const currentRuleCount = await ruleRegistry.ruleCount();
 
-  // create two expression rules and retrieve ruleId's
-  const tx4 = await ruleRegistry.createRule("", "", Operator.complement, [RULE_ID_PEP]);
-  await tx4.wait();
-  const tx5 = await ruleRegistry.createRule("", "", Operator.union, sortedRules);
-  await tx5.wait();
-  const RULE_ID_UNION_GB_US = await ruleRegistry.ruleAtIndex(5);
-  const RULE_ID_COMPLEMENT_PEP = await ruleRegistry.ruleAtIndex(6);
-
-  // create another expression rule based on the previous two rules
-  sortedRules = sortAscendingOrder([RULE_ID_UNION_GB_US, RULE_ID_COMPLEMENT_PEP]);
-  const tx6 = await ruleRegistry.createRule("", "", Operator.intersection, sortedRules);
-  await tx6.wait();
-
-  const RULE_ID_GBUS_EXCL_PEP = await ruleRegistry.ruleAtIndex(7);
-
-  console.log("Successfully created 6 rules!");
-
-  /* ------------------------------ Create Policy ----------------------------- */
-  const policyScalar: PolicyStorage.PolicyScalarStruct = {
-    ruleId: RULE_ID_GBUS_EXCL_PEP,
-    descriptionUtf8: "Intersection: Union [ GB, US ], Complement [ PEP ] - 1 of 2",
-    ttl: ONE_DAY_IN_SECONDS,
-    gracePeriod: THIRTY_DAYS_IN_SECONDS,
-    acceptRoots: 1,
-    allowUserWhitelists: false,
-    disablementPeriod: 30 * 1440 * 60, 
-    locked: false,
-  };
-
-  const policyCount = await policyManager.policyCount();
-  console.log("Policy count: " + policyCount);
-
-  // NOTE Buluts Attestor address
-  const attestorAddress = "0xbF76cca6D678949E207D7fB66136bbFdd4E317aF";
-  const walletcheckAddress = deploymentInfo.contracts.WalletCheck.address;
-
-  // create policy with ID 1 to 20
-  const policies = <any>[];
-  for (let i = 1; i <= 20; i++) {
-    // console.log("Creating policy with ID: " + i);
-    policies.push(await policyManager.createPolicy(policyScalar, [attestorAddress], [walletcheckAddress]));
+  for (const rule of BASE_RULES) {
+    const ruleCount = (await ruleRegistry.ruleCount()).toString();
+    const uri = rule.uri + ruleCount;
+    console.log(rule.description, uri, rule.operator, rule.operands);
+    const tx = await ruleRegistry.createRule(rule.description, uri, rule.operator, rule.operands);
+    await tx.wait();
   }
 
-  await Promise.all(policies).then(() => {
-    for (let i = 0; i < policies.length; i++) {
-      policies[i].wait().then(() => {
-        // nothing to do
-      });
-    }
-  });
+  const numberOfRulesCreated = BASE_RULES.length;
+  const newRuleIds = [];
+  console.log(`Number of base rules created: ${numberOfRulesCreated}`);
+  for (let i = 0; i < numberOfRulesCreated; i++) {
+    const index = currentRuleCount.add(i);
+    const rule = await ruleRegistry.ruleAtIndex(index);
+    newRuleIds.push(rule);
+    console.log(`Rule ID at index ${index}: ${rule}`);
+  }
+
+  // create complement expression rule
+  const tx = await ruleRegistry.createRule("", "", RULE_OPERATORS.complement, [newRuleIds[0]]);
+  await tx.wait();
+
+  const ruleCount = await ruleRegistry.ruleCount();
+  const expressionRuleId = await ruleRegistry.ruleAtIndex(ruleCount.sub(1));
+  console.log(`Expression rule created with ID: ${expressionRuleId}`);
+
+  /* ----------------------- Admit RBD Regime Public Key ---------------------- */
+
+  for (const key of RBD_REGIME_PUBLIC_KEYS) {
+    const _tx = await policyManager.admitBackdoor(key);
+    await _tx.wait();
+  }
+  const globalBackdoorCount = await policyManager.globalBackdoorCount();
+  console.log("Expected global backdoor count: ", RBD_REGIME_PUBLIC_KEYS.length);
+  console.log("Actual global backdoor count: ", globalBackdoorCount.toString());
+
+  /* ---------------------------- Deploy KYC Tokens --------------------------- */
+  await hre.run("deploy-tokens", { token: "USDC", ruleId: expressionRuleId });
+  // await hre.run("deploy-tokens", { token: "WETH", ruleId: expressionRuleId });
+  // await hre.run("deploy-tokens", { token: "bIB01", ruleId: expressionRuleId });
+
+  /* ------------------------------ Revoke Roles ------------------------------ */
+  console.log("Revoking temporary roles...");
+  await executeRoleTransactions(hre, DEPLOYER.address, temporaryRoles, RoleOperation.Renounce);
+  console.log("Roles revoked!");
 
   console.log("Done!");
 });
-
-/* -------------------------------------------------------------------------- */
-/*                              Helper Functions                              */
-/* -------------------------------------------------------------------------- */
-
-// NOTE instead of `1675276993802` set timestamp of latest deployment
-async function getDeploymentInfo() {
-  var result = fs.readdirSync(contractsDir).sort().reverse();
-  var subdir = result[0];
-  console.log("Reading DeploymentInfo from: " + contractsDir + "/" + subdir + "/deployment.json");
-  const deploymentInfo = await fsp.readFile(contractsDir + "/" + subdir + "/deployment.json");
-  return JSON.parse(deploymentInfo);
-}
-
-function sortAscendingOrder(ruleIds: string[]) {
-  return ruleIds.sort();
-}

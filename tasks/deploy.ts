@@ -1,272 +1,264 @@
 import { task } from "hardhat/config";
-import { TaskArguments } from "hardhat/types";
-import type { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
+import * as fs from "fs";
+import * as path from "path";
 
-const fs = require("fs");
+import {
+  WALLETCHECK_URI,
+  ozNetworkToFilename,
+  MAXIMUM_CONSENT_PERIOD,
+  GENESIS_RULE_REGISTRY,
+} from "../deploy/constants";
+import { deployContract, getContractByName, initAndConfirm, writeDeploymentInfoToFile } from "../deploy/helpers";
+import { ContractList, DeploymentInfo } from "../deploy/types";
 
-const timestamp = Date.now();
-const contractsDir = `${__dirname}/../deploymentInfo/${timestamp}`;
+/**
+ * Deploys the core contracts and writes the deployment info to a file.
+ * Upgradability is enabled for specific contracts (see `upgrades.deployProxy`).
+ * @example npx hardhat deploy
+ */
+task("deploy", "Deploys the core contracts").setAction(async function (_, hre) {
+  const { ethers, upgrades, network } = hre;
 
-import { genesis } from "../constants";
+  // silence hardhat-upgrades warnings for unsafeAllow flags
+  upgrades.silenceWarnings();
 
-export interface Signers {
-  admin: SignerWithAddress;
-}
+  const [DEPLOYER] = await ethers.getSigners();
 
-// TODO: THIS IS DEPLOYING NON-UPGRADABLE CONTRACTS. REFACTOR FOR PROXY DEPLOYMENT.
+  const contracts: ContractList[] = [];
 
-task("deploy").setAction(async function (taskArguments: TaskArguments, { ethers }) {
-  /* ------------------------- Contract Data ----------------------------- */
-  const IdentityConstructionProofVerifier = await import(
-    "../artifacts/contracts/zkVerifiers/identityContructionProof/contracts/IdentityConstructionProofVerifier.sol/Verifier.json"
-  );
-  const AuthorizationProofVerifier = await import(
-    "../artifacts/contracts/zkVerifiers/authorizationProof/contracts/AuthorizationProofVerifier.sol/Verifier.json"
-  );
-  const IdentityMembershipProofVerifier = await import(
-    "../artifacts/contracts/zkVerifiers/membershipProof/contracts/IdentityMembershipProofVerifier.sol/Verifier20.json"
-  );
+  const timestamp = Date.now();
+  const blockNumber = await ethers.provider.getBlockNumber();
+  console.log(`DEPLOYMENT HAS STARTED (timestamp: ${timestamp}, block: ${blockNumber})`);
+  console.log(`Deploying contracts on ${network.name}...`);
+  console.log("Deployer account:", DEPLOYER.address);
 
-  // don't need to import these as we create a factory for them
-  // const IdentityTree = await import("../artifacts/contracts/identityTree/IdentityTree.sol/IdentityTree.json");
-  // const Pack12x20 = await import("../artifacts/contracts/lib/Pack12x20.sol/Pack12x20.json");
-  // const WalletCheck = await import("../artifacts/contracts/walletCheck/WalletCheck.sol/WalletCheck.json");
-  // const PolicyStorage = await import("../artifacts/contracts/lib/PolicyStorage.sol/PolicyStorage.json");
-  const NoImplementation = await import("../artifacts/contracts/forwarder/NoImplementation.sol/NoImplementation.json");
-  const KeyringCredentials = await import(
-    "../artifacts/contracts/keyringCredentials/KeyringCredentials.sol/KeyringCredentials.json"
-  );
-  const RuleRegistry = await import("../artifacts/contracts/ruleRegistry/RuleRegistry.sol/RuleRegistry.json");
-  const PolicyManager = await import("../artifacts/contracts/policyManager/PolicyManager.sol/PolicyManager.json");
-  const KeyringZkCredentialUpdater = await import(
-    "../artifacts/contracts/credentialUpdater/KeyringZkCredentialUpdater.sol/KeyringZkCredentialUpdater.json"
-  );
-  const KeyringZkVerifier = await import(
-    "../artifacts/contracts/keyringZkVerifier/KeyringZkVerifier.sol/KeyringZkVerifier.json"
-  );
-  const UserPolicies = await import("../artifacts/contracts/userPolicies/UserPolicies.sol/UserPolicies.json");
-  /* ------------------------------ Forwarder ------------------------------ */
-
-  const signers = {} as Signers;
-  const walletSigners: SignerWithAddress[] = await ethers.getSigners();
-  signers.admin = walletSigners[0];
-  console.log("deploying contracts");
+  /* --------------------------------- Proxies -------------------------------- */
+  // NOTE: when calling `upgrades.deployProxy` for the first time and without pre-existing proxies,
+  // the proxy admin contract will be deployed first and linked to the proxy.
+  // Afterwards the implementation contract will be deployed and linked to the proxy.
+  // Check `.openzeppelin/` folder for more details.
+  console.log("Deploying proxies...");
 
   /* ------------------------------ Forwarder ------------------------------ */
-  const ForwarderFactory = await ethers.getContractFactory("NoImplementation");
-  const forwarder = await ForwarderFactory.deploy();
-  console.log("Forwarder:                    ", forwarder.address);
+  let name = "KeyringMinimalForwarder"; // NOTE - contract name was renamed to `NoImplementation`
+  {
+    const { contract, factory } = await deployContract("NoImplementation", [], hre, true);
+    contracts.push({ name, contract, factory });
+  }
+  const forwarderAddress = getContractByName(name, contracts)?.address;
 
   /* ---------------------------- KeyringZkVerifier --------------------------- */
+  name = "ConstructionVerifier";
+  {
+    const { contract, factory } = await deployContract(name, [], hre);
+    contracts.push({ name, contract, factory });
+  }
+  const constructionVerifierAddress = getContractByName(name, contracts)?.address;
 
-  let verifierFactory = new ethers.ContractFactory(
-    IdentityConstructionProofVerifier.abi,
-    IdentityConstructionProofVerifier.bytecode,
-    signers.admin,
-  );
-  const identityConstructionProofVerifier = await verifierFactory.deploy();
-  verifierFactory = new ethers.ContractFactory(
-    AuthorizationProofVerifier.abi,
-    AuthorizationProofVerifier.bytecode,
-    signers.admin,
-  );
-  const authorizationProofVerifier = await verifierFactory.deploy();
+  name = "MembershipVerifier20";
+  {
+    const { contract, factory } = await deployContract(name, [], hre);
+    contracts.push({ name, contract, factory });
+  }
+  const MembershipVerifierAddress = getContractByName(name, contracts)?.address;
 
-  verifierFactory = new ethers.ContractFactory(
-    IdentityMembershipProofVerifier.abi,
-    IdentityMembershipProofVerifier.bytecode,
-    signers.admin,
-  );
-  const identityMembershipProofVerifier = await verifierFactory.deploy();
+  name = "AuthorizationVerifier";
+  {
+    const { contract, factory } = await deployContract(name, [], hre);
+    contracts.push({ name, contract, factory });
+  }
+  const authorizationVerifierAddress = getContractByName(name, contracts)?.address;
 
-  const KeyringZkVerifierFactory = await ethers.getContractFactory("KeyringZkVerifier");
-  const keyringZkVerifier = await KeyringZkVerifierFactory.deploy(
-    identityConstructionProofVerifier.address,
-    identityMembershipProofVerifier.address,
-    authorizationProofVerifier.address,
-  );
-  console.log("KeyringZkVerifier:            ", keyringZkVerifier.address);
+  name = "KeyringZkVerifier";
+  {
+    const { contract, factory } = await deployContract(
+      name,
+      [constructionVerifierAddress, MembershipVerifierAddress, authorizationVerifierAddress],
+      hre,
+    );
+    contracts.push({ name, contract, factory });
+  }
+  const keyringZkVerifierAddress = getContractByName(name, contracts)?.address;
 
   /* ------------------------------ RuleRegistry ------------------------------ */
-  const RuleRegistryFactory = await ethers.getContractFactory("RuleRegistry");
-  const ruleRegistry = await RuleRegistryFactory.deploy(forwarder.address);
-  console.log("RuleRegistry:                  ", ruleRegistry.address);
+
+  name = "RuleRegistry";
+  {
+    const { contract, factory } = await deployContract(name, [forwarderAddress], hre, true, {
+      unsafeAllow: ["constructor", "delegatecall"],
+    });
+    contracts.push({ name, contract, factory });
+  }
+  const ruleRegistryAddress = getContractByName(name, contracts)?.address;
 
   /* ------------------------------ PolicyManager ------------------------------ */
-  const PolicyStorageFactory = await ethers.getContractFactory("PolicyStorage");
-  const policyStorage = await PolicyStorageFactory.deploy();
-  const PolicyManagerFactory = await ethers.getContractFactory("PolicyManager", {
-    libraries: {
-      PolicyStorage: policyStorage.address,
-    },
-  });
-  const policyManager = await PolicyManagerFactory.deploy(forwarder.address, ruleRegistry.address);
-  console.log("PolicyManager:                 ", policyManager.address);
+  name = "PolicyStorage";
+  {
+    const { contract, factory } = await deployContract(name, [], hre);
+    contracts.push({ name, contract, factory });
+  }
+  const policyStorageAddress = getContractByName(name, contracts)?.address;
+
+  name = "PolicyManager";
+  {
+    const { contract, factory } = await deployContract(
+      name,
+      [forwarderAddress, ruleRegistryAddress],
+      hre,
+      true,
+      {
+        unsafeAllow: ["constructor", "delegatecall", "external-library-linking"],
+      },
+      {
+        libraries: {
+          PolicyStorage: policyStorageAddress as string,
+        },
+      },
+    );
+    contracts.push({ name, contract, factory });
+  }
+  const policyManagerAddress = getContractByName(name, contracts)?.address;
 
   /* ------------------------------ UserPolicies ------------------------------ */
-  const UserPoliciesFactory = await ethers.getContractFactory("UserPolicies");
-  const userPolicies = await UserPoliciesFactory.deploy(forwarder.address, policyManager.address);
-  console.log("UserPolicies:                 ", userPolicies.address);
+  name = "UserPolicies";
+  {
+    const { contract, factory } = await deployContract(name, [forwarderAddress, policyManagerAddress], hre, true, {
+      unsafeAllow: ["constructor"],
+    });
+    contracts.push({ name, contract, factory });
+  }
 
   /* --------------------------- KeyringCredentials --------------------------- */
-  const CredentialFactory = await ethers.getContractFactory("KeyringCredentials");
-  const credentials = await CredentialFactory.deploy(forwarder.address, policyManager.address);
-  console.log("KeyringCredentials:            ", credentials.address);
+  name = "KeyringCredentials";
+  {
+    const { contract, factory } = await deployContract(
+      name,
+      [forwarderAddress, policyManagerAddress, MAXIMUM_CONSENT_PERIOD],
+      hre,
+      true,
+      { unsafeAllow: ["constructor", "delegatecall", "state-variable-immutable"] },
+    );
+    contracts.push({ name, contract, factory });
+  }
+  const keyringCredentialsAddress = getContractByName(name, contracts)?.address;
 
   /* ---------------------- KeyringZkCredentialUpdater ----------------------- */
-  const CredentialUpdaterFactory = await ethers.getContractFactory("KeyringZkCredentialUpdater");
-  const credentialUpdater = await CredentialUpdaterFactory.deploy(
-    forwarder.address,
-    credentials.address,
-    policyManager.address,
-    keyringZkVerifier.address,
-  );
-  console.log("KeyringZkCredentialUpdater:    ", credentialUpdater.address);
+  name = "KeyringZkCredentialUpdater";
+  {
+    const { contract, factory } = await deployContract(
+      name,
+      [forwarderAddress, keyringCredentialsAddress, policyManagerAddress, keyringZkVerifierAddress],
+      hre,
+    );
+    contracts.push({ name, contract, factory });
+  }
+
+  /* --------------------------- ExemptionsManager ---------------------------- */
+  name = "ExemptionsManager";
+  {
+    const { contract, factory } = await deployContract(name, [forwarderAddress], hre, true, {
+      unsafeAllow: ["constructor", "delegatecall"],
+    });
+    contracts.push({ name, contract, factory });
+  }
 
   /* ------------------------------- WalletCheck ------------------------------ */
-  const WalletCheckFactory = await ethers.getContractFactory("WalletCheck");
-  const walletCheck = await WalletCheckFactory.deploy(forwarder.address);
-  console.log("WalletCheck:                  ", walletCheck.address);
+  name = "WalletCheck";
+  {
+    const { contract, factory } = await deployContract(
+      name,
+      [forwarderAddress, policyManagerAddress, MAXIMUM_CONSENT_PERIOD, WALLETCHECK_URI],
+      hre,
+    );
+    contracts.push({ name, contract, factory });
+  }
 
   /* ------------------------------ IdentityTree ------------------------------ */
-  const IdentityTreeFactory = await ethers.getContractFactory("IdentityTree");
-  const identityTree = await IdentityTreeFactory.deploy(forwarder.address);
-  console.log("IdentityTree:                 ", identityTree.address);
+  name = "IdentityTree";
+  {
+    const { contract, factory } = await deployContract(
+      name,
+      [forwarderAddress, policyManagerAddress, MAXIMUM_CONSENT_PERIOD],
+      hre,
+    );
+    contracts.push({ name, contract, factory });
+  }
 
-  await forwarder.deployed();
-  await identityConstructionProofVerifier.deployed();
-  await authorizationProofVerifier.deployed();
-  await identityMembershipProofVerifier.deployed();
-  await keyringZkVerifier.deployed();
-  await credentials.deployed();
-  await ruleRegistry.deployed();
-  await policyManager.deployed();
-  await userPolicies.deployed();
-  await credentialUpdater.deployed();
-  await policyStorage.deployed();
-  await walletCheck.deployed();
-  await identityTree.deployed();
+  /* ---------- Wait for all contracts to be deployed and initialized --------- */
+  for (const contract of contracts) {
+    await contract.contract.deployed();
+  }
 
   console.log("contract deployments confirmed");
 
-  const tx1 = await credentials.init();
-  await tx1.wait();
-  const tx2 = await ruleRegistry.init(
-    genesis.universeDescription,
-    genesis.universeUri,
-    genesis.emptyDescription,
-    genesis.emptyUri,
-  );
-  await tx2.wait();
-  const tx3 = await policyManager.init();
-  await tx3.wait();
+  /* -------------------------- Initialize contracts -------------------------- */
+  console.log("Initializing contracts...");
+
+  await initAndConfirm([
+    {
+      contract: getContractByName("RuleRegistry", contracts),
+      args: [...Object.values(GENESIS_RULE_REGISTRY)],
+    },
+    {
+      contract: getContractByName("KeyringCredentials", contracts),
+    },
+    {
+      contract: getContractByName("PolicyManager", contracts),
+    },
+    {
+      contract: getContractByName("ExemptionsManager", contracts),
+      args: [policyManagerAddress],
+    },
+  ]);
 
   console.log("contract initialization confirmed");
 
-  /* ------------------------------ Grant Roles ------------------------------ */
-  const credentialUpdaterRole = await credentials.ROLE_CREDENTIAL_UPDATER();
-  const issuerAdminRole = await policyManager.ROLE_GLOBAL_ATTESTOR_ADMIN();
-  const globalWalletCheckAdminRole = await policyManager.ROLE_GLOBAL_WALLETCHECK_ADMIN();
-  const policyCreatorRole = await policyManager.ROLE_POLICY_CREATOR();
-  const walletCheckAdminRole = await walletCheck.ROLE_WALLETCHECK_ADMIN();
-  const roleAggregator = await identityTree.ROLE_AGGREGATOR();
-  const roleIdentityTreeAdmin = await credentialUpdater.ROLE_IDENTITY_TREE_ADMIN();
+  /* -------------------------- Save deployment info -------------------------- */
+  console.log("Saving deployment info...");
 
-  const admin = signers.admin.address;
-  const tx4 = await credentials.grantRole(credentialUpdaterRole, credentialUpdater.address);
-  const tx5 = await policyManager.grantRole(issuerAdminRole, admin);
-  const tx6 = await policyManager.grantRole(globalWalletCheckAdminRole, admin);
-  const tx7 = await policyManager.grantRole(policyCreatorRole, admin);
-  const tx8 = await walletCheck.grantRole(walletCheckAdminRole, admin);
-  const tx9 = await identityTree.grantRole(roleAggregator, admin);
-  const tx10 = await credentialUpdater.grantRole(roleIdentityTreeAdmin, admin);
-
-  await tx4.wait();
-  await tx5.wait();
-  await tx6.wait();
-  await tx7.wait();
-  await tx8.wait();
-  await tx9.wait();
-  await tx10.wait();
-
-  console.log("contract internal roles configuration confirmed");
-
-  /* --------------------- Admit Attestor and WalletCheck --------------------- */
-  const attestorAddress = "0xbF76cca6D678949E207D7fB66136bbFdd4E317aF";
-  const tx11 = await policyManager.admitAttestor(attestorAddress, "bulut");
-  const tx12 = await policyManager.admitWalletCheck(walletCheck.address);
-  // NOTE granting an aggregator with the `ROLE_AGGREGATOR` on the IdentityTree contract is missing
-  await tx11.wait();
-  await tx12.wait();
-
-  console.log("contract Attestor and Walletcheck configuration confirmed");
-
-  /* ------------------------------ Deployer Info ------------------------------ */
-
-  const deploymentInfo = {
-    roles: {
-      admin: signers.admin.address,
-    },
-    contracts: {
-      IdentityConstructionProofVerifier: {
-        address: identityConstructionProofVerifier.address,
-        abi: IdentityConstructionProofVerifier.abi,
+  const deploymentInfo: DeploymentInfo = {
+    blockNumber: blockNumber,
+    roles: [
+      {
+        name: "Deployer",
+        address: "",
+        granted: {},
       },
-      IdentityMembershipProofVerifier: {
-        address: identityMembershipProofVerifier.address,
-        abi: IdentityMembershipProofVerifier.abi,
+      {
+        name: "Default Admin",
+        address: "",
+        granted: {},
       },
-      AuthorizationProofVerifier: {
-        address: authorizationProofVerifier.address,
-        abi: AuthorizationProofVerifier.abi,
-      },
-      KeyringMinimalForwarder: {
-        address: forwarder.address,
-        abi: NoImplementation.abi,
-      },
-      KeyringZkVerifier: {
-        address: keyringZkVerifier.address,
-        abi: KeyringZkVerifier.abi,
-      },
-      KeyringCredentials: {
-        address: credentials.address,
-        abi: KeyringCredentials.abi,
-      },
-      RuleRegistry: {
-        address: ruleRegistry.address,
-        abi: RuleRegistry.abi,
-      },
-      PolicyManager: {
-        address: policyManager.address,
-        abi: PolicyManager.abi,
-      },
-      UserPolicies: {
-        address: userPolicies.address,
-        abi: UserPolicies.abi,
-      },
-      PolicyStorage: {
-        address: policyStorage.address,
-        abi: policyStorage.abi,
-      },
-      KeyringZkCredentialUpdater: {
-        address: credentialUpdater.address,
-        abi: KeyringZkCredentialUpdater.abi,
-      },
-      WalletCheck: {
-        address: walletCheck.address,
-        abi: walletCheck.abi,
-      },
-      IdentityTree: {
-        address: identityTree.address,
-        abi: identityTree.abi,
-      },
-    },
+    ],
+    contracts: {},
+    upgradable: {},
   };
 
-  if (!fs.existsSync(contractsDir)) {
-    fs.mkdirSync(contractsDir, { recursive: true });
-  }
-  fs.writeFileSync(`${contractsDir}/deployment.json`, JSON.stringify(deploymentInfo, undefined, 2));
+  deploymentInfo.roles[0].address = DEPLOYER.address; // DEPLOYER
+  // NOTE - `Default Admin` role gets transferred via the separate `owner` task
+  deploymentInfo.roles[1].address = DEPLOYER.address; // DEFAULT ADMIN
 
-  console.log("Admin has all roles:           ", signers.admin.address);
+  for (const { name, contract, factory } of contracts) {
+    deploymentInfo.contracts[name] = {
+      address: contract.address,
+      abi: JSON.parse(factory.interface.format("json") as string),
+    };
+  }
+
+  // Add OpenZeppelin upgradable info
+  let openzeppelinData;
+  try {
+    const openzeppelinFile = path.join(__dirname, `../.openzeppelin/${ozNetworkToFilename[network.name]}.json`);
+    openzeppelinData = JSON.parse(fs.readFileSync(openzeppelinFile, "utf8"));
+  } catch (err) {
+    console.error(`Failed to read or parse OpenZeppelin upgradable info: ${err}`);
+    openzeppelinData = {}; // fallback to an empty object
+  }
+  deploymentInfo.upgradable = openzeppelinData;
+
+  const contractsDir = `${__dirname}/../deploymentInfo/${network.name}/${timestamp}`;
+  writeDeploymentInfoToFile(deploymentInfo, contractsDir, "deployment-core.json");
+
+  console.log("Deployment info saved");
+  console.log("DEPLOYMENT HAS BEEN COMPLETED");
 });

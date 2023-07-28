@@ -10,17 +10,35 @@ import {
   WalletCheck,
   IdentityTree,
   UserPolicies,
+  ExemptionsManager,
+  IdentityTree__factory,
+  WalletCheck__factory,
+  ExemptionsManager__factory,
+  KeyringZkCredentialUpdater__factory,
+  KeyringCredentials__factory,
+  UserPolicies__factory,
+  PolicyManager__factory,
+  PolicyStorage__factory,
+  RuleRegistry__factory,
+  KeyringZkVerifier__factory,
+  NoImplementation__factory,
+  AuthorizationVerifier,
+  ConstructionVerifier,
+  MembershipVerifier20,
 } from "../../src/types";
 import { PolicyStorage } from "../../src/types/PolicyManager";
+import IdentityConstructionProofVerifier from "../../artifacts/contracts/zkVerifiers/identityContructionProof/contracts/ConstructionVerifier.sol/ConstructionVerifier.json";
+import AuthorizationProofVerifier from "../../artifacts/contracts/zkVerifiers/authorizationProof/contracts/AuthorizationVerifier.sol/AuthorizationVerifier.json";
+import IdentityMembershipProofVerifier from "../../artifacts/contracts/zkVerifiers/membershipProof/contracts/MembershipVerifier20.sol/MembershipVerifier20.json";
 import {
-  IdentityConstructionProofVerifier as _IdentityConstructionProofVerifier,
-  AuthorizationProofVerifier as _AuthorizationProofVerifier,
-  IdentityMembershipProofVerifier as _IdentityMembershipProofVerifier,
-} from "../../src/typesHardcoded";
-import IdentityConstructionProofVerifier from "../../artifacts/contracts/zkVerifiers/identityContructionProof/contracts/IdentityConstructionProofVerifier.sol/Verifier.json";
-import AuthorizationProofVerifier from "../../artifacts/contracts/zkVerifiers/authorizationProof/contracts/AuthorizationProofVerifier.sol/Verifier.json";
-import IdentityMembershipProofVerifier from "../../artifacts/contracts/zkVerifiers/membershipProof/contracts/IdentityMembershipProofVerifier.sol/Verifier20.json";
-import { baseRules, genesis, ONE_DAY_IN_SECONDS, Operator, THIRTY_DAYS_IN_SECONDS } from "../../constants";
+  baseRules,
+  genesis,
+  MAXIMUM_CONSENT_PERIOD,
+  ONE_DAY_IN_SECONDS,
+  Operator,
+  policyDisablementPeriod,
+  THIRTY_DAYS_IN_SECONDS,
+} from "../constants";
 
 // silence hardhat-upgrades warnings
 upgrades.silenceWarnings();
@@ -33,12 +51,13 @@ interface KeyringFixture {
     policyManager: PolicyManager;
     credentialsUpdater: KeyringZkCredentialUpdater;
     forwarder: NoImplementation;
-    identityConstructionProofVerifier: _IdentityConstructionProofVerifier;
-    authorizationProofVerifier: _AuthorizationProofVerifier;
-    identityMembershipProofVerifier: _IdentityMembershipProofVerifier;
+    identityConstructionProofVerifier: ConstructionVerifier;
+    authorizationProofVerifier: AuthorizationVerifier;
+    identityMembershipProofVerifier: MembershipVerifier20;
     keyringZkVerifier: KeyringZkVerifier;
     walletCheck: WalletCheck;
     identityTree: IdentityTree;
+    exemptionsManager: ExemptionsManager;
   };
   policyScalar: PolicyStorage.PolicyScalarStruct;
 }
@@ -52,7 +71,7 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
    * This stateless contract is upgradeable.
    */
 
-  const NoForwarder = await ethers.getContractFactory("NoImplementation");
+  const NoForwarder = await ethers.getContractFactory("NoImplementation") as NoImplementation__factory;
   const forwarder = (await upgrades.deployProxy(NoForwarder, {
     unsafeAllow: ["constructor", "state-variable-immutable"],
   })) as NoImplementation;
@@ -68,7 +87,7 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
     signer,
   );
 
-  const identityConstructionProofVerifier = (await verifierFactory.deploy()) as _IdentityConstructionProofVerifier;
+  const identityConstructionProofVerifier = (await verifierFactory.deploy()) as ConstructionVerifier;
   await identityConstructionProofVerifier.deployed();
 
   verifierFactory = new ethers.ContractFactory(
@@ -76,7 +95,7 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
     AuthorizationProofVerifier.bytecode,
     signer,
   );
-  const authorizationProofVerifier = (await verifierFactory.deploy()) as _AuthorizationProofVerifier;
+  const authorizationProofVerifier = (await verifierFactory.deploy()) as AuthorizationVerifier;
   await authorizationProofVerifier.deployed();
 
   verifierFactory = new ethers.ContractFactory(
@@ -84,11 +103,11 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
     IdentityMembershipProofVerifier.bytecode,
     signer,
   );
-  const identityMembershipProofVerifier = (await verifierFactory.deploy()) as _IdentityMembershipProofVerifier;
+  const identityMembershipProofVerifier = (await verifierFactory.deploy()) as MembershipVerifier20;
   await identityMembershipProofVerifier.deployed();
 
   // then deploy the zk credential updater
-  const KeyringZkVerifierFactory = await ethers.getContractFactory("KeyringZkVerifier");
+  const KeyringZkVerifierFactory = await ethers.getContractFactory("KeyringZkVerifier") as KeyringZkVerifier__factory;
   const keyringZkVerifier = (await upgrades.deployProxy(KeyringZkVerifierFactory, {
     constructorArgs: [
       identityConstructionProofVerifier.address,
@@ -104,7 +123,7 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
    * The rule registry holds the rule IDs incl. minimal metadata about base rules and formulas
    * for rules that are not base rules. This stateful contract is upgradeable.
    */
-  const RuleRegistryFactory = await ethers.getContractFactory("RuleRegistry");
+  const RuleRegistryFactory = await ethers.getContractFactory("RuleRegistry") as RuleRegistry__factory;
   const ruleRegistry = (await upgrades.deployProxy(RuleRegistryFactory, {
     constructorArgs: [forwarder.address],
     unsafeAllow: ["constructor", "delegatecall"],
@@ -122,14 +141,14 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
    *   - a time-to-live property that expires credentials
    * This stateful contract is upgradeable.
    */
-  const PolicyStorageFactory = await ethers.getContractFactory("PolicyStorage");
+  const PolicyStorageFactory = await ethers.getContractFactory("PolicyStorage") as PolicyStorage__factory;
   const PolicyStorage = await PolicyStorageFactory.deploy();
   await PolicyStorage.deployed();
   const PolicyManagerFactory = await ethers.getContractFactory("PolicyManager", {
     libraries: {
       PolicyStorage: PolicyStorage.address,
     },
-  });
+  }) as PolicyManager__factory;
   const policyManager = (await upgrades.deployProxy(PolicyManagerFactory, {
     constructorArgs: [forwarder.address, ruleRegistry.address],
     unsafeAllow: ["constructor", "delegatecall", "state-variable-immutable", "external-library-linking"],
@@ -138,7 +157,7 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
 
   /* ------------------------------ UserPolicies ------------------------------ */
 
-  const UserPoliciesFactory = await ethers.getContractFactory("UserPolicies");
+  const UserPoliciesFactory = await ethers.getContractFactory("UserPolicies") as UserPolicies__factory;
   const userPolicies = (await upgrades.deployProxy(UserPoliciesFactory, {
     constructorArgs: [forwarder.address, policyManager.address],
     unsafeAllow: ["constructor"],
@@ -151,9 +170,9 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
    * This stateful contract is upgradeable.
    */
   // NOTE policyManager.address is not required in the constructor
-  const CredentialsFactory = await ethers.getContractFactory("KeyringCredentials");
+  const CredentialsFactory = await ethers.getContractFactory("KeyringCredentials") as KeyringCredentials__factory;
   const credentials = (await upgrades.deployProxy(CredentialsFactory, {
-    constructorArgs: [forwarder.address, policyManager.address],
+    constructorArgs: [forwarder.address, policyManager.address, MAXIMUM_CONSENT_PERIOD],
     unsafeAllow: ["constructor", "delegatecall", "state-variable-immutable"],
   })) as KeyringCredentials;
   await credentials.deployed();
@@ -171,7 +190,7 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
    *  - redirecting UI submissions to a replacement credential updater with write permission.
    */
 
-  const CredentialsUpdaterFactory = await ethers.getContractFactory("KeyringZkCredentialUpdater");
+  const CredentialsUpdaterFactory = await ethers.getContractFactory("KeyringZkCredentialUpdater") as KeyringZkCredentialUpdater__factory;
   const credentialsUpdater = (await CredentialsUpdaterFactory.deploy(
     forwarder.address,
     credentials.address,
@@ -181,29 +200,58 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
   await credentialsUpdater.deployed();
 
   /* ------------------------------- WalletCheck ------------------------------ */
-  const WalletCheck = await ethers.getContractFactory("WalletCheck");
-  const walletCheck = (await WalletCheck.deploy(forwarder.address)) as WalletCheck;
+  const WalletCheck = (await ethers.getContractFactory("WalletCheck")) as WalletCheck__factory;
+  const walletCheckUri = "https://keyring.network/walletchecker1";
+  const walletCheck = (await WalletCheck.deploy(
+    forwarder.address,
+    policyManager.address,
+    MAXIMUM_CONSENT_PERIOD,
+    walletCheckUri,
+  )) as WalletCheck;
 
   /* ------------------------------ IdentityTree ------------------------------ */
-  const IdentityTree = await ethers.getContractFactory("IdentityTree");
-  const identityTree = (await IdentityTree.deploy(forwarder.address)) as IdentityTree;
+  const IdentityTree = (await ethers.getContractFactory("IdentityTree")) as IdentityTree__factory;
+  const identityTree = (await IdentityTree.deploy(
+    forwarder.address,
+    policyManager.address,
+    MAXIMUM_CONSENT_PERIOD,
+  )) as IdentityTree;
+
+  /* --------------------------- ExemptionsManager ---------------------------- */
+  const ExemptionsManager = (await ethers.getContractFactory("ExemptionsManager")) as ExemptionsManager__factory;
+  const exemptionsManager = (await ExemptionsManager.deploy(forwarder.address)) as ExemptionsManager;
+  await exemptionsManager.init(policyManager.address);
 
   /* ------------------------------ Grant Roles ------------------------------ */
   const credentialUpdaterRole = await credentials.ROLE_CREDENTIAL_UPDATER();
   const issuerAdminRole = await policyManager.ROLE_GLOBAL_ATTESTOR_ADMIN();
   const globalWalletCheckAdminRole = await policyManager.ROLE_GLOBAL_WALLETCHECK_ADMIN();
   const policyCreatorRole = await policyManager.ROLE_POLICY_CREATOR();
-  const walletCheckAdminRole = await walletCheck.ROLE_WALLETCHECK_ADMIN();
+  const roleGlobalBackdoorAdmin = await policyManager.ROLE_GLOBAL_BACKDOOR_ADMIN();
+  const roleGlobalValidationAdmin = await policyManager.ROLE_GLOBAL_VALIDATION_ADMIN();
+  const walletCheckListAdminRole = await walletCheck.ROLE_WALLETCHECK_LIST_ADMIN();
+  const roleWalletcheckMetaAdmin = await walletCheck.ROLE_WALLETCHECK_META_ADMIN();
   const roleAggregator = await identityTree.ROLE_AGGREGATOR();
+  // ROLE_SERVICE_SUPERVISOR for Degradable contract
+  const roleServiceSupervisor = await identityTree.ROLE_SERVICE_SUPERVISOR();
+  const roleGlobalExemptionsAdmin = await exemptionsManager.ROLE_GLOBAL_EXEMPTIONS_ADMIN();
+
 
   await credentials.grantRole(credentialUpdaterRole, credentialsUpdater.address);
+  await credentials.grantRole(roleServiceSupervisor, admin);
   await policyManager.grantRole(issuerAdminRole, admin);
   await policyManager.grantRole(globalWalletCheckAdminRole, admin);
   await policyManager.grantRole(policyCreatorRole, admin);
-  await walletCheck.grantRole(walletCheckAdminRole, admin);
-  await walletCheck.grantRole(walletCheckAdminRole, credentialsUpdater.address);
+  await policyManager.grantRole(roleGlobalBackdoorAdmin, admin);
+  await policyManager.grantRole(roleGlobalValidationAdmin, admin);
+  await walletCheck.grantRole(walletCheckListAdminRole, admin);
+  await walletCheck.grantRole(walletCheckListAdminRole, credentialsUpdater.address);
+  await walletCheck.grantRole(roleWalletcheckMetaAdmin, admin);
+  await walletCheck.grantRole(roleServiceSupervisor, admin);
+  await identityTree.grantRole(roleServiceSupervisor, admin);
   await identityTree.grantRole(roleAggregator, admin);
   await credentialsUpdater.grantRole(roleAggregator, admin);
+  await exemptionsManager.grantRole(roleGlobalExemptionsAdmin, admin);
 
   /* ------------------------------ Create Rules ------------------------------ */
 
@@ -256,10 +304,11 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
     descriptionUtf8: "Intersection: Union [ GB, US ], Complement [ PEP ] - 1 of 2",
     ttl: ONE_DAY_IN_SECONDS,
     gracePeriod: THIRTY_DAYS_IN_SECONDS,
-    acceptRoots: 1,
+    allowApprovedCounterparties: false,
+    disablementPeriod: policyDisablementPeriod,
     locked: false,
-    allowUserWhitelists: false,
   };
+
   await policyManager.createPolicy(policyScalar, [attestor1, attestor2, identityTree.address], [walletCheck.address]);
 
   // check if the policy is created correctly
@@ -270,7 +319,6 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
   expect(policy.scalarActive.descriptionUtf8).to.equal(policyScalar.descriptionUtf8);
   expect(policy.scalarActive.ttl).to.equal(policyScalar.ttl);
   expect(policy.scalarActive.gracePeriod).to.equal(policyScalar.gracePeriod);
-  expect(policy.scalarActive.acceptRoots).to.equal(policyScalar.acceptRoots);
   expect(policy.scalarActive.locked).to.equal(policyScalar.locked);
   expect(policy.attestorsActive.length).to.equal(3);
   expect(policy.walletChecksActive.length).to.equal(1);
@@ -298,6 +346,7 @@ export async function keyringTestFixture(): Promise<KeyringFixture> {
       keyringZkVerifier,
       walletCheck,
       identityTree,
+      exemptionsManager,
     },
     policyScalar: policyScalar,
   };

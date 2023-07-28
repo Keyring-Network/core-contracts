@@ -13,6 +13,17 @@ import type {
   WalletCheck,
   IdentityTree,
   UserPolicies,
+  KeyringCredentials__factory,
+  KeyringZkCredentialUpdater__factory,
+  PolicyStorage__factory,
+  PolicyManager__factory,
+  RuleRegistry__factory,
+  UserPolicies__factory,
+  KeyringZkVerifier__factory,
+  WalletCheck__factory,
+  IdentityTree__factory,
+  ExemptionsManager,
+  ExemptionsManager__factory,
 } from "../../src/types";
 import { PolicyStorage } from "../../src/types/PolicyManager";
 import {
@@ -22,10 +33,16 @@ import {
   ONE_DAY_IN_SECONDS,
   ROLE_GLOBAL_ATTESTOR_ADMIN,
   ROLE_RULE_ADMIN,
-  ROLE_WALLETCHECK_ADMIN,
   THIRTY_DAYS_IN_SECONDS,
   NULL_ADDRESS,
-} from "../../constants";
+  MAXIMUM_CONSENT_PERIOD,
+  FIRST_CONFIGURABLE_POLICY,
+  MAX_DEGRATION_FRESHNESS_PERIOD,
+  MAX_DEGRATION_PERIOD,
+  policyDisablementPeriod,
+  MAX_DISABLEMENT_PERIOD,
+  MINIMUM_MAX_CONSENT_PERIOD,
+} from "../constants";
 
 /* -------------------------------------------------------------------------- */
 /*  Test to enure rules and policies can be created and changed accordingly   */
@@ -46,6 +63,7 @@ describe("Admin", function () {
   let keyringZkVerifier: KeyringZkVerifier;
   let walletCheck: WalletCheck;
   let identityTree: IdentityTree;
+  let exemptionsManager: ExemptionsManager;
 
   // fixture loader
   let loadFixture: ReturnType<typeof createFixtureLoader>;
@@ -55,7 +73,10 @@ describe("Admin", function () {
 
   // accounts in this test
   let admin: string;
+  let alice: string;
+  let aliceAsSigner: Signer;
   let bob: string;
+  let bobAsSigner: Signer;
   let attestor1: string;
   let attestor2: string;
   let attacker: string;
@@ -64,13 +85,17 @@ describe("Admin", function () {
   before(async () => {
     const {
       admin: adminAddress,
+      alice: aliceAddress,
       bob: bobAddress,
       attestor1: attestor1Address,
       attestor2: attestor2Address,
       attacker: attackerAddress,
     } = await getNamedAccounts();
     admin = adminAddress;
+    aliceAsSigner = ethers.provider.getSigner(aliceAddress);
+    alice = aliceAddress;
     bob = bobAddress;
+    bobAsSigner = ethers.provider.getSigner(bob);
     attestor1 = attestor1Address;
     attestor2 = attestor2Address;
     // `attacker` connect's with contract and try to sign invalid
@@ -92,22 +117,32 @@ describe("Admin", function () {
       keyringZkVerifier = fixture.contracts.keyringZkVerifier;
       walletCheck = fixture.contracts.walletCheck;
       identityTree = fixture.contracts.identityTree;
+      exemptionsManager = fixture.contracts.exemptionsManager;
 
       policyScalar = fixture.policyScalar;
     });
 
     /* --------------------------------- GENERAL -------------------------------- */
 
-    it("should not deploy if constructor inputs are empty", async function () {
-      const CredentialsFactory = await ethers.getContractFactory("KeyringCredentials");
-      await expect(CredentialsFactory.deploy(NULL_ADDRESS, NULL_ADDRESS)).to.be.revertedWith(
-        unacceptable("trustedForwarder cannot be empty"),
-      );
-      await expect(CredentialsFactory.deploy(forwarder.address, NULL_ADDRESS)).to.be.revertedWith(
-        unacceptable("policyManager_ cannot be empty"),
-      );
+    // TODO add describe sections to improve readability
+    // describe("GENERAL", function () {
+    //   it("should rub", async function () {
+    //     // do something
+    //   });
+    // });
 
-      const CredentialsUpdaterFactory = await ethers.getContractFactory("KeyringZkCredentialUpdater");
+    it("should not deploy if constructor inputs are empty", async function () {
+      const CredentialsFactory = (await ethers.getContractFactory("KeyringCredentials")) as KeyringCredentials__factory;
+      await expect(
+        CredentialsFactory.deploy(NULL_ADDRESS, policyManager.address, MAXIMUM_CONSENT_PERIOD),
+      ).to.be.revertedWith(unacceptable("trustedForwarder cannot be empty"));
+      await expect(
+        CredentialsFactory.deploy(forwarder.address, NULL_ADDRESS, MAXIMUM_CONSENT_PERIOD),
+      ).to.be.revertedWith(unacceptable("policyManager_ cannot be empty"));
+
+      const CredentialsUpdaterFactory = (await ethers.getContractFactory(
+        "KeyringZkCredentialUpdater",
+      )) as KeyringZkCredentialUpdater__factory;
 
       await expect(
         CredentialsUpdaterFactory.deploy(
@@ -137,14 +172,14 @@ describe("Admin", function () {
         CredentialsUpdaterFactory.deploy(forwarder.address, credentials.address, policyManager.address, NULL_ADDRESS),
       ).to.be.revertedWith(unacceptable("keyringZkVerifier cannot be empty"));
 
-      const PolicyStorageFactory = await ethers.getContractFactory("PolicyStorage");
+      const PolicyStorageFactory = (await ethers.getContractFactory("PolicyStorage")) as PolicyStorage__factory;
       const PolicyStorage = await PolicyStorageFactory.deploy();
       await PolicyStorage.deployed();
-      const PolicyManagerFactory = await ethers.getContractFactory("PolicyManager", {
+      const PolicyManagerFactory = (await ethers.getContractFactory("PolicyManager", {
         libraries: {
           PolicyStorage: PolicyStorage.address,
         },
-      });
+      })) as PolicyManager__factory;
       await expect(PolicyManagerFactory.deploy(NULL_ADDRESS, ruleRegistry.address)).to.be.revertedWith(
         unacceptable("trustedForwarder cannot be empty"),
       );
@@ -152,12 +187,12 @@ describe("Admin", function () {
         unacceptable("ruleRegistry cannot be empty"),
       );
 
-      const RuleRegistryFactory = await ethers.getContractFactory("RuleRegistry");
+      const RuleRegistryFactory = (await ethers.getContractFactory("RuleRegistry")) as RuleRegistry__factory;
       await expect(RuleRegistryFactory.deploy(NULL_ADDRESS)).to.be.revertedWith(
         unacceptable("trustedForwarder cannot be empty"),
       );
 
-      const UserPoliciesFactory = await ethers.getContractFactory("UserPolicies");
+      const UserPoliciesFactory = (await ethers.getContractFactory("UserPolicies")) as UserPolicies__factory;
       await expect(UserPoliciesFactory.deploy(NULL_ADDRESS, policyManager.address)).to.be.revertedWith(
         unacceptable("trustedForwarder cannot be empty"),
       );
@@ -165,7 +200,9 @@ describe("Admin", function () {
         unacceptable("policyManager cannot be empty"),
       );
 
-      const KeyringZkVerifierFactory = await ethers.getContractFactory("KeyringZkVerifier");
+      const KeyringZkVerifierFactory = (await ethers.getContractFactory(
+        "KeyringZkVerifier",
+      )) as KeyringZkVerifier__factory;
       const verifier = "0x0000000000000000000000000000000000000001";
       await expect(KeyringZkVerifierFactory.deploy(NULL_ADDRESS, verifier, verifier)).to.be.revertedWith(
         unacceptable("identityConstructionProofVerifier cannot be empty"),
@@ -177,19 +214,33 @@ describe("Admin", function () {
         unacceptable("authorisationProofVerifier cannot be empty"),
       );
 
-      const WalletCheckFactory = await ethers.getContractFactory("WalletCheck");
-      await expect(WalletCheckFactory.deploy(NULL_ADDRESS)).to.be.revertedWith(
-        unacceptable("trustedForwarder cannot be empty"),
-      );
+      const WalletCheckFactory = (await ethers.getContractFactory("WalletCheck")) as WalletCheck__factory;
+      const walletCheckUri = "https://keyring.network/walletchecker1";
+      await expect(
+        WalletCheckFactory.deploy(NULL_ADDRESS, policyManager.address, MAXIMUM_CONSENT_PERIOD, walletCheckUri),
+      ).to.be.revertedWith(unacceptable("trustedForwarder cannot be empty"));
+      await expect(
+        WalletCheckFactory.deploy(forwarder.address, policyManager.address, MAXIMUM_CONSENT_PERIOD, ""),
+      ).to.be.revertedWith(unacceptable("uri_ cannot be empty"));
+      await expect(
+        WalletCheckFactory.deploy(forwarder.address, NULL_ADDRESS, MAXIMUM_CONSENT_PERIOD, walletCheckUri),
+      ).to.be.revertedWith(unacceptable("policyManager_ cannot be empty"));
+      const invalidConsentPeriod = MINIMUM_MAX_CONSENT_PERIOD - 1;
+      await expect(
+        WalletCheckFactory.deploy(forwarder.address, policyManager.address, invalidConsentPeriod, walletCheckUri),
+      ).to.be.revertedWith(unacceptable("The maximum consent period must be at least 1 hour"));
 
-      const IdentityTreeFactory = await ethers.getContractFactory("IdentityTree");
-      await expect(IdentityTreeFactory.deploy(NULL_ADDRESS)).to.be.revertedWith(
-        unacceptable("trustedForwarder cannot be empty"),
-      );
+      const IdentityTreeFactory = (await ethers.getContractFactory("IdentityTree")) as IdentityTree__factory;
+      await expect(
+        IdentityTreeFactory.deploy(NULL_ADDRESS, policyManager.address, MAXIMUM_CONSENT_PERIOD),
+      ).to.be.revertedWith(unacceptable("trustedForwarder cannot be empty"));
+      await expect(
+        IdentityTreeFactory.deploy(forwarder.address, NULL_ADDRESS, MAXIMUM_CONSENT_PERIOD),
+      ).to.be.revertedWith(unacceptable("policyManager_ cannot be empty"));
     });
 
     it("should not allow to init if inputs are empty", async function () {
-      const RuleRegistryFactory = await ethers.getContractFactory("RuleRegistry");
+      const RuleRegistryFactory = (await ethers.getContractFactory("RuleRegistry")) as RuleRegistry__factory;
       const ruleRegistry = await RuleRegistryFactory.deploy(forwarder.address);
 
       // universeDescription cannot be empty
@@ -211,9 +262,32 @@ describe("Admin", function () {
       await expect(
         ruleRegistry.init(genesis.universeDescription, genesis.universeUri, genesis.emptyDescription, ""),
       ).to.be.revertedWith(unacceptable("emptyUri cannot be empty"));
+
+      // policyManager_ cannot be empty
+      const ExemptionsManager = (await ethers.getContractFactory("ExemptionsManager")) as ExemptionsManager__factory;
+      exemptionsManager = (await ExemptionsManager.deploy(forwarder.address)) as ExemptionsManager;
+      await expect(exemptionsManager.init(NULL_ADDRESS)).to.be.revertedWith(
+        unacceptable("policyManager_ cannot be empty"),
+      );
     });
 
     /* ------------------------------ PolicyManager ----------------------------- */
+
+    it("should not allow to create a policy without an attestor", async function () {
+      const RULE_ID_GBUS_EXCL_PEP = await policyManager.callStatic.policyRuleId(1);
+      const policyScalar: PolicyStorage.PolicyScalarStruct = {
+        ruleId: RULE_ID_GBUS_EXCL_PEP,
+        descriptionUtf8: "Intersection: Union [ GB, US ], Complement [ PEP ] - 1 of 2",
+        ttl: ONE_DAY_IN_SECONDS,
+        gracePeriod: THIRTY_DAYS_IN_SECONDS,
+        allowApprovedCounterparties: false,
+        disablementPeriod: policyDisablementPeriod,
+        locked: false,
+      };
+      await expect(policyManager.createPolicy(policyScalar, [], [])).to.be.revertedWith(
+        unacceptable("every policy needs at least one attestor"),
+      );
+    });
 
     it("should process staged changes and commit them if the deadline has passed", async () => {
       const policyId = 1;
@@ -237,16 +311,15 @@ describe("Admin", function () {
       // check if the staged changes are correct
       const policy = await policyManager.policyRawData(policyId);
       expect(policy.scalarPending.ttl).to.equal(policyScalarUpdated.ttl);
-      expect(policy.scalarPending.acceptRoots).to.equal(policyScalarUpdated.acceptRoots);
       expect(policy.attestorsPendingRemovals.includes(attestor2)).to.equal(true);
 
       // check that the active policy is not changed
       expect(policy.scalarActive.ttl).to.equal(policyScalar.ttl);
-      expect(policy.scalarActive.acceptRoots).to.equal(policyScalar.acceptRoots);
       expect(policy.attestorsActive.includes(attestor2)).to.equal(true);
 
       // move the time forward to the deadline and process the staged changes
-      const policyDeadline = await policyManager.callStatic.policyDeadline(policyId);
+      const policyObj = await policyManager.callStatic.policy(policyId);
+      const policyDeadline = policyObj.deadline;
       await helpers.time.increaseTo(policyDeadline);
       await policyManager.policy(policyId);
 
@@ -254,7 +327,6 @@ describe("Admin", function () {
       const policyAfterDeadline = await policyManager.policyRawData(policyId);
       expect(policyAfterDeadline.attestorsPendingRemovals.length).to.equal(0);
       expect(policyAfterDeadline.scalarActive.ttl).to.equal(policyScalarUpdated.ttl);
-      expect(policyAfterDeadline.scalarActive.acceptRoots).to.equal(policyScalarUpdated.acceptRoots);
       expect(policyAfterDeadline.attestorsActive.includes(attestor2)).to.equal(false);
 
       // check the rule registry
@@ -293,8 +365,8 @@ describe("Admin", function () {
         ...policyScalar,
         descriptionUtf8: "",
       };
-
-      await expect(policyManager.createPolicy(invalidPolicyScalar, [], [])).to.be.revertedWith(
+      // TODO add check for: Unacceptable("every policy needs at least one attestor"
+      await expect(policyManager.createPolicy(invalidPolicyScalar, [identityTree.address], [])).to.be.revertedWith(
         unacceptable("descriptionUtf8 cannot be empty"),
       );
 
@@ -303,13 +375,13 @@ describe("Admin", function () {
         ruleId: bogusRuleId,
       };
 
-      await expect(policyManager.createPolicy(invalidPolicyScalar, [], [])).to.be.revertedWith(
+      await expect(policyManager.createPolicy(invalidPolicyScalar, [identityTree.address], [])).to.be.revertedWith(
         unacceptable("rule not found"),
       );
       await expect(policyManager.createPolicy(policyScalar, [bob], [])).to.be.revertedWith(
         unacceptable("attestor not found"),
       );
-      await expect(policyManager.createPolicy(policyScalar, [], [bob])).to.be.revertedWith(
+      await expect(policyManager.createPolicy(policyScalar, [identityTree.address], [bob])).to.be.revertedWith(
         unacceptable("walletCheck not found"),
       );
     });
@@ -434,10 +506,6 @@ describe("Admin", function () {
       ).to.be.revertedWith("Unauthorized");
 
       await expect(
-        policyManager.connect(attackerAsSigner).updatePolicyAcceptRoots(policyId, policyScalar.acceptRoots, deadline),
-      ).to.be.revertedWith("Unauthorized");
-
-      await expect(
         policyManager.connect(attackerAsSigner).updatePolicyLock(policyId, true, deadline),
       ).to.be.revertedWith("Unauthorized");
       await expect(
@@ -521,18 +589,21 @@ describe("Admin", function () {
       expect(attestorCount.toNumber()).to.equal(3);
 
       let policy = await policyManager.policyRawData(policyId);
-      expect(
-        policy.attestorsActive.length +
-          policy.attestorsPendingAdditions.length +
-          policy.attestorsPendingRemovals.length,
-      ).to.equal(3);
+      expect(policy.attestorsActive.length).to.equal(3);
+      expect(policy.attestorsPendingAdditions.length).to.equal(0);
+      expect(policy.attestorsPendingRemovals.length).to.equal(0);
 
       let deadline = 0;
       await policyManager.removePolicyAttestors(policyId, [attestor1], deadline);
       await policyManager.admitAttestor(bob, "https://bob.com");
-      const now = await helpers.time.latest();
+      let now = await helpers.time.latest();
       deadline = now + THIRTY_DAYS_IN_SECONDS + 1;
       await policyManager.addPolicyAttestors(policyId, [bob], deadline);
+
+      policy = await policyManager.policyRawData(policyId);
+      expect(policy.attestorsActive.length).to.equal(3);
+      expect(policy.attestorsPendingAdditions.length).to.equal(1);
+      expect(policy.attestorsPendingRemovals.length).to.equal(1);
 
       await helpers.time.increaseTo(deadline);
       await policyManager.policy(policyId);
@@ -540,11 +611,16 @@ describe("Admin", function () {
       policy = await policyManager.policyRawData(policyId);
 
       expect(attestorCount.toNumber()).to.equal(3);
-      expect(
-        policy.attestorsActive.length +
-          policy.attestorsPendingAdditions.length +
-          policy.attestorsPendingRemovals.length,
-      ).to.equal(3);
+      expect(policy.attestorsActive.length).to.equal(3);
+      expect(policy.attestorsPendingAdditions.length).to.equal(0);
+      expect(policy.attestorsPendingRemovals.length).to.equal(0);
+
+      // do not allow to delete last/all attestor
+      now = await helpers.time.latest();
+      deadline = now + THIRTY_DAYS_IN_SECONDS + 1;
+      await expect(
+        policyManager.removePolicyAttestors(policyId, [attestor2, identityTree.address, bob], deadline),
+      ).to.be.revertedWith(unacceptable("Cannot remove the last attestor. Add a replacement first"));
     });
 
     it("should allow policy owners to manage policy wallet checks", async function () {
@@ -591,11 +667,17 @@ describe("Admin", function () {
       expect(policyWc1).to.equal(bob);
       expect(ipwc).to.equal(true);
 
-      // add walletcheck1 back, add it to pending removals, then remove it from pending removals
+      // add walletcheck1 to pending addition, then remove it from pending addition
       now = await helpers.time.latest();
-      deadline = now + THIRTY_DAYS_IN_SECONDS + 1;
+      deadline = now + THIRTY_DAYS_IN_SECONDS + 100;
       await policyManager.addPolicyWalletChecks(policyId, [walletCheck.address], deadline);
-      await policyManager.policy(policyId);
+      // await policyManager.policy(policyId);
+      await policyManager.removePolicyWalletChecks(policyId, [walletCheck.address], deadline);
+      await policyManager.addPolicyWalletChecks(policyId, [walletCheck.address], deadline);
+
+      await applyPolicyChanges(policyManager, policyId);
+
+      // add walletcheck1 to pending removals, then remove it from pending removals
       deadline = 0;
       await policyManager.removePolicyWalletChecks(policyId, [walletCheck.address], deadline);
       await policyManager.addPolicyWalletChecks(policyId, [walletCheck.address], deadline);
@@ -688,7 +770,6 @@ describe("Admin", function () {
       await policyManager.updatePolicyRuleId(policy, policyScalarUpdated.ruleId, deadline);
       await policyManager.updatePolicyDescription(policy, policyScalarUpdated.descriptionUtf8, deadline);
       await policyManager.updatePolicyTtl(policy, policyScalarUpdated.ttl, deadline);
-      await policyManager.updatePolicyAcceptRoots(policy, policyScalarUpdated.acceptRoots, deadline);
       await policyManager.updatePolicyLock(policy, true, deadline);
       await policyManager.updatePolicyLock(policy, true, deadline); // to reach the empty else path
       await policyManager.updatePolicyLock(policy, false, deadline);
@@ -708,7 +789,6 @@ describe("Admin", function () {
       expect(policyUpdated.scalarActive.descriptionUtf8).to.equal(policyScalarUpdated.descriptionUtf8);
       expect(policyUpdated.scalarActive.ttl).to.equal(policyScalarUpdated.ttl);
       expect(policyUpdated.scalarActive.gracePeriod).to.equal(policyScalarUpdated.gracePeriod);
-      expect(policyUpdated.scalarActive.acceptRoots).to.equal(policyScalarUpdated.acceptRoots);
       expect(policyUpdated.scalarActive.locked).to.equal(policyScalarUpdated.locked);
     });
 
@@ -738,9 +818,6 @@ describe("Admin", function () {
       await expect(policyManager.updatePolicyTtl(policy, policyScalar.ttl, deadline)).to.be.revertedWith(
         unacceptable("policy is locked"),
       );
-      await expect(
-        policyManager.updatePolicyAcceptRoots(policy, policyScalar.acceptRoots, deadline),
-      ).to.be.revertedWith(unacceptable("policy is locked"));
       await expect(policyManager.updatePolicyLock(policy, false, deadline)).to.be.revertedWith(
         unacceptable("policy is locked"),
       );
@@ -756,20 +833,6 @@ describe("Admin", function () {
 
     it("should allow to inspect a policy", async function () {
       const policy = 1;
-
-      const policyRuleId = await policyManager.callStatic.policyRuleId(policy);
-      const policyDescription = await policyManager.callStatic.policyDescription(policy);
-      const policyTtl = await policyManager.callStatic.policyTtl(policy);
-      const policyGracePeriod = await policyManager.callStatic.policyGracePeriod(policy);
-      const policyAcceptRoots = await policyManager.callStatic.policyAcceptRoots(policy);
-      const policyLocked = await policyManager.callStatic.policyLocked(policy);
-
-      expect(policyRuleId).to.equal(policyScalar.ruleId);
-      expect(policyDescription).to.equal(policyScalar.descriptionUtf8);
-      expect(policyTtl).to.equal(policyScalar.ttl);
-      expect(policyGracePeriod).to.equal(policyScalar.gracePeriod);
-      expect(policyAcceptRoots).to.equal(policyScalar.acceptRoots);
-      expect(policyLocked).to.equal(false);
 
       const policyAttestors = await policyManager.callStatic.policyAttestors(policy);
       const policyAttestorAtIndex0 = await policyManager.callStatic.policyAttestorAtIndex(policy, 0);
@@ -793,11 +856,67 @@ describe("Admin", function () {
       await policyManager.updatePolicyTtl(1, MAX_TTL, 0);
     });
 
-    /* NOTE not feasible to test this
-    it("should not allow to exceed the amount of max policies", async function () {
-      const MAX_POLICIES = 2 ** 20 ;
+    /* ---------------------------- ExemptionsManager --------------------------- */
+    it("should only allow exemption admin to add and update global exemptions", async function () {
+      const exemptions = [admin, bob];
+      const description = "test exemption";
+      const admissionPolicyId = 1;
+
+      await expect(
+        exemptionsManager.connect(attackerAsSigner).admitGlobalExemption(exemptions, description),
+      ).to.be.revertedWith("sender does not have the required role");
+      expect((await exemptionsManager.globalExemptionsCount()).toString()).to.equal("0");
+      expect((await exemptionsManager.policyExemptionsCount(admissionPolicyId)).toString()).to.equal("0");
+
+      await expect(exemptionsManager.globalExemptionAtIndex(1)).to.be.revertedWith("index out of range");
+      await expect(exemptionsManager.policyExemptionAtIndex(admissionPolicyId, 1)).to.be.revertedWith(
+        "index out of range",
+      );
+
+      await exemptionsManager.admitGlobalExemption(exemptions, description);
+
+      await expect(exemptionsManager.admitGlobalExemption([bob], description)).to.be.revertedWith(
+        "PolicyStorage:insertGlobalExemptAddress",
+      );
+
+      expect((await exemptionsManager.globalExemptionsCount()).toString()).to.equal("2");
+      expect(await exemptionsManager.globalExemptionAtIndex(0)).to.be.equal(exemptions[0]);
+      expect(await exemptionsManager.globalExemptionAtIndex(1)).to.be.equal(exemptions[1]);
+      expect(await exemptionsManager.exemptionDescriptions(exemptions[0])).to.be.equal(description);
+
+      const newDescription = "new description";
+      await exemptionsManager.updateGlobalExemption(exemptions[0], newDescription);
+      expect(await exemptionsManager.exemptionDescriptions(exemptions[0])).to.be.equal(newDescription);
+      expect(await exemptionsManager.exemptionDescriptions(exemptions[1])).to.be.equal(description);
+
+      await expect(exemptionsManager.updateGlobalExemption(exemptions[1], "")).to.be.revertedWith(
+        unacceptable("description cannot be empty"),
+      );
+      await expect(exemptionsManager.updateGlobalExemption(attacker, description)).to.be.revertedWith(
+        unacceptable("unknown exemptAddress"),
+      );
     });
-    */
+
+    it("should only allow policy admin to add exemptions to a policy", async function () {
+      const exemptions = [admin, bob];
+      const description = "test exemption";
+      const admissionPolicyId = 1;
+
+      await exemptionsManager.admitGlobalExemption(exemptions, description);
+
+      await expect(
+        exemptionsManager.connect(attackerAsSigner).approvePolicyExemptions(admissionPolicyId, exemptions),
+      ).to.be.revertedWith("sender does not have the required role");
+
+      await exemptionsManager.approvePolicyExemptions(admissionPolicyId, exemptions);
+      await expect(exemptionsManager.approvePolicyExemptions(admissionPolicyId, [alice])).to.be.revertedWith(
+        "exemption is not approved",
+      );
+
+      expect((await exemptionsManager.policyExemptionsCount(admissionPolicyId)).toString()).to.equal("2");
+      expect(await exemptionsManager.policyExemptionAtIndex(admissionPolicyId, 0)).to.be.equal(exemptions[0]);
+      expect(await exemptionsManager.policyExemptionAtIndex(admissionPolicyId, 1)).to.be.equal(exemptions[1]);
+    });
 
     /* ------------------------------ RuleRegistry ------------------------------ */
 
@@ -1006,28 +1125,132 @@ describe("Admin", function () {
     });
 
     /* ------------------------------- WalletCheck ------------------------------ */
-    it("should only let wallet check admin whitelist wallet addresses", async function () {
-      expect((await walletCheck.birthday(bob)).toString()).to.equal("0");
+    it("should only allow to set valid timestamps", async function () {
       const now = await helpers.time.latest();
-      await expect(walletCheck.connect(attackerAsSigner).setWalletWhitelist(bob, true, now)).to.be.revertedWith(
-        unauthorized(
-          attacker,
-          "KeyringAccessControl",
-          "_checkRole",
-          ROLE_WALLETCHECK_ADMIN,
-          "sender does not have the required role",
-          "WalletCheck::onlyWalletCheckAdmin",
-        ),
+      let time = now + 100;
+      await expect(walletCheck.setWalletCheck(bob, true, time)).to.be.revertedWith(
+        unacceptable("time must be in the past"),
       );
-      await walletCheck.setWalletWhitelist(bob, true, now);
-      expect((await walletCheck.birthday(bob)).toNumber()).to.equal(now);
+
+      time = time - 200;
+      await walletCheck.setWalletCheck(bob, true, time);
+      expect(await walletCheck.subjectUpdates(walletCheckKeyGen(bob))).to.equal(time);
+      time = time - 100;
+      await expect(walletCheck.setWalletCheck(bob, true, time)).to.be.revertedWith(
+        unacceptable("time is older than existing update"),
+      );
     });
 
-    it("should not allow timestamps that are in the future", async function () {
+    it("should set walletcheck to 0 when whitelisted is false", async function () {
       const now = await helpers.time.latest();
-      await expect(walletCheck.setWalletWhitelist(bob, true, now + 100)).to.be.revertedWith(
-        unacceptable("timestamp cannot be in the future"),
+      await walletCheck.setWalletCheck(bob, true, now);
+      expect(await walletCheck.subjectUpdates(walletCheckKeyGen(bob))).to.equal(now);
+      await walletCheck.setWalletCheck(bob, false, now);
+      expect((await walletCheck.subjectUpdates(walletCheckKeyGen(bob))).toString()).to.equal("0");
+    });
+
+    /* ------------------------------- Degradable ------------------------------- */
+    it("should allow validation admin to set minimumPolicyDisablementPeriod", async function () {
+      expect((await policyManager.minimumPolicyDisablementPeriod()).toString()).to.equal("0");
+
+      const validMinimumPolicyDisablementPeriod = MAX_DISABLEMENT_PERIOD - 1;
+      await policyManager.updateMinimumPolicyDisablementPeriod(validMinimumPolicyDisablementPeriod);
+      expect((await policyManager.minimumPolicyDisablementPeriod()).toString()).to.equal(
+        validMinimumPolicyDisablementPeriod.toString(),
       );
+
+      await expect(policyManager.connect(attackerAsSigner).updateMinimumPolicyDisablementPeriod(0)).to.be.revertedWith(
+        "sender does not have the required role",
+      );
+
+      await expect(policyManager.updateMinimumPolicyDisablementPeriod(MAX_DISABLEMENT_PERIOD)).to.be.revertedWith(
+        unacceptable("minimum disablement period is too long"),
+      );
+    });
+
+    it("should only allowed the policy admin or service supervisor to setPolicyParameters", async function () {
+      const admissionPolicyId = 1;
+      const degrationPeriod = ONE_DAY_IN_SECONDS;
+      const degradationFreshness = ONE_DAY_IN_SECONDS;
+      await expect(
+        walletCheck
+          .connect(attackerAsSigner)
+          .setPolicyParameters(admissionPolicyId, degrationPeriod, degradationFreshness),
+      ).to.be.revertedWith("sender does not have the required role");
+
+      // bob as supervisor
+      const ROLE_SERVICE_SUPERVISOR = await walletCheck.ROLE_SERVICE_SUPERVISOR();
+      await walletCheck.grantRole(ROLE_SERVICE_SUPERVISOR, bob);
+      await walletCheck
+        .connect(bobAsSigner)
+        .setPolicyParameters(admissionPolicyId, degrationPeriod, degradationFreshness);
+
+      // alice as policy admin
+      const ROLE_POLICY_ADMIN = await policyManager.policyOwnerRole(admissionPolicyId);
+      await policyManager.grantRole(ROLE_POLICY_ADMIN, alice);
+      await walletCheck
+        .connect(aliceAsSigner)
+        .setPolicyParameters(admissionPolicyId, degrationPeriod, degradationFreshness);
+    });
+
+    it("should only allow to set policy paremeters within the requirements", async function () {
+      const invalidDegrationPeriod = MAX_DEGRATION_PERIOD + 1;
+      const invalidDegradationFreshness = MAX_DEGRATION_FRESHNESS_PERIOD + 1;
+
+      const admissionPolicyId = 1;
+      const degrationPeriod = MAX_DEGRATION_PERIOD - 1;
+      const degradationFreshness = MAX_DEGRATION_FRESHNESS_PERIOD - 1;
+
+      await expect(
+        walletCheck.setPolicyParameters(FIRST_CONFIGURABLE_POLICY, degrationPeriod, degradationFreshness),
+      ).to.be.revertedWith(unacceptable("Cannot configure genesis policies 0 and 1"));
+
+      await expect(
+        walletCheck.setPolicyParameters(admissionPolicyId, invalidDegrationPeriod, degradationFreshness),
+      ).to.be.revertedWith(unacceptable("degradationPeriod cannot exceed 60 days"));
+
+      await expect(
+        walletCheck.setPolicyParameters(admissionPolicyId, degrationPeriod, invalidDegradationFreshness),
+      ).to.be.revertedWith(unacceptable("degradationFreshness cannot exceed 50 years"));
+
+      await walletCheck.setPolicyParameters(admissionPolicyId, degrationPeriod, degradationFreshness);
+    });
+
+    it("should allow policy admin to update disablement period", async function () {
+      const admissionPolicyId = 1;
+      const policyObj = await policyManager.callStatic.policy(admissionPolicyId);
+      expect(policyObj.config.disablementPeriod).to.equal(policyDisablementPeriod);
+
+      let newDisablementPeriod = policyDisablementPeriod + ONE_DAY_IN_SECONDS;
+      let now = await helpers.time.latest();
+      let deadline = now + THIRTY_DAYS_IN_SECONDS + 100;
+      await policyManager.updatePolicyDisablementPeriod(admissionPolicyId, newDisablementPeriod, deadline);
+      await applyPolicyChanges(policyManager, admissionPolicyId);
+
+      let updatedPolicyObj = await policyManager.callStatic.policy(admissionPolicyId);
+      expect(updatedPolicyObj.config.disablementPeriod).to.equal(newDisablementPeriod);
+
+      // once again with a minimum policy disablement period set
+      const newMinimumPolicyDisablementPeriod = THIRTY_DAYS_IN_SECONDS * 2;
+      await policyManager.updateMinimumPolicyDisablementPeriod(newMinimumPolicyDisablementPeriod);
+
+      now = await helpers.time.latest();
+      deadline = now + THIRTY_DAYS_IN_SECONDS + 100;
+
+      const invalidDisablementPeriod = newMinimumPolicyDisablementPeriod - 1;
+      await expect(
+        policyManager.updatePolicyDisablementPeriod(admissionPolicyId, invalidDisablementPeriod, deadline),
+      ).to.be.revertedWith(unacceptable("disablement period is too short"));
+
+      await expect(
+        policyManager.updatePolicyDisablementPeriod(admissionPolicyId, MAX_DISABLEMENT_PERIOD, deadline),
+      ).to.be.revertedWith(unacceptable("disablement period is too long"));
+
+      newDisablementPeriod = newMinimumPolicyDisablementPeriod + 1;
+      await policyManager.updatePolicyDisablementPeriod(admissionPolicyId, newDisablementPeriod, deadline);
+      await applyPolicyChanges(policyManager, admissionPolicyId);
+      updatedPolicyObj = await policyManager.callStatic.policy(admissionPolicyId);
+      expect(updatedPolicyObj.config.disablementPeriod).to.equal(newDisablementPeriod);
     });
   });
 });
@@ -1053,4 +1276,17 @@ const unauthorized = (
   context: string,
 ) => {
   return `Unauthorized("${sender}", "${module}", "${method}", "${role}", "${reason}", "${context}")`;
+};
+
+// TODO put into utils file
+const walletCheckKeyGen = (subject: string) => {
+  const subjectBN = ethers.BigNumber.from(subject);
+  const subjectBytes32 = ethers.utils.hexZeroPad(subjectBN.toHexString(), 32);
+  return subjectBytes32;
+};
+
+const applyPolicyChanges = async (policyManager: PolicyManager, policyId: number) => {
+  const policyObj = await policyManager.callStatic.policy(policyId);
+  await helpers.time.increaseTo(policyObj.deadline.toNumber());
+  await policyManager.policy(policyId);
 };
