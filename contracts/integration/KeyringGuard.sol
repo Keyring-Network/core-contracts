@@ -159,8 +159,9 @@ contract KeyringGuard is IKeyringGuard, Consent {
        
         if(IPolicyManager(policyManager).policyDisabled(admissionPolicyId)) {
             if (
-                userConsentDeadlines[from] > block.timestamp || fromExempt &&
-                userConsentDeadlines[to] > block.timestamp || toExempt) 
+                (userConsentDeadlines[from] > block.timestamp || fromExempt) &&
+                (userConsentDeadlines[to] > block.timestamp || toExempt)
+            ) 
             {
                 return true;
             } else {
