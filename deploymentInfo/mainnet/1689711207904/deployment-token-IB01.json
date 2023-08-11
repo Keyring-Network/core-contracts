@@ -1,4 +1,6 @@
 {
+  "blockNumber": 17894646,
+  "commitHash": "07581ff82e1b6e664038825c74bbca9d503a6016",
   "roles": [
     {
       "name": "Default Admin",
@@ -15,7 +17,7 @@
   },
   "contracts": {
     "bIB01.k2": {
-      "address": "0x4954c61984180868495D1a7Fb193b05a2cbd9dE3",
+      "address": "0x9391B14dB2d43687Ea1f6E546390ED4b20766c46",
       "abi": [
         {
           "type": "constructor",
@@ -1034,7 +1036,22 @@
             }
           ]
         }
-      ]
+      ],
+      "constructorArgs": [
+        {
+          "trustedForwarder": "0x2f5885a892cFf774Df6051E70baC6Ce552dC7E2a",
+          "collateralToken": "0xca30c93b02514f86d5c86a6e375e3a330b435fb5",
+          "keyringCredentials": "0x8a16F136121FD53B5c72c3414b42299f972c9c67",
+          "policyManager": "0x685BC814f9ee40fA7bD35588ac6a9E882A2345F3",
+          "userPolicies": "0x77985FD28C1334c46CA45bEAC73f839Fd2860E7c",
+          "exemptionsManager": "0xAA7E8090a26464181E188848Eea5Ac5b81ed6B93"
+        },
+        "2",
+        10368000,
+        "Backed IB01 $ Treasury Bond 0-1yr (Compliance Policy: k2)",
+        "bIB01.k2"
+      ],
+      "isProxy": false
     }
   }
 }

@@ -1,3 +1,4 @@
+import { execSync } from "child_process";
 import { BigNumber, ContractReceipt, ethers, Contract, ContractFactory } from "ethers";
 import {
   ContractEvent,
@@ -17,6 +18,7 @@ import { promises as fsp } from "fs";
 import { FactoryOptions, HardhatRuntimeEnvironment } from "hardhat/types";
 import { ROLE_TO_ID } from "./roles";
 import {
+  DEFAULT_FILENAME,
   ALL_ROLE_CHANGING_EVENTS,
   GOERLI_ADMIN_ADDRESS,
   GOERLI_AGGREGATOR_ADDRESS,
@@ -86,7 +88,7 @@ export const initAndConfirm = async (contractInits: ContractInit[]) => {
  */
 export const writeDeploymentInfoToFile = (data: any, dir?: string, fileName?: string, networkName?: string) => {
   let filePath;
-  const _fileName = fileName ?? "deployment-core.json";
+  const _fileName = fileName ?? DEFAULT_FILENAME;
   if (dir) {
     filePath = path.join(dir, _fileName);
   } else {
@@ -113,10 +115,10 @@ export const getLatestDeploymentDir = (networkName: string) => {
 /**
  * @returns Returns deployment info from the latest deployment based on the timestamp
  */
-export const getDeploymentInfo = async (networkName: string): Promise<DeploymentInfo> => {
+export const getDeploymentInfo = async (networkName: string, fileName = DEFAULT_FILENAME): Promise<DeploymentInfo> => {
   const deploymentDir = getLatestDeploymentDir(networkName);
-  console.log("Reading DeploymentInfo from: " + deploymentDir + "/deployment-core.json");
-  const deploymentInfo = await fsp.readFile(deploymentDir + "/deployment-core.json");
+  console.log("Reading DeploymentInfo from: " + deploymentDir + "/" + fileName);
+  const deploymentInfo = await fsp.readFile(deploymentDir + "/" + fileName);
   return JSON.parse(deploymentInfo.toString());
 };
 
@@ -310,4 +312,14 @@ export const getEventTopics = (abi: string) => {
       topic: topic,
     };
   });
+};
+
+export const getCurrentCommitHash = () => {
+  try {
+    const commitHash = execSync("git rev-parse HEAD").toString().trim();
+    return commitHash;
+  } catch (err) {
+    console.error("Error reading git commit hash:", err);
+    return;
+  }
 };

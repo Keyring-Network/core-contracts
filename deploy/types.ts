@@ -17,12 +17,20 @@ export interface ContractInfo {
   name: string;
   address: string;
   abi: string;
+  constructorArgs?: unknown[];
+  isProxy?: boolean;
+  implementationAddress?: string;
+  libraries?: Record<string, string>;
 }
 
 interface ContractInfos {
   [key: string]: {
     address: string;
     abi: string;
+    constructorArgs: unknown[];
+    isProxy: boolean;
+    implementationAddress?: string;
+    libraries?: Record<string, string>;
   };
 }
 
@@ -38,6 +46,7 @@ export interface DeploymentInfo {
   upgradable?: Record<string, unknown>; // openzeppelin/upgrades
   tokenInfo?: any;
   blockNumber?: number; // block number when the deployment script was run
+  commitHash?: string; // commit hash when the deployment script was run
 }
 
 export interface ContractInit {
@@ -93,6 +102,10 @@ export interface ContractList {
   name: string;
   contract: Contract;
   factory: ContractFactory;
+  isProxy?: boolean;
+  implementationAddress?: string;
+  constructorArgs?: unknown[];
+  libraries?: Record<string, string>;
 }
 
 /**

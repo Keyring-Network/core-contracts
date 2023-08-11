@@ -8,7 +8,7 @@ import {
   MAXIMUM_CONSENT_PERIOD,
   GENESIS_RULE_REGISTRY,
 } from "../deploy/constants";
-import { deployContract, getContractByName, initAndConfirm, writeDeploymentInfoToFile } from "../deploy/helpers";
+import { deployContract, getContractByName, getCurrentCommitHash, initAndConfirm, writeDeploymentInfoToFile } from "../deploy/helpers";
 import { ContractList, DeploymentInfo } from "../deploy/types";
 
 /**
@@ -28,9 +28,11 @@ task("deploy", "Deploys the core contracts").setAction(async function (_, hre) {
 
   const timestamp = Date.now();
   const blockNumber = await ethers.provider.getBlockNumber();
+  const commitHash = getCurrentCommitHash();
   console.log(`DEPLOYMENT HAS STARTED (timestamp: ${timestamp}, block: ${blockNumber})`);
   console.log(`Deploying contracts on ${network.name}...`);
   console.log("Deployer account:", DEPLOYER.address);
+  console.log("Current commit hash:", commitHash);
 
   /* --------------------------------- Proxies -------------------------------- */
   // NOTE: when calling `upgrades.deployProxy` for the first time and without pre-existing proxies,
@@ -39,11 +41,13 @@ task("deploy", "Deploys the core contracts").setAction(async function (_, hre) {
   // Check `.openzeppelin/` folder for more details.
   console.log("Deploying proxies...");
 
+  const useProxy = true;
+
   /* ------------------------------ Forwarder ------------------------------ */
   let name = "KeyringMinimalForwarder"; // NOTE - contract name was renamed to `NoImplementation`
   {
-    const { contract, factory } = await deployContract("NoImplementation", [], hre, true);
-    contracts.push({ name, contract, factory });
+    const { contract, factory } = await deployContract("NoImplementation", [], hre, useProxy);
+    contracts.push({ name, contract, factory, isProxy: useProxy });
   }
   const forwarderAddress = getContractByName(name, contracts)?.address;
 
@@ -71,12 +75,9 @@ task("deploy", "Deploys the core contracts").setAction(async function (_, hre) {
 
   name = "KeyringZkVerifier";
   {
-    const { contract, factory } = await deployContract(
-      name,
-      [constructionVerifierAddress, MembershipVerifierAddress, authorizationVerifierAddress],
-      hre,
-    );
-    contracts.push({ name, contract, factory });
+    const constructorArgs = [constructionVerifierAddress, MembershipVerifierAddress, authorizationVerifierAddress];
+    const { contract, factory } = await deployContract(name, constructorArgs, hre);
+    contracts.push({ name, contract, factory, constructorArgs });
   }
   const keyringZkVerifierAddress = getContractByName(name, contracts)?.address;
 
@@ -84,10 +85,11 @@ task("deploy", "Deploys the core contracts").setAction(async function (_, hre) {
 
   name = "RuleRegistry";
   {
-    const { contract, factory } = await deployContract(name, [forwarderAddress], hre, true, {
+    const constructorArgs = [forwarderAddress];
+    const { contract, factory } = await deployContract(name, constructorArgs, hre, useProxy, {
       unsafeAllow: ["constructor", "delegatecall"],
     });
-    contracts.push({ name, contract, factory });
+    contracts.push({ name, contract, factory, constructorArgs, isProxy: useProxy });
   }
   const ruleRegistryAddress = getContractByName(name, contracts)?.address;
 
@@ -101,90 +103,85 @@ task("deploy", "Deploys the core contracts").setAction(async function (_, hre) {
 
   name = "PolicyManager";
   {
+    const constructorArgs = [forwarderAddress, ruleRegistryAddress];
+    const libraries = { PolicyStorage: policyStorageAddress as string };
     const { contract, factory } = await deployContract(
       name,
-      [forwarderAddress, ruleRegistryAddress],
+      constructorArgs,
       hre,
-      true,
+      useProxy,
       {
         unsafeAllow: ["constructor", "delegatecall", "external-library-linking"],
       },
       {
-        libraries: {
-          PolicyStorage: policyStorageAddress as string,
-        },
+        libraries,
       },
     );
-    contracts.push({ name, contract, factory });
+    contracts.push({ name, contract, factory, constructorArgs, isProxy: useProxy, libraries });
   }
   const policyManagerAddress = getContractByName(name, contracts)?.address;
 
   /* ------------------------------ UserPolicies ------------------------------ */
   name = "UserPolicies";
   {
-    const { contract, factory } = await deployContract(name, [forwarderAddress, policyManagerAddress], hre, true, {
+    const constructorArgs = [forwarderAddress, policyManagerAddress];
+    const { contract, factory } = await deployContract(name, constructorArgs, hre, useProxy, {
       unsafeAllow: ["constructor"],
     });
-    contracts.push({ name, contract, factory });
+    contracts.push({ name, contract, factory, constructorArgs, isProxy: useProxy });
   }
 
   /* --------------------------- KeyringCredentials --------------------------- */
   name = "KeyringCredentials";
   {
-    const { contract, factory } = await deployContract(
-      name,
-      [forwarderAddress, policyManagerAddress, MAXIMUM_CONSENT_PERIOD],
-      hre,
-      true,
-      { unsafeAllow: ["constructor", "delegatecall", "state-variable-immutable"] },
-    );
-    contracts.push({ name, contract, factory });
+    const constructorArgs = [forwarderAddress, policyManagerAddress, MAXIMUM_CONSENT_PERIOD];
+    const { contract, factory } = await deployContract(name, constructorArgs, hre, useProxy, {
+      unsafeAllow: ["constructor", "delegatecall", "state-variable-immutable"],
+    });
+    contracts.push({ name, contract, factory, constructorArgs, isProxy: useProxy });
   }
   const keyringCredentialsAddress = getContractByName(name, contracts)?.address;
 
   /* ---------------------- KeyringZkCredentialUpdater ----------------------- */
   name = "KeyringZkCredentialUpdater";
   {
-    const { contract, factory } = await deployContract(
-      name,
-      [forwarderAddress, keyringCredentialsAddress, policyManagerAddress, keyringZkVerifierAddress],
-      hre,
-    );
-    contracts.push({ name, contract, factory });
+    const constructorArgs = [
+      forwarderAddress,
+      keyringCredentialsAddress,
+      policyManagerAddress,
+      keyringZkVerifierAddress,
+    ];
+    const { contract, factory } = await deployContract(name, constructorArgs, hre);
+    contracts.push({ name, contract, factory, constructorArgs });
   }
 
   /* --------------------------- ExemptionsManager ---------------------------- */
   name = "ExemptionsManager";
   {
-    const { contract, factory } = await deployContract(name, [forwarderAddress], hre, true, {
+    const constructorArgs = [forwarderAddress];
+    const { contract, factory } = await deployContract(name, constructorArgs, hre, useProxy, {
       unsafeAllow: ["constructor", "delegatecall"],
     });
-    contracts.push({ name, contract, factory });
+    contracts.push({ name, contract, factory, constructorArgs, isProxy: useProxy });
   }
 
   /* ------------------------------- WalletCheck ------------------------------ */
   name = "WalletCheck";
   {
-    const { contract, factory } = await deployContract(
-      name,
-      [forwarderAddress, policyManagerAddress, MAXIMUM_CONSENT_PERIOD, WALLETCHECK_URI],
-      hre,
-    );
-    contracts.push({ name, contract, factory });
+    const constructorArgs = [forwarderAddress, policyManagerAddress, MAXIMUM_CONSENT_PERIOD, WALLETCHECK_URI];
+    const { contract, factory } = await deployContract(name, constructorArgs, hre);
+    contracts.push({ name, contract, factory, constructorArgs });
   }
 
   /* ------------------------------ IdentityTree ------------------------------ */
   name = "IdentityTree";
   {
-    const { contract, factory } = await deployContract(
-      name,
-      [forwarderAddress, policyManagerAddress, MAXIMUM_CONSENT_PERIOD],
-      hre,
-    );
-    contracts.push({ name, contract, factory });
+    const constructorArgs = [forwarderAddress, policyManagerAddress, MAXIMUM_CONSENT_PERIOD];
+    const { contract, factory } = await deployContract(name, constructorArgs, hre);
+    contracts.push({ name, contract, factory, constructorArgs });
   }
 
-  /* ---------- Wait for all contracts to be deployed and initialized --------- */
+  /* ------------------ Wait for all contracts to be deployed ----------------- */
   for (const contract of contracts) {
     await contract.contract.deployed();
   }
@@ -218,6 +215,7 @@ task("deploy", "Deploys the core contracts").setAction(async function (_, hre) {
 
   const deploymentInfo: DeploymentInfo = {
     blockNumber: blockNumber,
+    commitHash: commitHash,
     roles: [
       {
         name: "Deployer",
@@ -238,10 +236,16 @@ task("deploy", "Deploys the core contracts").setAction(async function (_, hre) {
   // NOTE - `Default Admin` role gets transferred via the separate `owner` task
   deploymentInfo.roles[1].address = DEPLOYER.address; // DEFAULT ADMIN
 
-  for (const { name, contract, factory } of contracts) {
+  for (const { name, contract, factory, constructorArgs, isProxy, libraries } of contracts) {
     deploymentInfo.contracts[name] = {
       address: contract.address,
       abi: JSON.parse(factory.interface.format("json") as string),
+      constructorArgs: constructorArgs || [],
+      libraries: libraries || undefined,
+      isProxy: isProxy || false,
+      implementationAddress: isProxy
+        ? await (await upgrades.admin.getInstance()).getProxyImplementation(contract.address)
+        : undefined,
     };
   }
 
@@ -257,7 +261,7 @@ task("deploy", "Deploys the core contracts").setAction(async function (_, hre) {
   deploymentInfo.upgradable = openzeppelinData;
 
   const contractsDir = `${__dirname}/../deploymentInfo/${network.name}/${timestamp}`;
-  writeDeploymentInfoToFile(deploymentInfo, contractsDir, "deployment-core.json");
+  writeDeploymentInfoToFile(deploymentInfo, contractsDir);
 
   console.log("Deployment info saved");
   console.log("DEPLOYMENT HAS BEEN COMPLETED");

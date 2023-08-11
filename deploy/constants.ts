@@ -4,7 +4,7 @@ import { BigNumberish } from "ethers";
 import dotenv from "dotenv";
 dotenv.config();
 
-// TODO - review all constants before deployment
+export const DEFAULT_FILENAME = "deployment-core.json";
 
 export const MAINNET_ADMIN_ADDRESS = process.env.MAINNET_ADMIN_ADDRESS;
 export const MAINNET_AGGREGATOR_ADDRESS = process.env.MAINNET_AGGREGATOR_ADDRESS;
@@ -80,6 +80,13 @@ export const TEST_TOKENS: TestTokens = {
     kycName: "KYC Backed IB01 $ Treasury Bond 0-1yr",
     kycSymbol: "KYCbIB01",
   },
+  USDC: {
+    name: "USD Coin",
+    symbol: "USDC",
+    supply: parseEther("500000000"), // 500M USDC
+    kycName: "KYC USD Coin",
+    kycSymbol: "kycUSDC",
+  }
 };
 
 export const WRAPPED_TOKENS: Tokens = {

@@ -25,14 +25,21 @@ import "./tasks/gas";
 import "./tasks/hasRoles";
 import "./tasks/exemptions";
 import "./tasks/rolesOwners";
+import "./tasks/verify-etherscan";
 
 dotenvConfig({ path: resolve(__dirname, "./.env") });
 
 const INFURA_API_KEY = process.env.INFURA_API_KEY;
 const GOERLI_PRIVATE_KEY = process.env.GOERLI_DEPLOYER_PRIVATE_KEY || "";
 const MAINNET_PRIVATE_KEY = process.env.MAINNET_DEPLOYER_PRIVATE_KEY || "";
+const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 
 const config: HardhatUserConfig = {
+  etherscan: {
+    apiKey: {
+      mainnet: ETHERSCAN_API_KEY,
+    },
+  },
   abiExporter: {
     path: "./abi",
     clear: false,
