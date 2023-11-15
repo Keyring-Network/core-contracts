@@ -1,0 +1,56 @@
+name: Chore
+description: Updating grunt tasks etc; no production code change
+title: "CHORE: "
+labels: ["stream: smart contracts", "type: chore"]
+assignees:
+  - keyringcore
+
+body:
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Feature Type
+      description: Please check what type of chore
+      options:
+        - label: >
+            CI/CD
+        - label: >
+            Templates
+        - label: >
+            Repo Administration
+        - label: >
+            Other
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: >
+        Please provide a description of what needs to be fixed/improved
+    validations:
+      required: true
+  - type: dropdown
+    id: effort
+    attributes:
+      label: Estimated Effort
+      description: Not corresponding to any specific unit of time, rank in relative effort units 1-21.
+      options:
+        - 1
+        - 2
+        - 3
+        - 5
+        - 8
+        - 13
+        - 21
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - critical
+        - high
+        - medium
+        - low
+    validations:
+      required: true

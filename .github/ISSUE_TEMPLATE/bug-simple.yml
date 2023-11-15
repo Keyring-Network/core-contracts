@@ -1,0 +1,94 @@
+name: Bug Report (Trivial)
+description: Report a bug that is trivial / we already know how to fix.
+title: "BUG: "
+labels: ["stream: smart contracts", "type: bug", "work: obvious"]
+assignees:
+  - keyringcore
+
+body:
+  - type: textarea
+    id: example
+    attributes:
+      label: Reproducible Example
+      description: >
+        Please follow [this guide](https://matthewrocklin.com/blog/work/2018/02/28/minimal-bug-reports) on how to
+        provide a minimal, copy-pastable example.
+      placeholder: >
+        from keyring_sdk import network
+        from keyring_sdk import rules
+
+        network.connect('goerli')
+        rule = rules.BaseRule("0xN00b")
+
+        ...
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: stacktrace
+    attributes:
+      label: Stacktrace
+      description: Please stacktrace if you're getting an exception/crash.
+      render: python
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: If applicable, provide relevant log output. No need for backticks here.
+      render: shell
+  - type: dropdown
+    id: effort
+    attributes:
+      label: Estimated Effort
+      description: Not corresponding to any specific unit of time, rank in relative effort units 1-21.
+      options:
+        - 1
+        - 2
+        - 3
+        - 5
+        - 8
+        - 13
+        - 21
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - critical
+        - high
+        - medium
+        - low
+    validations:
+      required: true
+  - type: dropdown
+    id: work
+    attributes:
+      label: Estimated Work Type
+      description: As per [Cynefin Framework](https://en.wikipedia.org/wiki/Cynefin_framework)
+      options:
+        - chaotic
+        - complex
+        - complicated
+        - obvious
+    validations:
+      required: true
+  - type: checkboxes
+    id: apps
+    attributes:
+      label: Affected Apps (if applicable)
+      description: You may select more than one if relevant, or none if not applicable.
+      options:
+        - label: backend - aggregator
+        - label: backend - attestion queue (sqs)
+        - label: backend - attestor
+        - label: backend - cache (dynamodb)
+        - label: backend - config (s3)
+        - label: backend - onboarding
+        - label: backend - pypi
+        - label: backend - triager
+        - label: frontend - landing
+        - label: frontend - onboarding
+        - label: frontend - widget
+        - label: frontend - zk credentials
