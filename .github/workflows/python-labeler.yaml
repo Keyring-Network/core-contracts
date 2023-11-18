@@ -1,0 +1,55 @@
+name: Issue labeler (Python)
+on:
+  issues:
+    types: [opened, reopened]
+
+jobs:
+  label-issues-policy:
+    runs-on: ubuntu-latest
+    permissions:
+      # required for all workflows
+      issues: write
+
+      # only required for workflows in private repositories
+      actions: read
+      contents: read
+
+    steps:
+      - name: Checkout this repo
+        id: checkout-generic
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.CHECKOUT_TOKEN }}
+
+      - name: Checkout labels repository
+        id: checkout-labels
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.CHECKOUT_TOKEN }}
+          repository: keyring-network/labels
+          path: labels-repo
+
+      - name: Setup Python
+        id: python-setup
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+
+      - name: Install Dependencies
+        id: python-pip
+        run: pip install PyGithub pyyaml
+
+      - name: Apply labels
+        id: labels-apply
+        env:
+          GITHUB_TOKEN: ${{ secrets.LABELS_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PARSED_ISSUE: ${{ steps.issue-parser.outputs.jsonString }}
+          LABEL_MAPPING_FILE: .github/python-labeler-config.yml
+        run: |
+          python ${{ github.workspace }}/labels-repo/scripts/auto_labeller.py \
+            --token=$GITHUB_TOKEN \
+            --repo=$GITHUB_REPOSITORY \
+            --issue-number=$ISSUE_NUMBER \
+            --label-mapping-file=$LABEL_MAPPING_FILE
