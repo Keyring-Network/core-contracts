@@ -1,0 +1,59 @@
+mappings:
+  - label: "effort: 1"
+    options: ["1"]
+  - label: "effort: 2"
+    options: ["2"]
+  - label: "effort: 3"
+    options: ["3"]
+  - label: "effort: 5"
+    options: ["5"]
+  - label: "effort: 8"
+    options: ["8"]
+  - label: "effort: 13"
+    options: ["13"]
+  - label: "effort: 21"
+    options: ["21"]
+  - label: "priority: critical"
+    options: ["critical"]
+  - label: "priority: high"
+    options: ["high"]
+  - label: "priority: medium"
+    options: ["medium"]
+  - label: "priority: low"
+    options: ["low"]
+  - label: "work: chaotic"
+    options: ["chaotic"]
+  - label: "work: complex"
+    options: ["complex"]
+  - label: "work: complicated"
+    options: ["complicated"]
+  - label: "work: obvious"
+    options: ["obvious"]
+  - label: "app: backend - aggregator"
+    options: ["backend - aggregator"]
+  - label: "app: backend - attestion queue (sqs)"
+    options: ["backend - attestion queue (sqs)"]
+  - label: "app: backend - attestor"
+    options: ["backend - attestor"]
+  - label: "app: backend - cache (dynamodb)"
+    options: ["backend - cache (dynamodb)"]
+  - label: "app: backend - config (s3)"
+    options: ["backend - config (s3)"]
+  - label: "app: backend - onboarding"
+    options: ["backend - onboarding"]
+  - label: "app: backend - pypi"
+    options: ["backend - pypi"]
+  - label: "app: backend - triager"
+    options: ["backend - triager"]
+  - label: "app: frontend - landing"
+    options: ["frontend - landing"]
+  - label: "app: frontend - onboarding"
+    options: ["frontend - onboarding"]
+  - label: "app: frontend - widget"
+    options: ["frontend - widget"]
+  - label: "app: frontend - zk credentials"
+    options: ["frontend - zk credentials"]
+  - label: "app: frontend - admin"
+    options: ["frontend - admin"]
+  - label: "stream: frontend"
+    options: ["frontend - landing", "frontend - onboarding", "frontend - widget", "frontend - zk credentials", "frontend - admin"]
