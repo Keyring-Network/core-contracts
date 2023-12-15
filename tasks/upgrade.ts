@@ -1,20 +1,22 @@
 import { task } from "hardhat/config";
-import {
-  getCurrentCommitHash,
-  getDeploymentInfo,
-  writeDeploymentInfoToFile,
-  upgradeContract
-} from "../deploy/helpers";
+import { getCurrentCommitHash, getDeploymentInfo, writeDeploymentInfoToFile, upgradeContract } from "../deploy/helpers";
 import { UpgradeInfo } from "../deploy/types";
 
-// Sample Command: npx hardhat upgrade --network goerli --contract RuleRegistry --args '["0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"]'
+/**
+ * @notice Upgrades a contract and writes the new implementation address to the deployment info file.
+ * @param contract - address of the proxy contract for the contract to upgrade
+ * @param args - constructor arguments for the new implementation contract
+ * @param libraries - names of libraries to link with new implementation contract
+ * @param proxyName - Proxy Name in the deployment info file, defaults to the contract name
+ *
+ * @example npx hardhat upgrade --network goerli --contract RuleRegistry --args '["0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"]'
+ */
 task("upgrade", "Upgrade Contract")
-  .addParam("contract", "Contract To Upgrade")
-  .addOptionalParam("args", "Constructor Arguments", '[]')
-  .addOptionalParam("libraries", "Libraries to link", '[]')
+  .addParam("contract", "Name of contract to upgrade")
+  .addOptionalParam("args", "Constructor arguments for ", "[]")
+  .addOptionalParam("libraries", "Names of libraries to link with new implementation contract", "[]")
   .addOptionalParam("proxyName", "Proxy Name in the deployment info file", "")
   .setAction(async (taskArgs, hre) => {
-
     const { ethers, network } = hre;
     const { contract, args, libraries, proxyName } = taskArgs;
 
@@ -28,7 +30,13 @@ task("upgrade", "Upgrade Contract")
     console.log(`DEPLOYMENT HAS STARTED (timestamp: ${timestamp}, block: ${blockNumber})`);
     console.log("Current commit hash:", commitHash);
 
-    const newImplementationAddress = await upgradeContract(ethers, contract, proxyAddress, JSON.parse(args), JSON.parse(libraries));
+    const newImplementationAddress = await upgradeContract(
+      ethers,
+      contract,
+      proxyAddress,
+      JSON.parse(args),
+      JSON.parse(libraries),
+    );
 
     /* ---------------------------------- DONE ---------------------------------- */
 
