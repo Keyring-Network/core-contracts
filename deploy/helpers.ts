@@ -26,7 +26,11 @@ import {
   MAINNET_ADMIN_ADDRESS,
   MAINNET_AGGREGATOR_ADDRESS,
   MAINNET_WALLET_CHECK,
+  ADMIN_SLOT,
+  IMPLEMENTATION_SLOT,
+  TRANSPARENT_PROXY_ADMIN_ABI,
 } from "./constants";
+import { HardhatEthersHelpers } from "@nomiclabs/hardhat-ethers/types";
 
 /**
  * @param networkName Name of the network
@@ -322,4 +326,99 @@ export const getCurrentCommitHash = () => {
     console.error("Error reading git commit hash:", err);
     return;
   }
+};
+
+const bytes32ToHexAddress = (hex: string) => "0x" + hex.slice(26);
+
+/**
+ * Upgrades a contract using a proxy admin contract (TransparentUpgradeableProxy)
+ * @param _ethers - ethers object from hardhat with provider
+ * @param contractName - name of the contract to upgrade
+ * @param proxyAddress - address of the proxy contract for the contract to upgrade
+ * @param constructorArgs - constructor arguments for the new implementation contract
+ * @param libraries - addresses of libraries to link to the new implementation contract
+ * @returns - address of the new implementation contract
+ */
+export const upgradeContract = async (
+  _ethers: HardhatEthersHelpers,
+  contractName: string,
+  proxyAddress: string,
+  constructorArgs: any[] = [],
+  libraries: string[] = [],
+): Promise<string> => {
+  if (proxyAddress === ethers.constants.AddressZero) {
+    throw new Error("Proxy address is zero.");
+  }
+
+  console.log("Upgrading contract:", contractName);
+  console.log("Proxy address:", proxyAddress);
+
+  const proxyAdminAddress = bytes32ToHexAddress(await _ethers.provider.getStorageAt(proxyAddress, ADMIN_SLOT));
+  const proxyAdmin = await _ethers.getContractAt(TRANSPARENT_PROXY_ADMIN_ABI, proxyAdminAddress);
+
+  // Ensure that the proxy admin address is not zero
+  if (proxyAdminAddress === ethers.constants.AddressZero) {
+    throw new Error("Proxy admin address is zero. Please check if the proxy is deployed correctly.");
+  }
+
+  // Ensure that the signer is the owner of the proxy admin or the upgrade might fail
+  const proxyAdminOwner = await proxyAdmin.owner();
+  const signerAddress = await _ethers.provider.getSigner().getAddress();
+  if (proxyAdminOwner.toLowerCase() !== signerAddress.toLowerCase()) {
+    throw new Error(`Signer is not the owner. Proxy admin owner is ${proxyAdminOwner}.`);
+  }
+
+  console.log("Proxy admin contract address:", proxyAdminAddress);
+
+  // Sanity checks to ensure that the proxy is deployed correctly
+  const currentImplementation = bytes32ToHexAddress(
+    await _ethers.provider.getStorageAt(proxyAddress, IMPLEMENTATION_SLOT),
+  );
+  if (currentImplementation === ethers.constants.AddressZero) {
+    throw new Error("Current implementation address is zero. Please check if the proxy is deployed correctly.");
+  }
+  console.log("Current implementation address:", currentImplementation);
+
+  const proxyImplementationFromProxyAdmin = await proxyAdmin.getProxyImplementation(proxyAddress);
+  if (proxyImplementationFromProxyAdmin.toLowerCase() !== currentImplementation.toLowerCase()) {
+    throw new Error(
+      `Current implementation address from proxy admin is ${proxyImplementationFromProxyAdmin}. Proxy admin is not corrrect.`,
+    );
+  }
+
+  const proxyAdminFromProxyAdmin = await proxyAdmin.getProxyAdmin(proxyAddress);
+  if (proxyAdminFromProxyAdmin.toLowerCase() !== proxyAdminAddress.toLowerCase()) {
+    throw new Error(
+      `Proxy admin address from proxy admin is ${proxyAdminFromProxyAdmin}. Proxy admin is not corrrect.`,
+    );
+  }
+
+  // Prepare libraries
+  const libraryAddresses: any = {};
+  for (let i = 0; i < libraries.length; i++) {
+    const libraryFactory = await _ethers.getContractFactory(libraries[i]);
+    libraryAddresses[libraries[i]] = (await libraryFactory.deploy()).address;
+  }
+
+  if (libraries.length > 0) console.log("Libraries:", libraryAddresses);
+  if (constructorArgs.length > 0) console.log("Constructor args:", constructorArgs);
+
+  // Deploy new implementation contract
+  const newImplementationFactory = await _ethers.getContractFactory(contractName, { libraries: libraryAddresses });
+  const newImplementationAddress = (await newImplementationFactory.deploy(...constructorArgs)).address;
+  console.log("New implementation address:", newImplementationAddress);
+
+  // Perform contract upgrade
+  await proxyAdmin.upgrade(proxyAddress, newImplementationAddress);
+
+  const newOnChainImplementation = bytes32ToHexAddress(
+    await _ethers.provider.getStorageAt(proxyAddress, IMPLEMENTATION_SLOT),
+  );
+  if (newOnChainImplementation.toLowerCase() !== newImplementationAddress.toLowerCase()) {
+    throw new Error(
+      `Upgrade failed.\nExpected implementation: ${newImplementationAddress}.\nActual implementation: ${newOnChainImplementation}`,
+    );
+  }
+
+  return newImplementationAddress;
 };
