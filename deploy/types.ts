@@ -149,3 +149,11 @@ export type Snapshot = {
   startBlock: number;
   endBlock: number;
 };
+
+export interface UpgradeInfo {
+  name: string;
+  address: string;
+  newImplementationAddress: string;
+  blockNumber?: number; // block number when the deployment script was run
+  commitHash?: string; // commit hash when the deployment script was run
+}

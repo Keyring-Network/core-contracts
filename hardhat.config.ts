@@ -26,6 +26,7 @@ import "./tasks/hasRoles";
 import "./tasks/exemptions";
 import "./tasks/rolesOwners";
 import "./tasks/verify-etherscan";
+import "./tasks/upgrade";
 
 dotenvConfig({ path: resolve(__dirname, "./.env") });
 
