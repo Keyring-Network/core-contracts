@@ -8,7 +8,13 @@ import {
   MAXIMUM_CONSENT_PERIOD,
   GENESIS_RULE_REGISTRY,
 } from "../deploy/constants";
-import { deployContract, getContractByName, getCurrentCommitHash, initAndConfirm, writeDeploymentInfoToFile } from "../deploy/helpers";
+import {
+  deployContract,
+  getContractByName,
+  getCurrentCommitHash,
+  initAndConfirm,
+  writeDeploymentInfoToFile,
+} from "../deploy/helpers";
 import { ContractList, DeploymentInfo } from "../deploy/types";
 
 /**
@@ -179,11 +185,6 @@ task("deploy", "Deploys the core contracts").setAction(async function (_, hre) {
     const constructorArgs = [forwarderAddress, policyManagerAddress, MAXIMUM_CONSENT_PERIOD];
     const { contract, factory } = await deployContract(name, constructorArgs, hre);
     contracts.push({ name, contract, factory, constructorArgs });
-  }
-
-  /* ------------------ Wait for all contracts to be deployed ----------------- */
-  for (const contract of contracts) {
-    await contract.contract.deployed();
   }
 
   console.log("contract deployments confirmed");

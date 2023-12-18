@@ -10,9 +10,9 @@ export const MAINNET_ADMIN_ADDRESS = process.env.MAINNET_ADMIN_ADDRESS;
 export const MAINNET_AGGREGATOR_ADDRESS = process.env.MAINNET_AGGREGATOR_ADDRESS;
 export const MAINNET_WALLET_CHECK = process.env.MAINNET_WALLET_CHECK;
 
-export const GOERLI_ADMIN_ADDRESS = process.env.GOERLI_ADMIN_ADDRESS;
-export const GOERLI_AGGREGATOR_ADDRESS = process.env.GOERLI_AGGREGATOR_ADDRESS;
-export const GOERLI_WALLET_CHECK = process.env.GOERLI_WALLET_CHECK;
+export const SEPOLIA_ADMIN_ADDRESS = process.env.SEPOLIA_ADMIN_ADDRESS;
+export const SEPOLIA_AGGREGATOR_ADDRESS = process.env.SEPOLIA_AGGREGATOR_ADDRESS;
+export const SEPOLIA_WALLET_CHECK = process.env.SEPOLIA_WALLET_CHECK;
 
 export const WALLETCHECK_URI = "https://roles.keyring.network/walletchecker1";
 export const ATTESTOR_URI = "https://roles.keyring.network/attestor1";
@@ -56,9 +56,9 @@ export const ALL_CONTRACT_NAMES = [
   // KeyringGuard // NOTE - this is not a standalone contract
 ];
 
-// NOTE - only used for testing on goerli
+// NOTE - only used for testnet deployments
 // wrapped kyc tokens
-export const TEST_TOKENS: TestTokens = {
+export const TESTNET_TOKENS: TestTokens = {
   USDT: {
     name: "Tether USD",
     symbol: "USDT",
@@ -89,13 +89,14 @@ export const TEST_TOKENS: TestTokens = {
   },
 };
 
+// NOTE - only used for mainnet deployments
 export const WRAPPED_TOKENS: Tokens = {
   USDC: {
     name: "USD Coin",
     symbol: "USDC",
     address: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", // NOTE - this is the mainnet address
   },
-  IB01: {
+  bIB01: {
     name: "Backed IB01 $ Treasury Bond 0-1yr",
     symbol: "bIB01",
     address: "0xca30c93b02514f86d5c86a6e375e3a330b435fb5",

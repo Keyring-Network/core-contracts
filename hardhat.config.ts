@@ -31,7 +31,7 @@ import "./tasks/upgrade";
 dotenvConfig({ path: resolve(__dirname, "./.env") });
 
 const INFURA_API_KEY = process.env.INFURA_API_KEY;
-const GOERLI_PRIVATE_KEY = process.env.GOERLI_DEPLOYER_PRIVATE_KEY || "";
+const SEPOLIA_PRIVATE_KEY = process.env.SEPOLIA_DEPLOYER_PRIVATE_KEY || "";
 const MAINNET_PRIVATE_KEY = process.env.MAINNET_DEPLOYER_PRIVATE_KEY || "";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 
@@ -39,6 +39,7 @@ const config: HardhatUserConfig = {
   etherscan: {
     apiKey: {
       mainnet: ETHERSCAN_API_KEY,
+      sepolia: ETHERSCAN_API_KEY,
     },
   },
   abiExporter: {
@@ -55,11 +56,12 @@ const config: HardhatUserConfig = {
       deploy: ["deploy/index.ts"],
     },
     ...(INFURA_API_KEY &&
-      GOERLI_PRIVATE_KEY && {
-        goerli: {
-          chainId: chainIds.goerli,
-          url: "https://goerli.infura.io/v3/" + INFURA_API_KEY,
-          accounts: [GOERLI_PRIVATE_KEY],
+      SEPOLIA_PRIVATE_KEY && {
+        sepolia: {
+          chainId: chainIds.sepolia,
+          url: "https://sepolia.infura.io/v3/" + INFURA_API_KEY,
+          accounts: [SEPOLIA_PRIVATE_KEY],
+          gasMultiplier: 1.5,
         },
       }),
     ...(INFURA_API_KEY &&

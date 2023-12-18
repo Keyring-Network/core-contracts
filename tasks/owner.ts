@@ -5,7 +5,6 @@ import {
   AGGREGATOR_CONTRACT_ROLES,
   WALLET_CHECK_CONTRACT_ROLES,
   CREDENTIAL_UPDATER_1_CONTRACT_ROLES,
-  DEPLOYER_CONTRACT_ROLES,
 } from "../deploy/roles";
 import { RoleOperation } from "../deploy/types";
 import { log } from "../deploy/helpers";
@@ -70,8 +69,9 @@ task("owner", "Transfer ownership of contract roles").setAction(async function (
   );
 
   /* ---------------------------- Revoke Deployer Roles --------------------------- */
-  log("REVOKING DEPLOYER ROLES");
-  await executeRoleTransactions(hre, DEPLOYER.address, DEPLOYER_CONTRACT_ROLES, RoleOperation.Renounce);
+  // TODO - move this to a separate task to avoid mistakes
+  // log("REVOKING DEPLOYER ROLES");
+  // await executeRoleTransactions(hre, DEPLOYER.address, DEPLOYER_CONTRACT_ROLES, RoleOperation.Renounce);
 
   /* ----------------------- Transfer Proxy Admin Owner ----------------------- */
   log("TRANSFERING PROXY ADMIN OWNER");

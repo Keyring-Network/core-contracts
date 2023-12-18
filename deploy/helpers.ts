@@ -20,9 +20,9 @@ import { ROLE_TO_ID } from "./roles";
 import {
   DEFAULT_FILENAME,
   ALL_ROLE_CHANGING_EVENTS,
-  GOERLI_ADMIN_ADDRESS,
-  GOERLI_AGGREGATOR_ADDRESS,
-  GOERLI_WALLET_CHECK,
+  SEPOLIA_ADMIN_ADDRESS,
+  SEPOLIA_AGGREGATOR_ADDRESS,
+  SEPOLIA_WALLET_CHECK,
   MAINNET_ADMIN_ADDRESS,
   MAINNET_AGGREGATOR_ADDRESS,
   MAINNET_WALLET_CHECK,
@@ -47,10 +47,10 @@ export const getAddresses = (networkName: string) => {
       AGGREGATOR = MAINNET_AGGREGATOR_ADDRESS;
       WALLET_CHECK = MAINNET_WALLET_CHECK;
       break;
-    case "goerli":
-      ADMIN = GOERLI_ADMIN_ADDRESS;
-      AGGREGATOR = GOERLI_AGGREGATOR_ADDRESS;
-      WALLET_CHECK = GOERLI_WALLET_CHECK;
+    case "sepolia":
+      ADMIN = SEPOLIA_ADMIN_ADDRESS;
+      AGGREGATOR = SEPOLIA_AGGREGATOR_ADDRESS;
+      WALLET_CHECK = SEPOLIA_WALLET_CHECK;
       break;
     case "hardhat": // testing
       ADMIN = "0x1234567890123456789012345678901234567890";
@@ -238,13 +238,33 @@ export async function deployContract<Factory extends ContractFactory, ContractTy
 
   let contract;
 
+  const [DEPLOYER] = await hre.ethers.getSigners();
+  const currentNonce = await getCurrentNonce(hre, DEPLOYER.address);
+  console.log(`Start deploying contract ${contractName} with nonce ${currentNonce}`);
+
   if (useProxy) {
     contract = (await hre.upgrades.deployProxy(factory, _proxyOptions)) as ContractType;
   } else {
     contract = (await factory.deploy(...constructorArgs)) as ContractType;
   }
 
-  console.log(`${contractName}:`, contract.address);
+  console.log(`Contract ${contractName} address:`, contract.address);
+  const txHash = contract.deployTransaction.hash;
+  console.log("Transaction hash:", txHash);
+
+  // set intervall until tx is mined and contract is deployed, console log status every 5 seconds
+  const intervall = setInterval(async () => {
+    const receipt = await hre.ethers.provider.getTransactionReceipt(txHash);
+    if (receipt) {
+      console.log("Transaction mined!");
+      clearInterval(intervall);
+    } else {
+      console.log("Waiting for transaction to be mined...");
+    }
+  }, 5000);
+
+  await contract.deployed();
+
   return { contract, factory };
 }
 
@@ -327,6 +347,12 @@ export const getCurrentCommitHash = () => {
     return;
   }
 };
+
+async function getCurrentNonce(hre: HardhatRuntimeEnvironment, address: string) {
+  const provider = hre.ethers.provider;
+  const nonce = await provider.getTransactionCount(address);
+  return nonce;
+}
 
 const bytes32ToHexAddress = (hex: string) => "0x" + hex.slice(26);
 

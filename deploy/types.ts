@@ -67,19 +67,20 @@ type Token = {
   name: string;
   symbol: string;
   address: string;
+  supply?: BigNumber;
 };
 
 export interface TestTokens {
-  [key: string]: TestToken;
+  [key: string]: Partial<TestToken>;
 }
 
-type TestToken = {
+interface TestToken extends Token {
   name: string;
   symbol: string;
   supply: BigNumber;
   kycName: string;
   kycSymbol: string;
-};
+}
 
 type UnsafeAllowType =
   | "constructor"

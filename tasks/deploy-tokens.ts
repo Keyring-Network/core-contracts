@@ -4,7 +4,6 @@ import { IKeyringGuard } from "../src/types/KycERC20";
 import { RuleRegistry, PolicyManager } from "../src/types";
 import {
   deployContract,
-  getAddresses,
   getCurrentCommitHash,
   getDeploymentInfo,
   log,
@@ -14,9 +13,11 @@ import {
   MAXIMUM_CONSENT_PERIOD,
   ONE_DAY_IN_SECONDS,
   POLICY_DISABLEMENT_PERIOD,
+  TESTNET_TOKENS,
   WRAPPED_TOKENS,
 } from "../deploy/constants";
 import { ContractList, DeploymentInfo } from "../deploy/types";
+import { parseEther } from "ethers/lib/utils";
 
 interface ContractAddresses {
   forwarder: string;
@@ -31,18 +32,20 @@ interface ContractAddresses {
 
 task("deploy-tokens", "Deploy KYC token")
   .addParam("token", "Token to deploy", "", types.string)
-  .addOptionalParam("ruleId", "Rule ID to use for the token", "", types.string)
+  .addParam("ruleId", "Rule ID to use for the token", "", types.string)
+  .addOptionalParam("deployNetwork", "Network to deploy to", "testnet", types.string)
   .addOptionalParam("policyId", "Policy ID to use for the token", "", types.string)
   .setAction(async (taskArgs, hre) => {
     const { ethers, network } = hre;
-    const { token, ruleId, policyId: _policyId } = taskArgs;
-    console.log({ token, ruleId });
+    const { token, ruleId, policyId: _policyId, deployNetwork: _network } = taskArgs;
+    console.log({ token, ruleId, _policyId, _network });
 
-    const { ADMIN } = getAddresses(network.name);
+    const [DEPLOYER] = await ethers.getSigners();
 
     const contracts: ContractList[] = [];
 
-    const selectedToken = WRAPPED_TOKENS[token];
+    const isTestnetDeployment = _network === "testnet";
+    const selectedToken = isTestnetDeployment ? TESTNET_TOKENS[token] : WRAPPED_TOKENS[token];
     if (!selectedToken) {
       throw new Error(`Token ${token} not supported`);
     }
@@ -74,21 +77,38 @@ task("deploy-tokens", "Deploy KYC token")
       throw new Error(`No valid Rule ID provided`);
     }
 
-    /* -------------------------- Deploy KycERC20 token ------------------------- */
-    log("DEPLOY KYC TOKEN | " + token.toUpperCase());
-
-    console.log({ selectedToken });
-    console.log("Used rule: ", ruleId);
+    // OPTIONALLY: deploy collateral ERC20 Token
+    if (isTestnetDeployment && !selectedToken?.address) {
+      const { contract: collateralToken, factory: collateralTokenFactory } = await deployContract(
+        "MockERC20",
+        [selectedToken.name, selectedToken.symbol, selectedToken?.supply ?? parseEther("500000000")],
+        hre,
+      );
+      contracts.push({
+        name: selectedToken?.symbol || "MockERC20",
+        contract: collateralToken,
+        factory: collateralTokenFactory,
+      });
+      console.log(`Address for collateral token ${selectedToken.name}: ${collateralToken.address}`);
+      console.log("Waiting for collateral token to be deployed...");
+      await collateralToken.deployed();
+      console.log("Collateral token deployed!");
+    }
 
     /* ------------------------------ Deploy Policy ----------------------------- */
 
     let policyId = _policyId;
 
     if (!policyId) {
+      const ROLE_POLICY_CREATOR = await policyManager.ROLE_POLICY_CREATOR();
+      const hasRole = await policyManager.hasRole(ROLE_POLICY_CREATOR, DEPLOYER.address);
+      console.log("Deployer has ROLE_POLICY_CREATOR: ", hasRole);
+      !hasRole && (await policyManager.grantRole(ROLE_POLICY_CREATOR, DEPLOYER.address));
+
       const policyScalar: PolicyStorage.PolicyScalarStruct = {
         ruleId: ruleId,
-        descriptionUtf8: `Admission Policy for KYC ${token} token`,
-        ttl: ONE_DAY_IN_SECONDS,
+        descriptionUtf8: `KYC ${token} token`,
+        ttl: ONE_DAY_IN_SECONDS * 30,
         gracePeriod: 60, // 1 minute
         allowApprovedCounterparties: false,
         disablementPeriod: POLICY_DISABLEMENT_PERIOD,
@@ -98,6 +118,17 @@ task("deploy-tokens", "Deploy KYC token")
       console.log("Create Policy:");
       console.log({ policyScalar });
 
+      // NOTE - improve check for attestor(s) and walletcheck(s)
+      const isAttestor = await policyManager.isGlobalAttestor(addresses.identityTree);
+      if (!isAttestor) {
+        console.log("Admitting attestor...");
+        const ROLE_GLOBAL_ATTESTOR_ADMIN = await policyManager.ROLE_GLOBAL_ATTESTOR_ADMIN();
+        const hasAttestorRole = await policyManager.hasRole(ROLE_GLOBAL_ATTESTOR_ADMIN, DEPLOYER.address);
+        !hasAttestorRole && (await policyManager.grantRole(ROLE_GLOBAL_ATTESTOR_ADMIN, DEPLOYER.address));
+        await policyManager.admitAttestor(addresses.identityTree, "TESTNET ATTESTOR");
+        console.log("Attestor admitted!");
+      }
+
       const tx = await policyManager.createPolicy(policyScalar, [addresses.identityTree], []);
       console.log("Waiting for Policy to be created...");
       await tx.wait();
@@ -105,6 +136,12 @@ task("deploy-tokens", "Deploy KYC token")
       policyId = Number(await policyManager.policyCount()) - 1;
       console.log("Policy created! PolicyId: ", policyId);
     }
+
+    /* -------------------------- Deploy KycERC20 token ------------------------- */
+    log("DEPLOY KYC TOKEN | " + token.toUpperCase());
+
+    console.log({ selectedToken });
+    console.log("Used rule: ", ruleId);
 
     /* ------------------------------ Deploy Tokens ----------------------------- */
 
@@ -116,7 +153,7 @@ task("deploy-tokens", "Deploy KYC token")
 
     const keyringGuardconfig: IKeyringGuard.KeyringConfigStruct = {
       trustedForwarder: addresses.forwarder,
-      collateralToken: selectedToken.address,
+      collateralToken: selectedToken?.address ?? contracts[0].contract.address,
       keyringCredentials: addresses.keyringCredentials,
       policyManager: policyManager.address,
       userPolicies: addresses.userPolicies,
