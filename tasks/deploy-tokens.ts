@@ -115,8 +115,6 @@ task("deploy-tokens", "Deploy KYC token")
         locked: false,
       };
 
-      console.log("Create Policy:");
-      console.log({ policyScalar });
 
       // NOTE - improve check for attestor(s) and walletcheck(s)
       const isAttestor = await policyManager.isGlobalAttestor(addresses.identityTree);
@@ -129,6 +127,8 @@ task("deploy-tokens", "Deploy KYC token")
         console.log("Attestor admitted!");
       }
 
+      console.log("Create Policy:");
+      console.log({ policyScalar });
       const tx = await policyManager.createPolicy(policyScalar, [addresses.identityTree], []);
       console.log("Waiting for Policy to be created...");
       await tx.wait();
