@@ -1,0 +1,187 @@
+{
+  "snapshot": {
+    "timestamp": 1689715893948,
+    "startBlock": 9223147,
+    "endBlock": 9367643
+  },
+  "proxyAdmins": [
+    "0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a"
+  ],
+  "roleOwners": {
+    "0x140FaFD9B6F802D94d65e8675aA326beEC92274A": [
+      {
+        "contract": "IdentityTree",
+        "roles": [
+          "ROLE_AGGREGATOR"
+        ]
+      },
+      {
+        "contract": "PolicyManager",
+        "roles": [
+          "POLICY_OWNER_ROLE_1",
+          "POLICY_USER_ADMIN_ROLE_1",
+          "POLICY_OWNER_ROLE_2",
+          "POLICY_USER_ADMIN_ROLE_2",
+          "ROLE_POLICY_CREATOR",
+          "POLICY_OWNER_ROLE_3",
+          "POLICY_USER_ADMIN_ROLE_3"
+        ]
+      }
+    ],
+    "0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a": [
+      {
+        "contract": "ExemptionsManager",
+        "roles": [
+          "DEFAULT_ADMIN_ROLE",
+          "ROLE_GLOBAL_EXEMPTIONS_ADMIN"
+        ]
+      },
+      {
+        "contract": "IdentityTree",
+        "roles": [
+          "DEFAULT_ADMIN_ROLE",
+          "ROLE_SERVICE_SUPERVISOR",
+          "ROLE_AGGREGATOR"
+        ]
+      },
+      {
+        "contract": "KeyringCredentials",
+        "roles": [
+          "DEFAULT_ADMIN_ROLE",
+          "ROLE_SERVICE_SUPERVISOR"
+        ]
+      },
+      {
+        "contract": "PolicyManager",
+        "roles": [
+          "DEFAULT_ADMIN_ROLE",
+          "ROLE_POLICY_CREATOR",
+          "ROLE_GLOBAL_ATTESTOR_ADMIN",
+          "ROLE_GLOBAL_WALLETCHECK_ADMIN",
+          "ROLE_GLOBAL_BACKDOOR_ADMIN",
+          "ROLE_GLOBAL_VALIDATION_ADMIN",
+          "POLICY_OWNER_ROLE_1"
+        ]
+      },
+      {
+        "contract": "RuleRegistry",
+        "roles": [
+          "DEFAULT_ADMIN_ROLE",
+          "ROLE_RULE_ADMIN"
+        ]
+      },
+      {
+        "contract": "WalletCheck",
+        "roles": [
+          "DEFAULT_ADMIN_ROLE",
+          "ROLE_SERVICE_SUPERVISOR",
+          "ROLE_WALLETCHECK_META_ADMIN"
+        ]
+      },
+      {
+        "contract": "KeyringZkCredentialUpdater",
+        "roles": [
+          "DEFAULT_ADMIN_ROLE"
+        ]
+      }
+    ],
+    "0x3106E1cb92ffFb73c752A8781457471Fc666fC5a": [
+      {
+        "contract": "WalletCheck",
+        "roles": [
+          "ROLE_WALLETCHECK_LIST_ADMIN"
+        ]
+      }
+    ],
+    "0x1F49bD7072a0C64D3D2906808d1dd3945F26ED7e": [
+      {
+        "contract": "KeyringCredentials",
+        "roles": [
+          "ROLE_CREDENTIAL_UPDATER"
+        ]
+      }
+    ],
+    "0xE1490aeB40A67e20a87e6EA3Ede98fa210f68430": [
+      {
+        "contract": "ExemptionsManager",
+        "roles": [
+          "ROLE_GLOBAL_EXEMPTIONS_ADMIN"
+        ]
+      },
+      {
+        "contract": "PolicyManager",
+        "roles": [
+          "POLICY_OWNER_ROLE_1"
+        ]
+      }
+    ]
+  },
+  "history": {
+    "0x140FaFD9B6F802D94d65e8675aA326beEC92274A": [
+      "DEFAULT_ADMIN_ROLE GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in KeyringZkCredentialUpdater contract. Block number - 9223149",
+      "DEFAULT_ADMIN_ROLE GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in IdentityTree contract. Block number - 9223150",
+      "DEFAULT_ADMIN_ROLE GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in WalletCheck contract. Block number - 9223150",
+      "ROLE_WALLETCHECK_META_ADMIN GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in WalletCheck contract. Block number - 9223150",
+      "DEFAULT_ADMIN_ROLE GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in RuleRegistry contract. Block number - 9223152",
+      "ROLE_RULE_ADMIN GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in RuleRegistry contract. Block number - 9223152",
+      "DEFAULT_ADMIN_ROLE GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in KeyringCredentials contract. Block number - 9223153",
+      "DEFAULT_ADMIN_ROLE GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in PolicyManager contract. Block number - 9223154",
+      "DEFAULT_ADMIN_ROLE GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in ExemptionsManager contract. Block number - 9223155",
+      "ROLE_GLOBAL_ATTESTOR_ADMIN GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in PolicyManager contract. Block number - 9223164",
+      "ROLE_GLOBAL_WALLETCHECK_ADMIN GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in PolicyManager contract. Block number - 9223165",
+      "ROLE_POLICY_CREATOR GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in PolicyManager contract. Block number - 9223166",
+      "POLICY_OWNER_ROLE_1 GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in PolicyManager contract. Block number - 9223170",
+      "POLICY_USER_ADMIN_ROLE_1 GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in PolicyManager contract. Block number - 9223170",
+      "POLICY_OWNER_ROLE_2 GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in PolicyManager contract. Block number - 9223173",
+      "POLICY_USER_ADMIN_ROLE_2 GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in PolicyManager contract. Block number - 9223173",
+      "ROLE_GLOBAL_ATTESTOR_ADMIN REVOKED from 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in PolicyManager contract. Block number - 9223176",
+      "ROLE_GLOBAL_WALLETCHECK_ADMIN REVOKED from 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in PolicyManager contract. Block number - 9223177",
+      "ROLE_POLICY_CREATOR REVOKED from 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in PolicyManager contract. Block number - 9223178",
+      "ROLE_AGGREGATOR GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in IdentityTree contract. Block number - 9248494",
+      "DEFAULT_ADMIN_ROLE REVOKED from 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in ExemptionsManager contract. Block number - 9248496",
+      "DEFAULT_ADMIN_ROLE REVOKED from 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in IdentityTree contract. Block number - 9248497",
+      "DEFAULT_ADMIN_ROLE REVOKED from 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in KeyringCredentials contract. Block number - 9248498",
+      "DEFAULT_ADMIN_ROLE REVOKED from 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in PolicyManager contract. Block number - 9248499",
+      "ROLE_RULE_ADMIN REVOKED from 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in RuleRegistry contract. Block number - 9248500",
+      "DEFAULT_ADMIN_ROLE REVOKED from 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in RuleRegistry contract. Block number - 9248501",
+      "ROLE_WALLETCHECK_META_ADMIN REVOKED from 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in WalletCheck contract. Block number - 9248502",
+      "DEFAULT_ADMIN_ROLE REVOKED from 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in WalletCheck contract. Block number - 9248503",
+      "DEFAULT_ADMIN_ROLE REVOKED from 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in KeyringZkCredentialUpdater contract. Block number - 9248504",
+      "ROLE_POLICY_CREATOR GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in PolicyManager contract. Block number - 9302062",
+      "POLICY_OWNER_ROLE_3 GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in PolicyManager contract. Block number - 9302065",
+      "POLICY_USER_ADMIN_ROLE_3 GRANTED to 0x140FaFD9B6F802D94d65e8675aA326beEC92274A in PolicyManager contract. Block number - 9302065"
+    ],
+    "0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a": [
+      "DEFAULT_ADMIN_ROLE GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in ExemptionsManager contract. Block number - 9248473",
+      "ROLE_GLOBAL_EXEMPTIONS_ADMIN GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in ExemptionsManager contract. Block number - 9248474",
+      "DEFAULT_ADMIN_ROLE GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in IdentityTree contract. Block number - 9248475",
+      "ROLE_SERVICE_SUPERVISOR GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in IdentityTree contract. Block number - 9248476",
+      "ROLE_AGGREGATOR GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in IdentityTree contract. Block number - 9248477",
+      "DEFAULT_ADMIN_ROLE GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in KeyringCredentials contract. Block number - 9248478",
+      "ROLE_SERVICE_SUPERVISOR GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in KeyringCredentials contract. Block number - 9248481",
+      "DEFAULT_ADMIN_ROLE GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in PolicyManager contract. Block number - 9248482",
+      "ROLE_POLICY_CREATOR GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in PolicyManager contract. Block number - 9248483",
+      "ROLE_GLOBAL_ATTESTOR_ADMIN GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in PolicyManager contract. Block number - 9248484",
+      "ROLE_GLOBAL_WALLETCHECK_ADMIN GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in PolicyManager contract. Block number - 9248485",
+      "ROLE_GLOBAL_BACKDOOR_ADMIN GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in PolicyManager contract. Block number - 9248486",
+      "ROLE_GLOBAL_VALIDATION_ADMIN GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in PolicyManager contract. Block number - 9248487",
+      "DEFAULT_ADMIN_ROLE GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in RuleRegistry contract. Block number - 9248488",
+      "ROLE_RULE_ADMIN GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in RuleRegistry contract. Block number - 9248489",
+      "DEFAULT_ADMIN_ROLE GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in WalletCheck contract. Block number - 9248490",
+      "ROLE_SERVICE_SUPERVISOR GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in WalletCheck contract. Block number - 9248491",
+      "ROLE_WALLETCHECK_META_ADMIN GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in WalletCheck contract. Block number - 9248492",
+      "DEFAULT_ADMIN_ROLE GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in KeyringZkCredentialUpdater contract. Block number - 9248493",
+      "POLICY_OWNER_ROLE_1 GRANTED to 0x7856A74A349E4e72F8FdcA4cAd635bBb1551794a in PolicyManager contract. Block number - 9300330"
+    ],
+    "0x3106E1cb92ffFb73c752A8781457471Fc666fC5a": [
+      "ROLE_WALLETCHECK_LIST_ADMIN GRANTED to 0x3106E1cb92ffFb73c752A8781457471Fc666fC5a in WalletCheck contract. Block number - 9248495"
+    ],
+    "0x1F49bD7072a0C64D3D2906808d1dd3945F26ED7e": [
+      "ROLE_CREDENTIAL_UPDATER GRANTED to 0x1F49bD7072a0C64D3D2906808d1dd3945F26ED7e in KeyringCredentials contract. Block number - 9257256"
+    ],
+    "0xE1490aeB40A67e20a87e6EA3Ede98fa210f68430": [
+      "ROLE_GLOBAL_EXEMPTIONS_ADMIN GRANTED to 0xE1490aeB40A67e20a87e6EA3Ede98fa210f68430 in ExemptionsManager contract. Block number - 9299428",
+      "POLICY_OWNER_ROLE_1 GRANTED to 0xE1490aeB40A67e20a87e6EA3Ede98fa210f68430 in PolicyManager contract. Block number - 9300346"
+    ]
+  }
+}

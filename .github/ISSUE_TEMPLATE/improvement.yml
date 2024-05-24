@@ -1,0 +1,84 @@
+name: Improvements / Optimisations
+description: e.g. optimisations, refactoring, style, maintenance.
+title: "IMP: "
+labels: ["stream: smart contracts", "type: improvement"]
+assignees:
+  - keyringcore
+
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: A clear and concise description of the improvement you wish to make.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solution
+      description: Describe the how you want to solve the problem.
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: >
+        Please provide any relevant GitHub issues, code examples or references that help describe.
+  - type: dropdown
+    id: effort
+    attributes:
+      label: Estimated Effort
+      description: Not corresponding to any specific unit of time, rank in relative effort units 1-21.
+      options:
+        - 1
+        - 2
+        - 3
+        - 5
+        - 8
+        - 13
+        - 21
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - critical
+        - high
+        - medium
+        - low
+    validations:
+      required: true
+  - type: dropdown
+    id: work
+    attributes:
+      label: Estimated Work Type
+      description: As per [Cynefin Framework](https://en.wikipedia.org/wiki/Cynefin_framework)
+      options:
+        - chaotic
+        - complex
+        - complicated
+        - obvious
+    validations:
+      required: true
+  - type: checkboxes
+    id: apps
+    attributes:
+      label: Affected Apps (if applicable)
+      description: You may select more than one if relevant, or none if not applicable.
+      options:
+        - label: backend - aggregator
+        - label: backend - attestion queue (sqs)
+        - label: backend - attestor
+        - label: backend - cache (dynamodb)
+        - label: backend - config (s3)
+        - label: backend - onboarding
+        - label: backend - pypi
+        - label: backend - triager
+        - label: frontend - landing
+        - label: frontend - onboarding
+        - label: frontend - widget
+        - label: frontend - zk credentials

@@ -1,0 +1,44 @@
+name: Documentation
+description: Documentation additions / modifications e.g. comments in the code, README files, etc.
+title: "DOC: "
+labels: ["stream: smart contracts", "type: documentation", "work: obvious"]
+assignees:
+  - keyringcore
+
+body:
+  - type: textarea
+    id: location
+    attributes:
+      label: Location of the documentation
+      description: >
+        Please provide the location of the documentation, e.g. "keyring_sdk.rules.BaseRule._from_args" or a specific URL that links to the code documentation.
+        Alternatively, the module(s) / file(s).
+      placeholder: https://github.com/Keyring-Network/keyring-sdk/blob/6e292ddb5da1ecd91a77b1073a5f5c89a33b68b1/keyring_sdk/rules.py#L636-L656
+    validations:
+      required: true
+  - type: dropdown
+    id: effort
+    attributes:
+      label: Estimated Effort
+      description: Not corresponding to any specific unit of time, rank in relative effort units 1-21.
+      options:
+        - 1
+        - 2
+        - 3
+        - 5
+        - 8
+        - 13
+        - 21
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - critical
+        - high
+        - medium
+        - low
+    validations:
+      required: true

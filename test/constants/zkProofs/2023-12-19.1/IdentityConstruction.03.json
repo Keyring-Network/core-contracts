@@ -1,0 +1,50 @@
+{
+  "proof": {
+    "a": [
+      "0x241bfe1754db0b4bb2b786658dae321a869d511d9531b2548a4b6c50f8582cb8",
+      "0x214742e5a8729e7c51094e0088d8d64aa164b224ddc6babf84c2cbb40aefaa8e"
+    ],
+    "b": [
+      [
+        "0x255309ee48845811b9cfb07c6e9a5982f47875c6dd302ab39c101a4dac647c82",
+        "0x09fedff0fbe4faf87a15d32cc420534a644f4e7da3d64caaf9e1c8bec40cba54"
+      ],
+      [
+        "0x088c00ef51cc830f3cdb6c395dd4b61a23cb3f2355f0c662229510114ad2234a",
+        "0x051b0619f225dd1c8d1f04e695a0430ef20b65c4ebe826b70b779fdacf8d9f74"
+      ]
+    ],
+    "c": [
+      "0x2d2c05385ea00cdb785315fc56f2c8e2d6bd08c4592f43d48ae217c6eebb216e",
+      "0x0c5a2695cdd40f774ed3eaf66c6f5ba67b6b2b9c15c532c325675558ba1bd2a7"
+    ]
+  },
+  "identityPK": [
+    "0x112737c85d9a368849edcecb5d24f7a953578d5b87065c1f18c93552399b89b6",
+    "0x261700c8d02a9e653c79c75db1881c8514e9439d69689b727f022e33ddb46dd2"
+  ],
+  "identity": "0x23da98cb99d1faa65ce1c36d929573be3d95865e982a5296913b57aa56e90e40",
+  "secretAddressCommitment": "0x043da05a738d50844540ff6ae3c46a1f13d01e106dc1a5916938016f7fded3d6",
+  "backdoor": [
+    [
+      [
+        [
+          "0x1b204763ba43d414e01100c88088d8e7c10f2a32f02a5e1539e0b345d0564dad",
+          "0x2e56c40ce27b3ba2f19302f88673c2671ce2f574f5a21cdcdaa0afa7469afa79"
+        ],
+        [
+          "0x2b6605b70d81978f26694c6c46b63ae95feae51d92b4224945c2c964bfc20784",
+          "0x186ff1fcbd3d1e4507eee2aa9a7de03d28e863e7e3cb700c5d8a08b15e580b91"
+        ]
+      ]
+    ]
+  ],
+  "policyCommitment": "0x0770aeb0bee89d68959da0f89007d9e01b82696b90c06bb68da26a05ba58041d",
+  "max_addresses": "0x0000000000000000000000000000000000000000000000000000000000000003",
+  "regimeKey": [
+    [
+      "0x2c36e5f918536d8b44b2ce52488111bd7a324f1e938929e25084d45a6eb5faa2",
+      "0x145adc2dca1c0f9c4f91718d34c4bdd3a9bf26e398cb0058fd18d744f0db5709"
+    ]
+  ]
+}

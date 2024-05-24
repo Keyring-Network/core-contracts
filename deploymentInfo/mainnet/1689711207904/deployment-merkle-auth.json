@@ -1,0 +1,851 @@
+{
+  "blockNumber": 19760245,
+  "commitHash": "85b69b97669ae49103851fb92e918f2307ec8609",
+  "roles": [
+    {
+      "name": "Default Admin",
+      "address": "",
+      "granted": {}
+    }
+  ],
+  "contracts": {
+    "MerkleAuthVerifier": {
+      "address": "0xE537C886F5Bf89dE75D59290c7E6101C5E309a89",
+      "abi": [
+        {
+          "type": "error",
+          "name": "InvalidProof",
+          "inputs": []
+        },
+        {
+          "type": "function",
+          "name": "verifyProof",
+          "constant": true,
+          "stateMutability": "view",
+          "payable": false,
+          "inputs": [
+            {
+              "type": "uint256[2]",
+              "name": "a"
+            },
+            {
+              "type": "uint256[2][2]",
+              "name": "b"
+            },
+            {
+              "type": "uint256[2]",
+              "name": "c"
+            },
+            {
+              "type": "uint256[]",
+              "name": "input"
+            }
+          ],
+          "outputs": [
+            {
+              "type": "bool",
+              "name": "isValid"
+            }
+          ]
+        }
+      ],
+      "constructorArgs": [],
+      "isProxy": false
+    },
+    "KeyringMerkleAuthZkVerifier": {
+      "address": "0x602DFd148f81D9Ff5fD18fD645a84c060D1c798F",
+      "abi": [
+        {
+          "type": "constructor",
+          "payable": false,
+          "inputs": [
+            {
+              "type": "address",
+              "name": "merkleAuthProofVerifier"
+            }
+          ]
+        },
+        {
+          "type": "error",
+          "name": "Unacceptable",
+          "inputs": [
+            {
+              "type": "string",
+              "name": "reason"
+            }
+          ]
+        },
+        {
+          "type": "event",
+          "anonymous": false,
+          "name": "Deployed",
+          "inputs": [
+            {
+              "type": "address",
+              "name": "deployer",
+              "indexed": false
+            },
+            {
+              "type": "address",
+              "name": "merkleAuthProofVerifier",
+              "indexed": false
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "MERKLE_AUTH_PROOF_VERIFIER",
+          "constant": true,
+          "stateMutability": "view",
+          "payable": false,
+          "inputs": [],
+          "outputs": [
+            {
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "checkClaim",
+          "constant": true,
+          "stateMutability": "view",
+          "payable": false,
+          "inputs": [
+            {
+              "type": "tuple",
+              "name": "merkleAuthProof",
+              "components": [
+                {
+                  "type": "tuple",
+                  "name": "proof",
+                  "components": [
+                    {
+                      "type": "uint256[2]",
+                      "name": "a"
+                    },
+                    {
+                      "type": "uint256[2][2]",
+                      "name": "b"
+                    },
+                    {
+                      "type": "uint256[2]",
+                      "name": "c"
+                    }
+                  ]
+                },
+                {
+                  "type": "tuple",
+                  "name": "backdoor",
+                  "components": [
+                    {
+                      "type": "uint256[2]",
+                      "name": "c1"
+                    },
+                    {
+                      "type": "uint256[2]",
+                      "name": "c2"
+                    }
+                  ]
+                },
+                {
+                  "type": "uint256",
+                  "name": "root"
+                },
+                {
+                  "type": "uint256[2]",
+                  "name": "policyDisclosures"
+                },
+                {
+                  "type": "uint256",
+                  "name": "tradingAddress"
+                },
+                {
+                  "type": "uint256[2]",
+                  "name": "regimeKey"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "type": "bool",
+              "name": "verified"
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "checkMerkleAuthProof",
+          "constant": true,
+          "stateMutability": "view",
+          "payable": false,
+          "inputs": [
+            {
+              "type": "tuple",
+              "name": "merkleAuthProof",
+              "components": [
+                {
+                  "type": "tuple",
+                  "name": "proof",
+                  "components": [
+                    {
+                      "type": "uint256[2]",
+                      "name": "a"
+                    },
+                    {
+                      "type": "uint256[2][2]",
+                      "name": "b"
+                    },
+                    {
+                      "type": "uint256[2]",
+                      "name": "c"
+                    }
+                  ]
+                },
+                {
+                  "type": "tuple",
+                  "name": "backdoor",
+                  "components": [
+                    {
+                      "type": "uint256[2]",
+                      "name": "c1"
+                    },
+                    {
+                      "type": "uint256[2]",
+                      "name": "c2"
+                    }
+                  ]
+                },
+                {
+                  "type": "uint256",
+                  "name": "root"
+                },
+                {
+                  "type": "uint256[2]",
+                  "name": "policyDisclosures"
+                },
+                {
+                  "type": "uint256",
+                  "name": "tradingAddress"
+                },
+                {
+                  "type": "uint256[2]",
+                  "name": "regimeKey"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "type": "bool",
+              "name": "verified"
+            }
+          ]
+        }
+      ],
+      "constructorArgs": [
+        "0xE537C886F5Bf89dE75D59290c7E6101C5E309a89"
+      ],
+      "isProxy": false
+    },
+    "KeyringMerkleAuthZkCredentialUpdater": {
+      "address": "0x3fe89A8330c0b8397149759e071fA02f9D9A1374",
+      "abi": [
+        {
+          "type": "constructor",
+          "payable": false,
+          "inputs": [
+            {
+              "type": "address",
+              "name": "trustedForwarder"
+            },
+            {
+              "type": "address",
+              "name": "keyringCredentials"
+            },
+            {
+              "type": "address",
+              "name": "policyManager"
+            },
+            {
+              "type": "address",
+              "name": "keyringMerkleAuthZkVerifier"
+            }
+          ]
+        },
+        {
+          "type": "error",
+          "name": "OutOfRange",
+          "inputs": [
+            {
+              "type": "uint32",
+              "name": "input"
+            }
+          ]
+        },
+        {
+          "type": "error",
+          "name": "Unacceptable",
+          "inputs": [
+            {
+              "type": "string",
+              "name": "reason"
+            }
+          ]
+        },
+        {
+          "type": "error",
+          "name": "Unauthorized",
+          "inputs": [
+            {
+              "type": "address",
+              "name": "sender"
+            },
+            {
+              "type": "string",
+              "name": "module"
+            },
+            {
+              "type": "string",
+              "name": "method"
+            },
+            {
+              "type": "bytes32",
+              "name": "role"
+            },
+            {
+              "type": "string",
+              "name": "reason"
+            },
+            {
+              "type": "string",
+              "name": "context"
+            }
+          ]
+        },
+        {
+          "type": "event",
+          "anonymous": false,
+          "name": "AcceptCredentialUpdate",
+          "inputs": [
+            {
+              "type": "address",
+              "name": "sender",
+              "indexed": false
+            },
+            {
+              "type": "address",
+              "name": "trader",
+              "indexed": false
+            },
+            {
+              "type": "tuple",
+              "name": "merkleAuthProof",
+              "indexed": false,
+              "components": [
+                {
+                  "type": "tuple",
+                  "name": "proof",
+                  "components": [
+                    {
+                      "type": "uint256[2]",
+                      "name": "a"
+                    },
+                    {
+                      "type": "uint256[2][2]",
+                      "name": "b"
+                    },
+                    {
+                      "type": "uint256[2]",
+                      "name": "c"
+                    }
+                  ]
+                },
+                {
+                  "type": "tuple",
+                  "name": "backdoor",
+                  "components": [
+                    {
+                      "type": "uint256[2]",
+                      "name": "c1"
+                    },
+                    {
+                      "type": "uint256[2]",
+                      "name": "c2"
+                    }
+                  ]
+                },
+                {
+                  "type": "uint256",
+                  "name": "root"
+                },
+                {
+                  "type": "uint256[2]",
+                  "name": "policyDisclosures"
+                },
+                {
+                  "type": "uint256",
+                  "name": "tradingAddress"
+                },
+                {
+                  "type": "uint256[2]",
+                  "name": "regimeKey"
+                }
+              ]
+            },
+            {
+              "type": "uint256",
+              "name": "rootTime",
+              "indexed": false
+            }
+          ]
+        },
+        {
+          "type": "event",
+          "anonymous": false,
+          "name": "AdmitIdentityTree",
+          "inputs": [
+            {
+              "type": "address",
+              "name": "admin",
+              "indexed": false
+            },
+            {
+              "type": "address",
+              "name": "identityTree",
+              "indexed": false
+            }
+          ]
+        },
+        {
+          "type": "event",
+          "anonymous": false,
+          "name": "CredentialUpdaterDeployed",
+          "inputs": [
+            {
+              "type": "address",
+              "name": "deployer",
+              "indexed": false
+            },
+            {
+              "type": "address",
+              "name": "trustedForwarder",
+              "indexed": false
+            },
+            {
+              "type": "address",
+              "name": "keyringCache",
+              "indexed": false
+            },
+            {
+              "type": "address",
+              "name": "admissionPolicyManager",
+              "indexed": false
+            },
+            {
+              "type": "address",
+              "name": "keyringMerkleAuthZkVerifier",
+              "indexed": false
+            }
+          ]
+        },
+        {
+          "type": "event",
+          "anonymous": false,
+          "name": "RemoveIdentityTree",
+          "inputs": [
+            {
+              "type": "address",
+              "name": "admin",
+              "indexed": false
+            },
+            {
+              "type": "address",
+              "name": "identityTree",
+              "indexed": false
+            }
+          ]
+        },
+        {
+          "type": "event",
+          "anonymous": false,
+          "name": "RoleAdminChanged",
+          "inputs": [
+            {
+              "type": "bytes32",
+              "name": "role",
+              "indexed": true
+            },
+            {
+              "type": "bytes32",
+              "name": "previousAdminRole",
+              "indexed": true
+            },
+            {
+              "type": "bytes32",
+              "name": "newAdminRole",
+              "indexed": true
+            }
+          ]
+        },
+        {
+          "type": "event",
+          "anonymous": false,
+          "name": "RoleGranted",
+          "inputs": [
+            {
+              "type": "bytes32",
+              "name": "role",
+              "indexed": true
+            },
+            {
+              "type": "address",
+              "name": "account",
+              "indexed": true
+            },
+            {
+              "type": "address",
+              "name": "sender",
+              "indexed": true
+            }
+          ]
+        },
+        {
+          "type": "event",
+          "anonymous": false,
+          "name": "RoleRevoked",
+          "inputs": [
+            {
+              "type": "bytes32",
+              "name": "role",
+              "indexed": true
+            },
+            {
+              "type": "address",
+              "name": "account",
+              "indexed": true
+            },
+            {
+              "type": "address",
+              "name": "sender",
+              "indexed": true
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "DEFAULT_ADMIN_ROLE",
+          "constant": true,
+          "stateMutability": "view",
+          "payable": false,
+          "inputs": [],
+          "outputs": [
+            {
+              "type": "bytes32"
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "KEYRING_CREDENTIALS",
+          "constant": true,
+          "stateMutability": "view",
+          "payable": false,
+          "inputs": [],
+          "outputs": [
+            {
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "KEYRING_MERKLE_AUTH_ZK_VERIFIER",
+          "constant": true,
+          "stateMutability": "view",
+          "payable": false,
+          "inputs": [],
+          "outputs": [
+            {
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "POLICY_MANAGER",
+          "constant": true,
+          "stateMutability": "view",
+          "payable": false,
+          "inputs": [],
+          "outputs": [
+            {
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "checkPolicy",
+          "constant": false,
+          "payable": false,
+          "inputs": [
+            {
+              "type": "uint32",
+              "name": "policyId"
+            },
+            {
+              "type": "address",
+              "name": "attestor"
+            }
+          ],
+          "outputs": [
+            {
+              "type": "bool",
+              "name": "acceptable"
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "getRoleAdmin",
+          "constant": true,
+          "stateMutability": "view",
+          "payable": false,
+          "inputs": [
+            {
+              "type": "bytes32",
+              "name": "role"
+            }
+          ],
+          "outputs": [
+            {
+              "type": "bytes32"
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "grantRole",
+          "constant": false,
+          "payable": false,
+          "inputs": [
+            {
+              "type": "bytes32",
+              "name": "role"
+            },
+            {
+              "type": "address",
+              "name": "account"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "type": "function",
+          "name": "hasRole",
+          "constant": true,
+          "stateMutability": "view",
+          "payable": false,
+          "inputs": [
+            {
+              "type": "bytes32",
+              "name": "role"
+            },
+            {
+              "type": "address",
+              "name": "account"
+            }
+          ],
+          "outputs": [
+            {
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "isTrustedForwarder",
+          "constant": true,
+          "stateMutability": "view",
+          "payable": false,
+          "inputs": [
+            {
+              "type": "address",
+              "name": "forwarder"
+            }
+          ],
+          "outputs": [
+            {
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "pack12x20",
+          "constant": true,
+          "stateMutability": "pure",
+          "payable": false,
+          "inputs": [
+            {
+              "type": "uint32[12]",
+              "name": "input"
+            }
+          ],
+          "outputs": [
+            {
+              "type": "uint256",
+              "name": "packed"
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "renounceRole",
+          "constant": false,
+          "payable": false,
+          "inputs": [
+            {
+              "type": "bytes32",
+              "name": "role"
+            },
+            {
+              "type": "address",
+              "name": "account"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "type": "function",
+          "name": "revokeRole",
+          "constant": false,
+          "payable": false,
+          "inputs": [
+            {
+              "type": "bytes32",
+              "name": "role"
+            },
+            {
+              "type": "address",
+              "name": "account"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "type": "function",
+          "name": "supportsInterface",
+          "constant": true,
+          "stateMutability": "view",
+          "payable": false,
+          "inputs": [
+            {
+              "type": "bytes4"
+            }
+          ],
+          "outputs": [
+            {
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "unpack12x20",
+          "constant": true,
+          "stateMutability": "pure",
+          "payable": false,
+          "inputs": [
+            {
+              "type": "uint256",
+              "name": "packed"
+            }
+          ],
+          "outputs": [
+            {
+              "type": "uint32[12]",
+              "name": "unpacked"
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "updateCredentials",
+          "constant": false,
+          "payable": false,
+          "inputs": [
+            {
+              "type": "address",
+              "name": "attestor"
+            },
+            {
+              "type": "tuple",
+              "name": "merkleAuthProof",
+              "components": [
+                {
+                  "type": "tuple",
+                  "name": "proof",
+                  "components": [
+                    {
+                      "type": "uint256[2]",
+                      "name": "a"
+                    },
+                    {
+                      "type": "uint256[2][2]",
+                      "name": "b"
+                    },
+                    {
+                      "type": "uint256[2]",
+                      "name": "c"
+                    }
+                  ]
+                },
+                {
+                  "type": "tuple",
+                  "name": "backdoor",
+                  "components": [
+                    {
+                      "type": "uint256[2]",
+                      "name": "c1"
+                    },
+                    {
+                      "type": "uint256[2]",
+                      "name": "c2"
+                    }
+                  ]
+                },
+                {
+                  "type": "uint256",
+                  "name": "root"
+                },
+                {
+                  "type": "uint256[2]",
+                  "name": "policyDisclosures"
+                },
+                {
+                  "type": "uint256",
+                  "name": "tradingAddress"
+                },
+                {
+                  "type": "uint256[2]",
+                  "name": "regimeKey"
+                }
+              ]
+            }
+          ],
+          "outputs": []
+        }
+      ],
+      "constructorArgs": [
+        "0x2f5885a892cFf774Df6051E70baC6Ce552dC7E2a",
+        "0x8a16F136121FD53B5c72c3414b42299f972c9c67",
+        "0x685BC814f9ee40fA7bD35588ac6a9E882A2345F3",
+        "0x602DFd148f81D9Ff5fD18fD645a84c060D1c798F"
+      ],
+      "isProxy": false
+    }
+  }
+}

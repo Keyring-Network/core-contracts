@@ -1,0 +1,73 @@
+name: Build and Deploy
+on:
+  # Triggers the workflow on push to matching branches
+  push:
+    branches:
+      - master
+env:
+  duplo_host: https://keyring-uat.duplocloud.net
+  duplo_token: "${{ secrets.DUPLO_SECRET_PROD }}"
+  ECR_REPO_NAME: core-dev02 
+  SERVICE_NAME: core                      
+  TENANT_NAME: dev02
+  CONTRACT_BUCKET: duploservices-dev02-contracts-178195871625  
+  AWS_ACCOUNT_NO: "178195871625"                          
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+# dummy commit 
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set env variables based on branch
+        id: branch_check
+        run: |
+          echo 'TENANT_NAME1 is' $TENANT_NAME
+          echo "Running on branch ${{ github.ref }}"
+          if [ "${{ github.ref }}" = "refs/heads/staging" ]; then
+            echo "TENANT_NAME=stage01" >> $GITHUB_ENV
+            echo "ECR_REPO_NAME=core-stage01" >> $GITHUB_ENV
+            echo "CONTRACT_BUCKET=duploservices-stage01-contracts-178195871625" >> $GITHUB_ENV
+          elif [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            echo "TENANT_NAME=prod01" >> $GITHUB_ENV
+            echo "ECR_REPO_NAME=core-prod01" >> $GITHUB_ENV
+            echo "CONTRACT_BUCKET=duploservices-prod01-contracts-742406308994" >> $GITHUB_ENV
+            echo "AWS_ACCOUNT_NO=742406308994" >> $GITHUB_ENV
+          fi
+
+      # Set up for docker build
+      - name: Get AWS credentials
+        uses: duplocloud/ghactions-aws-jit@master
+        with:
+          tenant: ${{ env.TENANT_NAME }}
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      # Build and push the docker image
+      - name: Docker Build and Push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: dockerfiles/demodata.Dockerfile
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO_NAME }}:${{ github.sha }}
+
+      # generates ABIs and byte-codes 
+      - uses: addnab/docker-run-action@v3
+        with:
+          image: "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO_NAME }}:${{ github.sha }}"
+          options: "-v ${{ github.workspace }}/generated-contracts:/app/artifacts/contracts -e MODULE=contract-generation"
+          shell: bash
+          run: /app/bin/entrypoint.sh
+      - name: listing generated contracts and publish to S3
+        run: |-
+          # listing generated contracts
+          ls -lrt "${{ github.workspace }}/generated-contracts"
+          aws s3 cp --recursive "${{ github.workspace }}/generated-contracts" s3://$CONTRACT_BUCKET/$GITHUB_SHA
+        # This part is important - it will be used by the deploy job
+    outputs:
+      image: "${{ steps.login-ecr.outputs.registry }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"

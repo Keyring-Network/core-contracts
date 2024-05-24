@@ -1,0 +1,51 @@
+name: Build and Deploy using Native AWS and k8s
+on:
+  # Triggers the workflow on push to matching branches
+  push:
+    branches:
+      - feature/duplo-devops
+env:
+  SERVICE_NAME: core                      
+  CONTRACT_BUCKET: duploservices-dev01-contracts-178195871625
+  AWS_ACCESS_KEY_ID: "${{ secrets.AWS_ACCESS_KEY_ID }}"
+  AWS_SECRET_ACCESS_KEY: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+  AWS_DEFAULT_REGION: us-west-2    
+  AWS_REGION: us-west-2          
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+# dummy commit - 5
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      # Build and push the docker image
+      - name: Docker Build and Push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: dockerfiles/demodata.Dockerfile
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+
+      # generates ABIs and byte-codes 
+      - uses: addnab/docker-run-action@v3
+        with:
+          image: "${{ steps.login-ecr.outputs.registry }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
+          options: "-v ${{ github.workspace }}/generated-contracts:/app/artifacts/contracts"
+          shell: bash
+          run: /app/bin/entrypoint.sh
+      - name: listing generated contracts and publish to S3
+        run: |-
+          # listing generated contracts
+          ls -lrt "${{ github.workspace }}/generated-contracts"
+          aws s3 cp --recursive "${{ github.workspace }}/generated-contracts" s3://$CONTRACT_BUCKET/$GITHUB_SHA
+    outputs:
+      image: "${{ steps.login-ecr.outputs.registry }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
